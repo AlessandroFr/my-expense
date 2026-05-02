@@ -195,6 +195,11 @@ CREATE TABLE IF NOT EXISTS `accounts` (
 
 -- ── Saved filters ────────────────────────────────────────────────────────────
 -- Migration: 009_saved_filters.sql
+-- Splitting (Migration: 010_expense_split.sql)
+-- ALTER TABLE expenses ADD COLUMN shared_with VARCHAR(255) NULL AFTER description;
+-- ALTER TABLE expenses ADD COLUMN share_amount DECIMAL(12,2) NULL AFTER shared_with;
+-- (gestiti via migration; non duplicati qui per evitare rebuild da zero invasivo)
+
 CREATE TABLE IF NOT EXISTS `saved_filters` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `user_id`    INT UNSIGNED NOT NULL,

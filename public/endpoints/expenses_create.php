@@ -26,10 +26,12 @@ $amount        = (string) ($_POST['amount'] ?? '0');
 $description   = isset($_POST['description']) ? (string) $_POST['description'] : null;
 $paymentMethod = (string) ($_POST['payment_method'] ?? 'card');
 $expenseDate   = (string) ($_POST['expense_date'] ?? date('Y-m-d'));
+$sharedWith    = ($_POST['shared_with']  ?? '') === '' ? null : (string) $_POST['shared_with'];
+$shareAmount   = ($_POST['share_amount'] ?? '') === '' ? null : (string) $_POST['share_amount'];
 $userId        = (int) Auth::userId();
 
 try {
-    $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
+    $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount);
     $row = Expense::findForUser($id, $userId);
     $ym  = substr($expenseDate, 0, 7);
     $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);

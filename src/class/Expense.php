@@ -26,6 +26,7 @@ final class Expense
         $offset = max(0, (int) ($filters['offset'] ?? 0));
 
         $sql = "SELECT e.id, e.user_id, e.category_id, e.account_id, e.amount, e.description,
+                       e.shared_with, e.share_amount,
                        e.payment_method, e.expense_date, e.created_at, e.updated_at,
                        c.name  AS category_name,
                        c.color AS category_color,
@@ -77,6 +78,7 @@ final class Expense
     {
         $stmt = Database::pdo()->prepare(
             'SELECT e.id, e.user_id, e.category_id, e.account_id, e.amount, e.description,
+                    e.shared_with, e.share_amount,
                     e.payment_method, e.expense_date, e.created_at, e.updated_at,
                     c.name AS category_name, c.color AS category_color, c.icon AS category_icon,
                     a.name AS account_name,  a.color AS account_color,  a.icon AS account_icon
@@ -98,13 +100,16 @@ final class Expense
         ?string $description,
         string $paymentMethod,
         string $expenseDate,
-        ?int $accountId = null
+        ?int $accountId = null,
+        ?string $sharedWith = null,
+        string|float|null $shareAmount = null
     ): int {
-        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount);
 
         $stmt = Database::pdo()->prepare(
-            'INSERT INTO expenses (user_id, category_id, account_id, amount, description, payment_method, expense_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO expenses (user_id, category_id, account_id, amount, description,
+                                   shared_with, share_amount, payment_method, expense_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $userId,
@@ -112,6 +117,8 @@ final class Expense
             $row['account_id'],
             $row['amount'],
             $row['description'],
+            $row['shared_with'],
+            $row['share_amount'],
             $row['payment_method'],
             $row['expense_date'],
         ]);
@@ -127,13 +134,17 @@ final class Expense
         ?string $description,
         string $paymentMethod,
         string $expenseDate,
-        ?int $accountId = null
+        ?int $accountId = null,
+        ?string $sharedWith = null,
+        string|float|null $shareAmount = null
     ): void {
-        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount);
 
         $stmt = Database::pdo()->prepare(
             'UPDATE expenses
-             SET category_id = ?, account_id = ?, amount = ?, description = ?, payment_method = ?, expense_date = ?
+             SET category_id = ?, account_id = ?, amount = ?, description = ?,
+                 shared_with = ?, share_amount = ?,
+                 payment_method = ?, expense_date = ?
              WHERE id = ? AND user_id = ?'
         );
         $stmt->execute([
@@ -141,6 +152,8 @@ final class Expense
             $row['account_id'],
             $row['amount'],
             $row['description'],
+            $row['shared_with'],
+            $row['share_amount'],
             $row['payment_method'],
             $row['expense_date'],
             $id,
@@ -282,6 +295,7 @@ final class Expense
     /**
      * @return array{
      *   category_id: ?int, account_id: ?int, amount: string, description: ?string,
+     *   shared_with: ?string, share_amount: ?string,
      *   payment_method: string, expense_date: string
      * }
      */
@@ -292,7 +306,9 @@ final class Expense
         ?string $description,
         string $paymentMethod,
         string $expenseDate,
-        ?int $accountId = null
+        ?int $accountId = null,
+        ?string $sharedWith = null,
+        string|float|null $shareAmount = null
     ): array {
         $amountF = is_string($amount) ? (float) str_replace(',', '.', $amount) : (float) $amount;
         if ($amountF < 0.01) {
@@ -348,11 +364,31 @@ final class Expense
             }
         }
 
+        $sharedWith = $sharedWith === null ? null : trim($sharedWith);
+        if ($sharedWith === '') $sharedWith = null;
+        if ($sharedWith !== null && mb_strlen($sharedWith) > 255) {
+            throw new InvalidArgumentException('Lista "Condiviso con" troppo lunga.');
+        }
+
+        $shareNorm = null;
+        if ($shareAmount !== null && $shareAmount !== '') {
+            $shareF = is_string($shareAmount) ? (float) str_replace(',', '.', $shareAmount) : (float) $shareAmount;
+            if ($shareF < 0.01) {
+                throw new InvalidArgumentException('Quota personale non valida.');
+            }
+            if ($shareF > $amountF) {
+                throw new InvalidArgumentException('La tua quota non puo\' superare il totale.');
+            }
+            $shareNorm = number_format($shareF, 2, '.', '');
+        }
+
         return [
             'category_id'    => $categoryId,
             'account_id'     => $accountId,
             'amount'         => number_format($amountF, 2, '.', ''),
             'description'    => $description,
+            'shared_with'    => $sharedWith,
+            'share_amount'   => $shareNorm,
             'payment_method' => $paymentMethod,
             'expense_date'   => $expenseDate,
         ];

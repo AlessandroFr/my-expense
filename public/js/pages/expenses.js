@@ -63,10 +63,20 @@ function rowDataFromExpense(e) {
         category_icon: e.category_icon,
         amount: e.amount,
         description: e.description,
+        shared_with: e.shared_with,
+        share_amount: e.share_amount,
         payment_method: e.payment_method,
         expense_date: e.expense_date,
         tags: e.tags ?? [],
     };
+}
+
+function shareBadge(e) {
+    if (!e.shared_with && !e.share_amount) return '';
+    const yours = e.share_amount ? fmtMoney(e.share_amount) : '';
+    const tip   = e.shared_with ? `Diviso con: ${e.shared_with}` : 'Spesa condivisa';
+    return `<span class="badge bg-info-subtle text-info-emphasis ms-1" title="${escHtml(tip)}">
+        <i class="bi bi-people me-1"></i>${yours || 'split'}</span>`;
 }
 
 function tagsCell(tags) {
@@ -114,7 +124,7 @@ function renderViewRow(e) {
         <td>${escHtml(e.description ?? '')}</td>
         <td>${tagsCell(e.tags)}</td>
         <td><span class="badge bg-light text-dark">${escHtml(PAYMENT_LABELS[e.payment_method] ?? e.payment_method)}</span></td>
-        <td class="text-end fw-semibold">${escHtml(fmtMoney(e.amount))}</td>
+        <td class="text-end fw-semibold">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}</td>
         <td class="text-end text-nowrap">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="attach" title="Allegati"><i class="bi bi-paperclip"></i></button>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit"><i class="bi bi-pencil"></i></button>
@@ -132,10 +142,16 @@ function replaceWithEditRow(tr) {
     edit.innerHTML = `
         <td><input type="date"   name="expense_date"   class="form-control form-control-sm" required value="${escHtml(e.expense_date)}"></td>
         <td><select               name="category_id"    class="form-select form-select-sm">${buildCategoryOptions(e.category_id)}</select></td>
-        <td><input type="text"   name="description"    class="form-control form-control-sm" maxlength="255" value="${escHtml(e.description ?? '')}"></td>
-        <td><input type="text"   name="tags"           class="form-control form-control-sm" list="all-tags-datalist" placeholder="tag, separati, da, virgola" value="${escHtml(tagNames)}"></td>
+        <td>
+            <input type="text" name="description" class="form-control form-control-sm mb-1" maxlength="255" value="${escHtml(e.description ?? '')}">
+            <input type="text" name="shared_with" class="form-control form-control-sm" maxlength="255" placeholder="Condiviso con..." value="${escHtml(e.shared_with ?? '')}">
+        </td>
+        <td><input type="text"   name="tags"           class="form-control form-control-sm" list="all-tags-datalist" placeholder="tag, separati" value="${escHtml(tagNames)}"></td>
         <td><select               name="payment_method" class="form-select form-select-sm">${buildPaymentOptions(e.payment_method)}</select></td>
-        <td><input type="number" name="amount"         class="form-control form-control-sm text-end" step="0.01" min="0.01" required value="${escHtml(e.amount)}"></td>
+        <td>
+            <input type="number" name="amount"       class="form-control form-control-sm text-end mb-1" step="0.01" min="0.01" required value="${escHtml(e.amount)}" title="Totale">
+            <input type="number" name="share_amount" class="form-control form-control-sm text-end" step="0.01" min="0.01" placeholder="tua quota" value="${escHtml(e.share_amount ?? '')}" title="La tua quota">
+        </td>
         <td class="text-end text-nowrap">
             <button type="button" class="btn btn-sm btn-success" data-action="save"><i class="bi bi-check-lg"></i></button>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="cancel"><i class="bi bi-x-lg"></i></button>

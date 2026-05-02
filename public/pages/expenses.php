@@ -169,13 +169,21 @@ $paymentLabels  = [
                 <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
                 <input type="text" name="description" class="form-control" maxlength="255" placeholder="es. Pranzo bar">
             </div>
-            <div class="col-md-9">
+            <div class="col-md-6">
                 <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
                 <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
                 <datalist id="all-tags-datalist"></datalist>
             </div>
-            <div class="col-md-3 d-grid">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi</button>
+            <div class="col-md-3">
+                <label class="form-label small">Condivisa con <span class="text-muted">(opz.)</span></label>
+                <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">La tua quota EUR <span class="text-muted">(opz.)</span></label>
+                <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
+            </div>
+            <div class="col-md-1 d-grid">
+                <button type="submit" class="btn btn-primary" title="Aggiungi"><i class="bi bi-check-lg"></i></button>
             </div>
         </form>
     </div>
