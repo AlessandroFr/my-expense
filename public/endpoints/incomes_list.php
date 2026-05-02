@@ -6,7 +6,7 @@ use App\Income;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 
 $userId = (int) Auth::userId();
@@ -24,7 +24,7 @@ try {
     $items   = Income::listForUser($userId, $filters);
     $sources = Income::distinctSources($userId);
 } catch (Throwable $e) {
-    Json::error('Errore caricamento entrate: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok([

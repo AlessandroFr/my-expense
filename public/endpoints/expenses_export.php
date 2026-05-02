@@ -29,5 +29,5 @@ try {
     $rows = Expense::listForUser($userId, $filters);
     CsvService::exportToStdout($rows, 'expenses');
 } catch (Throwable $e) {
-    Json::error('Errore export: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }

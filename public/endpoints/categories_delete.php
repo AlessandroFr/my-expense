@@ -11,21 +11,21 @@ use App\Csrf;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 if (!Csrf::check()) {
-    Json::error('Token CSRF non valido.', 'csrf', 419);
+    Json::error('Token CSRF non valido.', Json::ERR_CSRF, 403);
 }
 
 $id = (int) ($_POST['id'] ?? 0);
 if ($id <= 0) {
-    Json::error('ID categoria mancante.', 'validation', 400);
+    Json::error('ID categoria mancante.', Json::ERR_VALIDATION, 400);
 }
 
 try {
     Category::delete($id, (int) Auth::userId());
 } catch (Throwable $e) {
-    Json::error('Eliminazione fallita: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok(['id' => $id]);

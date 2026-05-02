@@ -12,20 +12,20 @@ use App\Expense;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 if (!Csrf::check()) {
-    Json::error('Token CSRF non valido.', 'csrf', 419);
+    Json::error('Token CSRF non valido.', Json::ERR_CSRF, 403);
 }
 
 $id = (int) ($_POST['id'] ?? 0);
 if ($id <= 0) {
-    Json::error('ID spesa mancante.', 'validation', 400);
+    Json::error('ID spesa mancante.', Json::ERR_VALIDATION, 400);
 }
 
 $userId = (int) Auth::userId();
 if (Expense::findForUser($id, $userId) === null) {
-    Json::error('Spesa non trovata.', 'not_found', 404);
+    Json::error('Spesa non trovata.', Json::ERR_NOT_FOUND, 404);
 }
 
 $catRaw        = $_POST['category_id'] ?? '';
@@ -45,9 +45,9 @@ try {
     $ym  = substr($expenseDate, 0, 7);
     $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);
 } catch (InvalidArgumentException $e) {
-    Json::error($e->getMessage(), 'validation', 400);
+    Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);
 } catch (Throwable $e) {
-    Json::error('Errore server: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok([

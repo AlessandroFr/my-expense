@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App;
 
+use Throwable;
+
 /**
  * JSON envelope helper.
  *
@@ -13,6 +15,14 @@ namespace App;
  */
 final class Json
 {
+    public const ERR_VALIDATION = 'validation_error';
+    public const ERR_UNAUTH     = 'unauthenticated';
+    public const ERR_FORBIDDEN  = 'forbidden';
+    public const ERR_CSRF       = 'csrf';
+    public const ERR_NOT_FOUND  = 'not_found';
+    public const ERR_CONFLICT   = 'conflict';
+    public const ERR_SERVER     = 'server_error';
+
     /**
      * @param array<string,mixed> $data
      */
@@ -24,13 +34,23 @@ final class Json
     /**
      * @param array<string,mixed>|null $details
      */
-    public static function error(string $message, string $code = 'generic', int $status = 400, ?array $details = null): void
+    public static function error(string $message, string $code = self::ERR_VALIDATION, int $status = 400, ?array $details = null): void
     {
         $error = ['code' => $code, 'message' => $message];
         if ($details !== null) {
             $error['details'] = $details;
         }
         self::send($status, ['ok' => false, 'error' => $error]);
+    }
+
+    /**
+     * Errore server: logga la traccia completa su error_log e ritorna un messaggio
+     * generico al client (mai PDO/SQL/stack al browser).
+     */
+    public static function serverError(Throwable $e, string $publicMessage = 'Errore server interno.'): void
+    {
+        error_log('[my-expense] ' . $e::class . ': ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+        self::error($publicMessage, self::ERR_SERVER, 500);
     }
 
     /**

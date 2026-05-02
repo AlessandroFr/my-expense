@@ -10,7 +10,7 @@ use App\Expense;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 
 $filters = [
@@ -29,7 +29,7 @@ $filters = [
 try {
     $rows = Expense::listForUser((int) Auth::userId(), $filters);
 } catch (Throwable $e) {
-    Json::error('Errore lettura spese: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok(['expenses' => $rows]);

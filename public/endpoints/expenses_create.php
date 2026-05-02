@@ -12,10 +12,10 @@ use App\Expense;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 if (!Csrf::check()) {
-    Json::error('Token CSRF non valido.', 'csrf', 419);
+    Json::error('Token CSRF non valido.', Json::ERR_CSRF, 403);
 }
 
 $catRaw        = $_POST['category_id'] ?? '';
@@ -36,9 +36,9 @@ try {
     $ym  = substr($expenseDate, 0, 7);
     $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);
 } catch (InvalidArgumentException $e) {
-    Json::error($e->getMessage(), 'validation', 400);
+    Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);
 } catch (Throwable $e) {
-    Json::error('Errore server: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok([

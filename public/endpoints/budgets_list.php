@@ -7,7 +7,7 @@ use App\Category;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 
 $ym = (string) ($_GET['month'] ?? date('Y-m'));
@@ -17,7 +17,7 @@ try {
     $progress   = Budget::progressForMonth($userId, $ym);
     $categories = Category::allForUser($userId);
 } catch (Throwable $e) {
-    Json::error($e->getMessage(), 'invalid_input', 400);
+    Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);
 }
 
 Json::ok([

@@ -20,7 +20,7 @@ use App\Income;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 
 $userId       = (int) Auth::userId();
@@ -44,7 +44,7 @@ try {
 
     $budgetProgress = Budget::progressForMonth($userId, $currentMonth);
 } catch (Throwable $e) {
-    Json::error('Errore caricamento dashboard: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok([

@@ -6,7 +6,7 @@ use App\Json;
 use App\Tag;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 
 $userId = (int) Auth::userId();
@@ -14,7 +14,7 @@ $userId = (int) Auth::userId();
 try {
     $items = Tag::allForUser($userId);
 } catch (Throwable $e) {
-    Json::error('Errore caricamento tag: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok(['tags' => $items]);

@@ -6,13 +6,13 @@ use App\Database;
 use App\Json;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 
 $userId = (int) Auth::userId();
 $year   = (int) ($_GET['year'] ?? date('Y'));
 if ($year < 1900 || $year > 2100) {
-    Json::error('Anno non valido.', 'invalid_input', 400);
+    Json::error('Anno non valido.', Json::ERR_VALIDATION, 400);
 }
 
 $start = sprintf('%04d-01-01', $year);
@@ -153,7 +153,7 @@ try {
     }
     $monthlyAvg = !empty($monthsWithExp) ? round($totalExp / count($monthsWithExp), 2) : 0.0;
 } catch (Throwable $e) {
-    Json::error('Errore report: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok([

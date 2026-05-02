@@ -7,10 +7,10 @@ use App\Json;
 use App\RecurringExpense;
 
 if (!Auth::check()) {
-    Json::error('Sessione scaduta.', 'unauthenticated', 401);
+    Json::error('Sessione scaduta.', Json::ERR_UNAUTH, 401);
 }
 if (!Csrf::check()) {
-    Json::error('Token CSRF non valido.', 'csrf', 419);
+    Json::error('Token CSRF non valido.', Json::ERR_CSRF, 403);
 }
 
 $userId = (int) Auth::userId();
@@ -18,7 +18,7 @@ $userId = (int) Auth::userId();
 try {
     $created = RecurringExpense::generatePending($userId);
 } catch (Throwable $e) {
-    Json::error('Errore generazione: ' . $e->getMessage(), 'server', 500);
+    Json::serverError($e);
 }
 
 Json::ok(['created' => $created]);
