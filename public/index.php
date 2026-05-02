@@ -199,6 +199,15 @@ switch ($route) {
         require __DIR__ . '/endpoints/tags_delete.php';
         break;
 
+    // ── Report ──────────────────────────────────────────────────────────
+    case 'GET /reports':
+        Auth::requireLogin();
+        renderPage('reports');
+        break;
+    case 'GET /reports/year':
+        require __DIR__ . '/endpoints/reports_year.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -225,6 +234,7 @@ function renderPage(string $page, array $data = []): void
         'incomes'       => 'Entrate',
         'budgets'       => 'Budget mensili',
         'recurring'     => 'Spese ricorrenti',
+        'reports'       => 'Report annuale',
         default         => 'Pagina non trovata',
     };
     extract($data, EXTR_SKIP);
