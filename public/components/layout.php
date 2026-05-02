@@ -22,6 +22,19 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Tema: applicato in head per evitare FOUC -->
+    <script>
+        (function() {
+            try {
+                var m = localStorage.getItem('mx-theme') || 'auto';
+                var r = (m === 'auto')
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : (m === 'dark' ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-bs-theme', r);
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body class="bg-body-tertiary" data-base-url="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>">
 
@@ -74,6 +87,16 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
             </li>
         </ul>
         <div class="ms-auto d-flex align-items-center gap-2">
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Tema">
+                    <i id="theme-toggle-icon" class="bi bi-circle-half"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item small" href="#" data-theme-mode="light"><i class="bi bi-sun-fill me-1"></i>Chiaro</a></li>
+                    <li><a class="dropdown-item small" href="#" data-theme-mode="dark"><i class="bi bi-moon-stars-fill me-1"></i>Scuro</a></li>
+                    <li><a class="dropdown-item small" href="#" data-theme-mode="auto"><i class="bi bi-circle-half me-1"></i>Auto (sistema)</a></li>
+                </ul>
+            </div>
             <span class="text-muted small">
                 <i class="bi bi-person-circle me-1"></i>
                 <?= htmlspecialchars(Auth::username() ?? '', ENT_QUOTES, 'UTF-8') ?>
@@ -101,5 +124,6 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="<?= htmlspecialchars($base . '/js/theme.js', ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
