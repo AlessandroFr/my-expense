@@ -13,8 +13,9 @@ $userId = (int) Auth::userId();
 $filters = [
     'date_from' => $_GET['date_from'] ?? null,
     'date_to'   => $_GET['date_to']   ?? null,
-    'source'    => $_GET['source']    ?? null,
-    'search'    => $_GET['search']    ?? null,
+    'source'     => $_GET['source']     ?? null,
+    'account_id' => isset($_GET['account_id']) && $_GET['account_id'] !== '' ? (int) $_GET['account_id'] : null,
+    'search'     => $_GET['search']     ?? null,
     'limit'     => (int) ($_GET['limit']  ?? 200),
     'offset'    => (int) ($_GET['offset'] ?? 0),
 ];

@@ -25,13 +25,17 @@ final class Expense
         $limit  = max(1, min(500, (int) ($filters['limit']  ?? 200)));
         $offset = max(0, (int) ($filters['offset'] ?? 0));
 
-        $sql = "SELECT e.id, e.user_id, e.category_id, e.amount, e.description,
+        $sql = "SELECT e.id, e.user_id, e.category_id, e.account_id, e.amount, e.description,
                        e.payment_method, e.expense_date, e.created_at, e.updated_at,
                        c.name  AS category_name,
                        c.color AS category_color,
-                       c.icon  AS category_icon
+                       c.icon  AS category_icon,
+                       a.name  AS account_name,
+                       a.color AS account_color,
+                       a.icon  AS account_icon
                 FROM expenses e
                 LEFT JOIN categories c ON c.id = e.category_id
+                LEFT JOIN accounts   a ON a.id = e.account_id
                 {$where}
                 ORDER BY e.expense_date DESC, e.id DESC
                 LIMIT {$limit} OFFSET {$offset}";
@@ -72,11 +76,13 @@ final class Expense
     public static function findForUser(int $id, int $userId): ?array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT e.id, e.user_id, e.category_id, e.amount, e.description,
+            'SELECT e.id, e.user_id, e.category_id, e.account_id, e.amount, e.description,
                     e.payment_method, e.expense_date, e.created_at, e.updated_at,
-                    c.name AS category_name, c.color AS category_color, c.icon AS category_icon
+                    c.name AS category_name, c.color AS category_color, c.icon AS category_icon,
+                    a.name AS account_name,  a.color AS account_color,  a.icon AS account_icon
              FROM expenses e
              LEFT JOIN categories c ON c.id = e.category_id
+             LEFT JOIN accounts   a ON a.id = e.account_id
              WHERE e.id = ? AND e.user_id = ?
              LIMIT 1'
         );
@@ -91,17 +97,19 @@ final class Expense
         string|float $amount,
         ?string $description,
         string $paymentMethod,
-        string $expenseDate
+        string $expenseDate,
+        ?int $accountId = null
     ): int {
-        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate);
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
 
         $stmt = Database::pdo()->prepare(
-            'INSERT INTO expenses (user_id, category_id, amount, description, payment_method, expense_date)
-             VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO expenses (user_id, category_id, account_id, amount, description, payment_method, expense_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $userId,
             $row['category_id'],
+            $row['account_id'],
             $row['amount'],
             $row['description'],
             $row['payment_method'],
@@ -118,17 +126,19 @@ final class Expense
         string|float $amount,
         ?string $description,
         string $paymentMethod,
-        string $expenseDate
+        string $expenseDate,
+        ?int $accountId = null
     ): void {
-        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate);
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
 
         $stmt = Database::pdo()->prepare(
             'UPDATE expenses
-             SET category_id = ?, amount = ?, description = ?, payment_method = ?, expense_date = ?
+             SET category_id = ?, account_id = ?, amount = ?, description = ?, payment_method = ?, expense_date = ?
              WHERE id = ? AND user_id = ?'
         );
         $stmt->execute([
             $row['category_id'],
+            $row['account_id'],
             $row['amount'],
             $row['description'],
             $row['payment_method'],
@@ -241,6 +251,10 @@ final class Expense
             $clauses[] = 'e.category_id = ?';
             $params[]  = (int) $filters['category_id'];
         }
+        if (!empty($filters['account_id'])) {
+            $clauses[] = 'e.account_id = ?';
+            $params[]  = (int) $filters['account_id'];
+        }
         if (isset($filters['amount_min']) && $filters['amount_min'] !== '' && $filters['amount_min'] !== null) {
             $clauses[] = 'e.amount >= ?';
             $params[]  = (float) $filters['amount_min'];
@@ -267,7 +281,7 @@ final class Expense
 
     /**
      * @return array{
-     *   category_id: ?int, amount: string, description: ?string,
+     *   category_id: ?int, account_id: ?int, amount: string, description: ?string,
      *   payment_method: string, expense_date: string
      * }
      */
@@ -277,7 +291,8 @@ final class Expense
         string|float $amount,
         ?string $description,
         string $paymentMethod,
-        string $expenseDate
+        string $expenseDate,
+        ?int $accountId = null
     ): array {
         $amountF = is_string($amount) ? (float) str_replace(',', '.', $amount) : (float) $amount;
         if ($amountF < 0.01) {
@@ -319,8 +334,23 @@ final class Expense
             }
         }
 
+        if ($accountId !== null) {
+            if ($accountId <= 0) {
+                $accountId = null;
+            } else {
+                $check = Database::pdo()->prepare(
+                    'SELECT 1 FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
+                );
+                $check->execute([$accountId, $userId]);
+                if ($check->fetchColumn() === false) {
+                    throw new InvalidArgumentException('Conto non trovato.');
+                }
+            }
+        }
+
         return [
             'category_id'    => $categoryId,
+            'account_id'     => $accountId,
             'amount'         => number_format($amountF, 2, '.', ''),
             'description'    => $description,
             'payment_method' => $paymentMethod,

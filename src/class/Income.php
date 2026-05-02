@@ -23,11 +23,13 @@ final class Income
         $limit  = max(1, min(500, (int) ($filters['limit']  ?? 200)));
         $offset = max(0, (int) ($filters['offset'] ?? 0));
 
-        $sql = "SELECT id, user_id, source, description, amount, income_date,
-                       created_at, updated_at
-                FROM incomes
+        $sql = "SELECT i.id, i.user_id, i.account_id, i.source, i.description, i.amount, i.income_date,
+                       i.created_at, i.updated_at,
+                       a.name AS account_name, a.color AS account_color, a.icon AS account_icon
+                FROM incomes i
+                LEFT JOIN accounts a ON a.id = i.account_id
                 {$where}
-                ORDER BY income_date DESC, id DESC
+                ORDER BY i.income_date DESC, i.id DESC
                 LIMIT {$limit} OFFSET {$offset}";
 
         $stmt = Database::pdo()->prepare($sql);
@@ -38,8 +40,12 @@ final class Income
     public static function findForUser(int $id, int $userId): ?array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT id, user_id, source, description, amount, income_date, created_at, updated_at
-             FROM incomes WHERE id = ? AND user_id = ? LIMIT 1'
+            'SELECT i.id, i.user_id, i.account_id, i.source, i.description, i.amount, i.income_date,
+                    i.created_at, i.updated_at,
+                    a.name AS account_name, a.color AS account_color, a.icon AS account_icon
+             FROM incomes i
+             LEFT JOIN accounts a ON a.id = i.account_id
+             WHERE i.id = ? AND i.user_id = ? LIMIT 1'
         );
         $stmt->execute([$id, $userId]);
         $row = $stmt->fetch();
@@ -51,16 +57,18 @@ final class Income
         string $source,
         ?string $description,
         string|float $amount,
-        string $incomeDate
+        string $incomeDate,
+        ?int $accountId = null
     ): int {
         $row = self::validate($source, $description, $amount, $incomeDate);
+        $accountId = self::checkAccount($userId, $accountId);
 
         $stmt = Database::pdo()->prepare(
-            'INSERT INTO incomes (user_id, source, description, amount, income_date)
-             VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO incomes (user_id, account_id, source, description, amount, income_date)
+             VALUES (?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
-            $userId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
+            $userId, $accountId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
         ]);
         return (int) Database::pdo()->lastInsertId();
     }
@@ -71,19 +79,34 @@ final class Income
         string $source,
         ?string $description,
         string|float $amount,
-        string $incomeDate
+        string $incomeDate,
+        ?int $accountId = null
     ): void {
         $row = self::validate($source, $description, $amount, $incomeDate);
+        $accountId = self::checkAccount($userId, $accountId);
 
         $stmt = Database::pdo()->prepare(
             'UPDATE incomes
-             SET source = ?, description = ?, amount = ?, income_date = ?
+             SET account_id = ?, source = ?, description = ?, amount = ?, income_date = ?
              WHERE id = ? AND user_id = ?'
         );
         $stmt->execute([
-            $row['source'], $row['description'], $row['amount'], $row['income_date'],
+            $accountId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
             $id, $userId,
         ]);
+    }
+
+    private static function checkAccount(int $userId, ?int $accountId): ?int
+    {
+        if ($accountId === null || $accountId <= 0) return null;
+        $check = Database::pdo()->prepare(
+            'SELECT 1 FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
+        );
+        $check->execute([$accountId, $userId]);
+        if ($check->fetchColumn() === false) {
+            throw new InvalidArgumentException('Conto non trovato.');
+        }
+        return $accountId;
     }
 
     public static function delete(int $id, int $userId): void
@@ -99,8 +122,8 @@ final class Income
         $end   = date('Y-m-d', strtotime($start . ' +1 month'));
 
         $stmt = Database::pdo()->prepare(
-            'SELECT COALESCE(SUM(amount), 0) FROM incomes
-             WHERE user_id = ? AND income_date >= ? AND income_date < ?'
+            'SELECT COALESCE(SUM(amount), 0) FROM incomes i
+             WHERE i.user_id = ? AND i.income_date >= ? AND i.income_date < ?'
         );
         $stmt->execute([$userId, $start, $end]);
         return (float) $stmt->fetchColumn();
@@ -113,11 +136,11 @@ final class Income
     {
         $monthsBack = max(1, min(36, $monthsBack));
         $stmt = Database::pdo()->prepare(
-            "SELECT DATE_FORMAT(income_date, '%Y-%m') AS month,
-                    SUM(amount) AS total
-             FROM incomes
-             WHERE user_id = ?
-               AND income_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
+            "SELECT DATE_FORMAT(i.income_date, '%Y-%m') AS month,
+                    SUM(i.amount) AS total
+             FROM incomes i
+             WHERE i.user_id = ?
+               AND i.income_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
              GROUP BY month
              ORDER BY month ASC"
         );
@@ -131,7 +154,7 @@ final class Income
     public static function distinctSources(int $userId): array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT DISTINCT source FROM incomes WHERE user_id = ? ORDER BY source ASC'
+            'SELECT DISTINCT source FROM incomes i WHERE i.user_id = ? ORDER BY source ASC'
         );
         $stmt->execute([$userId]);
         return array_map('strval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
@@ -142,23 +165,27 @@ final class Income
      */
     private static function buildWhere(int $userId, array $filters): array
     {
-        $clauses = ['user_id = ?'];
+        $clauses = ['i.user_id = ?'];
         $params  = [$userId];
 
         if (!empty($filters['date_from']) && self::isValidDate((string) $filters['date_from'])) {
-            $clauses[] = 'income_date >= ?';
+            $clauses[] = 'i.income_date >= ?';
             $params[]  = $filters['date_from'];
         }
         if (!empty($filters['date_to']) && self::isValidDate((string) $filters['date_to'])) {
-            $clauses[] = 'income_date <= ?';
+            $clauses[] = 'i.income_date <= ?';
             $params[]  = $filters['date_to'];
         }
         if (!empty($filters['source'])) {
-            $clauses[] = 'source = ?';
+            $clauses[] = 'i.source = ?';
             $params[]  = (string) $filters['source'];
         }
+        if (!empty($filters['account_id'])) {
+            $clauses[] = 'i.account_id = ?';
+            $params[]  = (int) $filters['account_id'];
+        }
         if (!empty($filters['search'])) {
-            $clauses[] = '(description LIKE ? OR source LIKE ?)';
+            $clauses[] = '(i.description LIKE ? OR i.source LIKE ?)';
             $params[]  = '%' . $filters['search'] . '%';
             $params[]  = '%' . $filters['search'] . '%';
         }

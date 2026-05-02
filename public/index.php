@@ -222,6 +222,24 @@ switch ($route) {
         require __DIR__ . '/endpoints/attachments_download.php';
         break;
 
+    // ── Conti (multi-account) ────────────────────────────────────────────
+    case 'GET /accounts':
+        Auth::requireLogin();
+        renderPage('accounts');
+        break;
+    case 'GET /accounts/list':
+        require __DIR__ . '/endpoints/accounts_list.php';
+        break;
+    case 'POST /accounts/create':
+        require __DIR__ . '/endpoints/accounts_create.php';
+        break;
+    case 'POST /accounts/update':
+        require __DIR__ . '/endpoints/accounts_update.php';
+        break;
+    case 'POST /accounts/delete':
+        require __DIR__ . '/endpoints/accounts_delete.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -249,6 +267,7 @@ function renderPage(string $page, array $data = []): void
         'budgets'       => 'Budget mensili',
         'recurring'     => 'Spese ricorrenti',
         'reports'       => 'Report annuale',
+        'accounts'      => 'Conti',
         default         => 'Pagina non trovata',
     };
     extract($data, EXTR_SKIP);

@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
+use App\Account;
 use App\Auth;
 use App\Csrf;
-use App\Income;
 use App\Json;
 
 if (!Auth::check()) {
@@ -16,14 +16,14 @@ if (!Csrf::check()) {
 $userId = (int) Auth::userId();
 
 try {
-    $accountId = ($_POST['account_id'] ?? '') === '' ? null : (int) $_POST['account_id'];
-    $id = Income::create(
+    $id = Account::create(
         $userId,
-        (string) ($_POST['source']      ?? ''),
-        $_POST['description'] === null || $_POST['description'] === '' ? null : (string) $_POST['description'],
-        (string) ($_POST['amount']      ?? ''),
-        (string) ($_POST['income_date'] ?? ''),
-        $accountId,
+        (string) ($_POST['name']            ?? ''),
+        (string) ($_POST['type']            ?? 'checking'),
+        (string) ($_POST['color']           ?? '#6c757d'),
+        ($_POST['icon'] ?? '') === '' ? null : (string) $_POST['icon'],
+        (string) ($_POST['opening_balance'] ?? '0'),
+        (int)    ($_POST['sort_order']      ?? 0),
     );
 } catch (Throwable $e) {
     Json::error($e->getMessage(), 'invalid_input', 400);

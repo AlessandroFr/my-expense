@@ -20,6 +20,8 @@ if (!Csrf::check()) {
 
 $catRaw        = $_POST['category_id'] ?? '';
 $categoryId    = ($catRaw === '' || $catRaw === null || $catRaw === '0') ? null : (int) $catRaw;
+$accRaw        = $_POST['account_id'] ?? '';
+$accountId     = ($accRaw === '' || $accRaw === null || $accRaw === '0') ? null : (int) $accRaw;
 $amount        = (string) ($_POST['amount'] ?? '0');
 $description   = isset($_POST['description']) ? (string) $_POST['description'] : null;
 $paymentMethod = (string) ($_POST['payment_method'] ?? 'card');
@@ -27,7 +29,7 @@ $expenseDate   = (string) ($_POST['expense_date'] ?? date('Y-m-d'));
 $userId        = (int) Auth::userId();
 
 try {
-    $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate);
+    $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
     $row = Expense::findForUser($id, $userId);
     $ym  = substr($expenseDate, 0, 7);
     $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);

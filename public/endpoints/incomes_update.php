@@ -20,6 +20,7 @@ if ($id <= 0) {
 }
 
 try {
+    $accountId = ($_POST['account_id'] ?? '') === '' ? null : (int) $_POST['account_id'];
     Income::update(
         $id,
         $userId,
@@ -27,6 +28,7 @@ try {
         $_POST['description'] === null || $_POST['description'] === '' ? null : (string) $_POST['description'],
         (string) ($_POST['amount']      ?? ''),
         (string) ($_POST['income_date'] ?? ''),
+        $accountId,
     );
 } catch (Throwable $e) {
     Json::error($e->getMessage(), 'invalid_input', 400);

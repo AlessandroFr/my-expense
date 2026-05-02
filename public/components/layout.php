@@ -67,6 +67,11 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
                     <i class="bi bi-bar-chart-steps me-1"></i>Report
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="<?= htmlspecialchars($base . '/accounts', ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-bank me-1"></i>Conti
+                </a>
+            </li>
         </ul>
         <div class="ms-auto d-flex align-items-center gap-2">
             <span class="text-muted small">
