@@ -4,6 +4,8 @@
 import FetchRequest          from '../FetchRequest.js';
 import { apiGuard, escapeHtml } from '../componentBase.js';
 import { toast }             from '../toast.js';
+import { stagger, withViewTransition, animateEnter, flip, tweenNumber } from '../transitions.js';
+import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 
 const api  = FetchRequest.getInstance();
 const BASE = document.body.dataset.baseUrl ?? '';
@@ -18,14 +20,22 @@ const yearSel = document.getElementById('report-year');
 let trendChart = null;
 let catChart   = null;
 
+function tweenMoneyR(el, to) {
+    if (!el) return;
+    const from = parseFloat((el.dataset.value ?? '''').replace(/[^\d.-]/g, '''')) || 0;
+    el.classList.add('mx-num');
+    tweenNumber(el, from, to, { format: fmtMoney });
+    el.dataset.value = String(to);
+}
+
 function setKpi(d) {
-    document.getElementById('r-total-exp').textContent = fmtMoney(d.total_expenses);
-    document.getElementById('r-total-inc').textContent = fmtMoney(d.total_incomes);
+    tweenMoneyR(document.getElementById('r-total-exp'), Number(d.total_expenses ?? 0));
+    tweenMoneyR(document.getElementById('r-total-inc'), Number(d.total_incomes ?? 0));
     const netEl = document.getElementById('r-net');
-    netEl.textContent = fmtMoney(d.net);
+    tweenMoneyR(netEl, Number(d.net ?? 0));
     netEl.className   = 'h3 fw-semibold mt-1 ' +
         (d.net > 0 ? 'text-success' : (d.net < 0 ? 'text-danger' : 'text-muted'));
-    document.getElementById('r-avg').textContent = fmtMoney(d.monthly_avg);
+    tweenMoneyR(document.getElementById('r-avg'), Number(d.monthly_avg ?? 0));
     const extr = [];
     if (d.max_month) extr.push(`max ${MONTH_LABELS[parseInt(d.max_month.month.slice(5,7))-1]} (${fmtMoney(d.max_month.expenses)})`);
     if (d.min_month && d.min_month.month !== d.max_month?.month) {

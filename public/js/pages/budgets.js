@@ -4,6 +4,8 @@
 import FetchRequest          from '../FetchRequest.js';
 import { apiSend, apiGuard, escapeHtml, confirmDialog } from '../componentBase.js';
 import { toast }             from '../toast.js';
+import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
+import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -87,7 +89,8 @@ async function loadList() {
             </div>`;
             return;
         }
-        list.innerHTML = items.map(renderCard).join('');
+        list.innerHTML = items.map(renderCard).join('''');
+        stagger(list);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento budget.');
     }

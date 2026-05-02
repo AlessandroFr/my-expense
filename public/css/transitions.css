@@ -1,0 +1,134 @@
+/* ─── transitions.css ────────────────────────────────────────────────────────
+ * View Transitions API + motion design system.
+ * Progressive enhancement: senza supporto, tutto resta funzionale.
+ * Rispetta prefers-reduced-motion.
+ */
+
+/* ── Tokens motion ──────────────────────────────────────────────────────── */
+:root {
+    --mx-ease-out:    cubic-bezier(0.22, 0.61, 0.36, 1);
+    --mx-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --mx-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --mx-dur-fast: 160ms;
+    --mx-dur-base: 260ms;
+    --mx-dur-slow: 420ms;
+}
+
+/* ── View Transitions root setup ────────────────────────────────────────── */
+@view-transition {
+    navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: var(--mx-dur-base);
+    animation-timing-function: var(--mx-ease-out);
+}
+
+::view-transition-old(root) { animation-name: mx-fade-out-up; }
+::view-transition-new(root) { animation-name: mx-fade-in-down; }
+
+@keyframes mx-fade-out-up {
+    to { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes mx-fade-in-down {
+    from { opacity: 0; transform: translateY(8px); }
+}
+
+/* ── Optimistic state classes ──────────────────────────────────────────── */
+.mx-optimistic {
+    opacity: 0.55;
+    pointer-events: none;
+    transition: opacity var(--mx-dur-fast) var(--mx-ease-out);
+}
+.mx-optimistic-error {
+    animation: mx-shake var(--mx-dur-base) var(--mx-ease-out);
+    background: rgba(220, 53, 69, 0.06) !important;
+}
+@keyframes mx-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+}
+
+/* ── Row enter/exit (FLIP-style) ───────────────────────────────────────── */
+.mx-row-enter {
+    animation: mx-row-enter var(--mx-dur-base) var(--mx-ease-spring) both;
+}
+.mx-row-exit {
+    animation: mx-row-exit var(--mx-dur-base) var(--mx-ease-out) both;
+}
+@keyframes mx-row-enter {
+    from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
+@keyframes mx-row-exit {
+    to { opacity: 0; transform: translateX(40px) scale(0.96); }
+}
+
+/* ── Cards entering (dashboard, accounts) — staggered ───────────────────── */
+.mx-stagger > * {
+    animation: mx-card-in var(--mx-dur-slow) var(--mx-ease-out) both;
+    animation-delay: calc(var(--mx-stagger-i, 0) * 60ms);
+}
+@keyframes mx-card-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Toast in/out ─────────────────────────────────────────────────────── */
+.toast {
+    animation: mx-toast-in var(--mx-dur-base) var(--mx-ease-spring) both;
+}
+@keyframes mx-toast-in {
+    from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
+
+/* ── Form-row morph (edit inline) ───────────────────────────────────────── */
+.mx-edit-row {
+    view-transition-name: mx-edit-row;
+}
+
+/* ── Backdrop press effect (dropdown, modal) ───────────────────────────── */
+.dropdown-menu, .modal-content {
+    animation: mx-pop-in var(--mx-dur-fast) var(--mx-ease-spring);
+}
+@keyframes mx-pop-in {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+/* ── Number flip (KPI count-up) ─────────────────────────────────────────── */
+.mx-num {
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Chart container hover-lift ────────────────────────────────────────── */
+.card.shadow-sm {
+    transition: transform var(--mx-dur-fast) var(--mx-ease-out),
+                box-shadow var(--mx-dur-fast) var(--mx-ease-out);
+}
+.card.shadow-sm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .12) !important;
+}
+
+/* ── Progress bar fill animation (budgets) ──────────────────────────────── */
+.progress-bar {
+    transition: width var(--mx-dur-slow) var(--mx-ease-out);
+}
+
+/* ── Reduced motion: kill it all ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after,
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .card.shadow-sm:hover { transform: none; }
+}

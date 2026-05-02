@@ -4,6 +4,7 @@
 import FetchRequest                from '../FetchRequest.js';
 import { apiGuard, escapeHtml }    from '../componentBase.js';
 import { toast }                   from '../toast.js';
+import { tweenNumber, stagger } from '../transitions.js';
 
 const api  = FetchRequest.getInstance();
 const BASE = document.body.dataset.baseUrl ?? '';
@@ -28,27 +29,39 @@ function fmtMonthShort(ym) {
     return monthShortFmt.format(new Date(y, (m || 1) - 1, 1));
 }
 
+function tweenMoney(el, to) {
+    if (!el) return;
+    const from = parseFloat((el.dataset.value ?? '').replace(/[^\d.-]/g, '')) || 0;
+    el.classList.add('mx-num');
+    tweenNumber(el, from, to, { format: fmtMoney });
+    el.dataset.value = String(to);
+}
+
 function renderKpi(d) {
-    document.getElementById('kpi-current').textContent       = fmtMoney(d.totals.current);
-    document.getElementById('kpi-income').textContent        = fmtMoney(d.totals.income_current ?? 0);
+    tweenMoney(document.getElementById('kpi-current'), Number(d.totals.current ?? 0));
+    tweenMoney(document.getElementById('kpi-income'),  Number(d.totals.income_current ?? 0));
     document.getElementById('kpi-current-month').textContent = fmtMonthLong(d.current_month);
 
     const netEl  = document.getElementById('kpi-net');
     const netVal = Number(d.totals.net_current ?? 0);
-    netEl.textContent = fmtMoney(netVal);
-    netEl.className   = 'h3 fw-semibold mt-1 ' +
+    tweenMoney(netEl, netVal);
+    netEl.className = 'mx-num h3 fw-semibold mt-1 ' +
         (netVal > 0 ? 'text-success' : (netVal < 0 ? 'text-danger' : 'text-muted'));
 
     const deltaEl = document.getElementById('kpi-delta');
+    deltaEl.classList.add('mx-num');
     if (d.totals.delta_pct === null) {
         deltaEl.textContent = '-';
-        deltaEl.className   = 'h3 fw-semibold mt-1 text-muted';
+        deltaEl.className   = 'mx-num h3 fw-semibold mt-1 text-muted';
     } else {
-        const sign = d.totals.delta_pct > 0 ? '+' : '';
-        deltaEl.textContent = `${sign}${d.totals.delta_pct.toFixed(1)}%`;
-        deltaEl.className = 'h3 fw-semibold mt-1 ' +
-            (d.totals.delta_pct > 0 ? 'text-danger'
-                : (d.totals.delta_pct < 0 ? 'text-success' : 'text-muted'));
+        const fromPct = parseFloat(deltaEl.dataset.value ?? '0') || 0;
+        const toPct   = Number(d.totals.delta_pct);
+        const sign    = (n) => (n > 0 ? '+' : '') + n.toFixed(1) + '%';
+        tweenNumber(deltaEl, fromPct, toPct, { format: sign });
+        deltaEl.dataset.value = String(toPct);
+        deltaEl.className = 'mx-num h3 fw-semibold mt-1 ' +
+            (toPct > 0 ? 'text-danger'
+                : (toPct < 0 ? 'text-success' : 'text-muted'));
     }
 }
 
@@ -179,4 +192,7 @@ async function loadData() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', loadData);
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.row.g-3.mb-4').forEach(row => stagger(row));
+    loadData();
+});

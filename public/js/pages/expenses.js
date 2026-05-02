@@ -4,6 +4,8 @@
 import FetchRequest         from '../FetchRequest.js';
 import { apiSend, apiGuard } from '../componentBase.js';
 import { toast }             from '../toast.js';
+import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
+import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -290,21 +292,45 @@ function wireCreateForm() {
         try {
             const params = new URLSearchParams(new FormData(form));
             params.set('_csrf', getCsrfToken());
-            const r = await send(`${BASE}/expenses/create`, params);
-            const exp = r.data?.expense;
-            if (!exp) throw new Error('Risposta server inattesa.');
-
-            const tagsCsv = form.querySelector('input[name="tags"]')?.value ?? '';
-            if (tagsCsv.trim() !== '') {
-                const tags = await assignTags(exp.id, tagsCsv);
-                if (tags) exp.tags = tags;
-                await loadTags();
-            }
 
             const tbody = document.getElementById('expenses-tbody');
             const empty = tbody.querySelector('td[colspan]')?.closest('tr');
             if (empty) tbody.innerHTML = '';
-            tbody.prepend(renderViewRow(exp));
+
+            const fd = new FormData(form);
+            const optimisticExpense = {
+                id: 'pending-' + Date.now(),
+                expense_date: fd.get('expense_date'),
+                category_id: fd.get('category_id'),
+                category_name: '',
+                category_color: '#6c757d',
+                description: fd.get('description'),
+                payment_method: fd.get('payment_method'),
+                amount: fd.get('amount'),
+                tags: [],
+            };
+
+            const r = await optimisticCreate({
+                container: tbody,
+                makeOptimisticRow: () => renderViewRow(optimisticExpense),
+                makeFinalRow: (resp) => renderViewRow(resp.data?.expense ?? optimisticExpense),
+                call: () => send(`${BASE}/expenses/create`, params),
+                position: 'prepend',
+            });
+
+            const exp = r.data?.expense;
+            const tagsCsv = form.querySelector('input[name="tags"]')?.value ?? '';
+            if (tagsCsv.trim() !== '' && exp) {
+                const tags = await assignTags(exp.id, tagsCsv);
+                if (tags) {
+                    const newRow = tbody.querySelector(`tr[data-id="${exp.id}"]`);
+                    if (newRow) {
+                        const updated = { ...exp, tags };
+                        newRow.replaceWith(renderViewRow(updated));
+                    }
+                }
+                await loadTags();
+            }
             updateTotalFromTable();
 
             form.reset();
@@ -333,7 +359,7 @@ function wireTableActions() {
         const action = btn.dataset.action;
 
         if (action === 'edit') {
-            replaceWithEditRow(tr);
+            await withViewTransition(() => replaceWithEditRow(tr));
             return;
         }
 
@@ -381,25 +407,33 @@ function wireTableActions() {
             params.set('_csrf', getCsrfToken());
             const tagsCsv = tr.querySelector('input[name="tags"]')?.value ?? '';
             inputs.forEach(i => {
-                if (i.name === 'tags') return; // gestito separatamente
+                if (i.name === 'tags') return;
                 params.set(i.name, i.value);
             });
 
             btn.disabled = true;
             try {
-                const r = await send(`${BASE}/expenses/update`, params);
+                const r = await optimisticUpdate({
+                    row: tr,
+                    applyValues: () => { /* values already shown in inputs */ },
+                    makeFinalRow: (resp) => {
+                        const exp = resp.data?.expense;
+                        return exp ? renderViewRow(exp) : null;
+                    },
+                    call: () => send(`${BASE}/expenses/update`, params),
+                });
                 const exp = r.data?.expense;
-                if (!exp) throw new Error('Risposta server inattesa.');
                 const tags = await assignTags(id, tagsCsv);
-                if (tags) exp.tags = tags;
+                if (tags && exp) {
+                    const newRow = document.querySelector(`#expenses-tbody tr[data-id="${exp.id}"]`);
+                    if (newRow) newRow.replaceWith(renderViewRow({ ...exp, tags }));
+                }
                 await loadTags();
-                tr.replaceWith(renderViewRow(exp));
                 updateTotalFromTable();
                 toast.success('Spesa aggiornata.');
                 showBudgetWarning(r.data?.budget_warning);
-            } catch (err) {
+            } catch {
                 btn.disabled = false;
-                toast.error(err.message ?? 'Errore aggiornamento spesa.');
             }
             return;
         }
