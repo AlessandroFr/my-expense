@@ -102,6 +102,24 @@ switch ($route) {
         require __DIR__ . '/endpoints/categories_delete.php';
         break;
 
+    // ── Spese ────────────────────────────────────────────────────────────
+    case 'GET /expenses':
+        Auth::requireLogin();
+        renderPage('expenses');
+        break;
+    case 'GET /expenses/list':
+        require __DIR__ . '/endpoints/expenses_list.php';
+        break;
+    case 'POST /expenses/create':
+        require __DIR__ . '/endpoints/expenses_create.php';
+        break;
+    case 'POST /expenses/update':
+        require __DIR__ . '/endpoints/expenses_update.php';
+        break;
+    case 'POST /expenses/delete':
+        require __DIR__ . '/endpoints/expenses_delete.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -124,6 +142,7 @@ function renderPage(string $page, array $data = []): void
         'dashboard'     => 'Dashboard',
         'categories'    => 'Categorie',
         'category_edit' => 'Modifica categoria',
+        'expenses'      => 'Spese',
         default         => 'Pagina non trovata',
     };
     extract($data, EXTR_SKIP);

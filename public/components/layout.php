@@ -38,6 +38,11 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" href="<?= htmlspecialchars($base . '/expenses', ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-receipt me-1"></i>Spese
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" href="<?= htmlspecialchars($base . '/categories', ENT_QUOTES, 'UTF-8') ?>">
                     <i class="bi bi-tags me-1"></i>Categorie
                 </a>
