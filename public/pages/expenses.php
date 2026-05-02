@@ -27,6 +27,16 @@ $paymentLabels  = [
         <h1 class="h3 mb-0"><i class="bi bi-receipt me-2"></i>Spese</h1>
     </div>
     <div class="col-md-6 text-md-end">
+        <div class="btn-group btn-group-sm me-1" role="group">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Filtri salvati">
+                <i class="bi bi-bookmark me-1"></i>Filtri
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" id="saved-filters-menu">
+                <li><a class="dropdown-item small" href="#" data-saved-action="save"><i class="bi bi-floppy me-1"></i>Salva filtro corrente...</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><span class="dropdown-item-text small text-muted">Nessun filtro salvato.</span></li>
+            </ul>
+        </div>
         <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
             <i class="bi bi-download me-1"></i>Esporta
         </button>

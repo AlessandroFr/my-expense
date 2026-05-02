@@ -240,6 +240,17 @@ switch ($route) {
         require __DIR__ . '/endpoints/accounts_delete.php';
         break;
 
+    // ── Saved filters ────────────────────────────────────────────────────
+    case 'GET /filters/list':
+        require __DIR__ . '/endpoints/filters_list.php';
+        break;
+    case 'POST /filters/save':
+        require __DIR__ . '/endpoints/filters_save.php';
+        break;
+    case 'POST /filters/delete':
+        require __DIR__ . '/endpoints/filters_delete.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');

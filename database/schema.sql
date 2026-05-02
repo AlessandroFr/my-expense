@@ -192,3 +192,18 @@ CREATE TABLE IF NOT EXISTS `accounts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- NOTA: per gli ALTER TABLE che aggiungono `account_id` a expenses/incomes/recurring_expenses
 --       vedere database/migrations/008_accounts.sql.
+
+-- ── Saved filters ────────────────────────────────────────────────────────────
+-- Migration: 009_saved_filters.sql
+CREATE TABLE IF NOT EXISTS `saved_filters` (
+    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id`    INT UNSIGNED NOT NULL,
+    `scope`      VARCHAR(32)  NOT NULL DEFAULT 'expenses',
+    `name`       VARCHAR(64)  NOT NULL,
+    `payload`    JSON         NOT NULL,
+    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_saved_filters_user_scope_name` (`user_id`, `scope`, `name`),
+    CONSTRAINT `fk_saved_filters_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

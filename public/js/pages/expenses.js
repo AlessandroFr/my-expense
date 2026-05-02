@@ -547,6 +547,87 @@ function wireCsvButtons() {
     }
 }
 
+// ── Saved filters ──────────────────────────────────────────────────────────
+
+let savedFiltersCache = [];
+
+async function loadSavedFilters() {
+    try {
+        const r = await apiGuard(api.get(`${BASE}/filters/list`, { scope: 'expenses' }));
+        savedFiltersCache = r.data?.filters ?? [];
+        renderSavedFiltersMenu();
+    } catch (err) {
+        // silenzioso
+    }
+}
+
+function renderSavedFiltersMenu() {
+    const menu = document.getElementById('saved-filters-menu');
+    if (!menu) return;
+    const items = savedFiltersCache;
+    const head = `<li><a class="dropdown-item small" href="#" data-saved-action="save"><i class="bi bi-floppy me-1"></i>Salva filtro corrente...</a></li>
+                  <li><hr class="dropdown-divider"></li>`;
+    const body = items.length === 0
+        ? `<li><span class="dropdown-item-text small text-muted">Nessun filtro salvato.</span></li>`
+        : items.map(f => `
+            <li class="d-flex">
+                <a class="dropdown-item small flex-grow-1" href="#" data-saved-action="apply" data-id="${f.id}">
+                    <i class="bi bi-funnel me-1"></i>${escHtml(f.name)}
+                </a>
+                <a class="dropdown-item small text-danger flex-shrink-0" href="#" data-saved-action="delete" data-id="${f.id}" style="width:auto" title="Elimina">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </li>`).join('');
+    menu.innerHTML = head + body;
+}
+
+function applyFiltersToForm(payload) {
+    const form = document.getElementById('expenses-filters');
+    form.reset();
+    for (const [k, v] of Object.entries(payload ?? {})) {
+        const el = form.querySelector(`[name="${k}"]`);
+        if (el) el.value = v;
+    }
+    lastFilters = { ...payload };
+    loadList();
+}
+
+document.addEventListener('click', async (ev) => {
+    const a = ev.target.closest('[data-saved-action]');
+    if (!a) return;
+    ev.preventDefault();
+    const action = a.dataset.savedAction;
+
+    if (action === 'save') {
+        const name = prompt('Nome del filtro?');
+        if (!name) return;
+        const params = new URLSearchParams();
+        params.set('name',    name);
+        params.set('scope',   'expenses');
+        params.set('payload', JSON.stringify(lastFilters));
+        params.set('_csrf',   getCsrfToken());
+        try {
+            await send(`${BASE}/filters/save`, params);
+            toast.success('Filtro salvato.');
+            loadSavedFilters();
+        } catch (err) {
+            toast.error(err.message ?? 'Errore salvataggio filtro.');
+        }
+    } else if (action === 'apply') {
+        const f = savedFiltersCache.find(x => x.id == a.dataset.id);
+        if (f) applyFiltersToForm(f.payload);
+    } else if (action === 'delete') {
+        if (!confirm('Eliminare questo filtro salvato?')) return;
+        try {
+            await send(`${BASE}/filters/delete`, { id: a.dataset.id });
+            toast.success('Filtro eliminato.');
+            loadSavedFilters();
+        } catch (err) {
+            toast.error(err.message ?? 'Errore eliminazione filtro.');
+        }
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     loadCategoriesFromDom();
     wireFilters();
@@ -554,5 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
     wireTableActions();
     wireCsvButtons();
     loadTags();
+    loadSavedFilters();
     loadList();
 });
