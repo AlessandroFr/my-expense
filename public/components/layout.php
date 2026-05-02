@@ -57,6 +57,11 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
                     <i class="bi bi-bullseye me-1"></i>Budget
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="<?= htmlspecialchars($base . '/recurring', ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-arrow-repeat me-1"></i>Ricorrenti
+                </a>
+            </li>
         </ul>
         <div class="ms-auto d-flex align-items-center gap-2">
             <span class="text-muted small">

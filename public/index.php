@@ -80,6 +80,8 @@ switch ($route) {
     case 'GET /':
     case 'GET /dashboard':
         Auth::requireLogin();
+        // Auto-genera occorrenze pendenti da spese ricorrenti (best effort).
+        try { \App\RecurringExpense::generatePending((int) Auth::userId()); } catch (\Throwable $e) { /* silent */ }
         renderPage('dashboard');
         break;
     case 'GET /dashboard/data':
@@ -156,6 +158,30 @@ switch ($route) {
         require __DIR__ . '/endpoints/incomes_delete.php';
         break;
 
+    // ── Spese ricorrenti ─────────────────────────────────────────────────
+    case 'GET /recurring':
+        Auth::requireLogin();
+        renderPage('recurring');
+        break;
+    case 'GET /recurring/list':
+        require __DIR__ . '/endpoints/recurring_list.php';
+        break;
+    case 'POST /recurring/create':
+        require __DIR__ . '/endpoints/recurring_create.php';
+        break;
+    case 'POST /recurring/update':
+        require __DIR__ . '/endpoints/recurring_update.php';
+        break;
+    case 'POST /recurring/toggle':
+        require __DIR__ . '/endpoints/recurring_toggle.php';
+        break;
+    case 'POST /recurring/delete':
+        require __DIR__ . '/endpoints/recurring_delete.php';
+        break;
+    case 'POST /recurring/run':
+        require __DIR__ . '/endpoints/recurring_run.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -181,6 +207,7 @@ function renderPage(string $page, array $data = []): void
         'expenses'      => 'Spese',
         'incomes'       => 'Entrate',
         'budgets'       => 'Budget mensili',
+        'recurring'     => 'Spese ricorrenti',
         default         => 'Pagina non trovata',
     };
     extract($data, EXTR_SKIP);
