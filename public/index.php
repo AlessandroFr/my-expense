@@ -208,6 +208,20 @@ switch ($route) {
         require __DIR__ . '/endpoints/reports_year.php';
         break;
 
+    // ── Allegati ─────────────────────────────────────────────────────────
+    case 'GET /attachments/list':
+        require __DIR__ . '/endpoints/attachments_list.php';
+        break;
+    case 'POST /attachments/upload':
+        require __DIR__ . '/endpoints/attachments_upload.php';
+        break;
+    case 'POST /attachments/delete':
+        require __DIR__ . '/endpoints/attachments_delete.php';
+        break;
+    case 'GET /attachments/download':
+        require __DIR__ . '/endpoints/attachments_download.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');

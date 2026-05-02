@@ -8,6 +8,11 @@
 /logs/*
 !/logs/.gitkeep
 
+# Allegati utente (file binari, non commit)
+/uploads/expenses/
+!/uploads/.gitkeep
+!/uploads/.htaccess
+
 # Editor / IDE
 /.idea/
 /.vscode/

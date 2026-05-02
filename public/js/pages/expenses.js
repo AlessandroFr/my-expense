@@ -116,6 +116,7 @@ function renderViewRow(e) {
         <td><span class="badge bg-light text-dark">${escHtml(PAYMENT_LABELS[e.payment_method] ?? e.payment_method)}</span></td>
         <td class="text-end fw-semibold">${escHtml(fmtMoney(e.amount))}</td>
         <td class="text-end text-nowrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="attach" title="Allegati"><i class="bi bi-paperclip"></i></button>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit"><i class="bi bi-pencil"></i></button>
             <button type="button" class="btn btn-sm btn-outline-danger"    data-action="delete"><i class="bi bi-trash"></i></button>
         </td>`;
@@ -320,6 +321,11 @@ function wireTableActions() {
             return;
         }
 
+        if (action === 'attach') {
+            openAttachmentsModal(tr.dataset.id);
+            return;
+        }
+
         if (action === 'cancel') {
             await loadList();
             return;
@@ -385,6 +391,102 @@ function wireTableActions() {
 }
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
+
+function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+let attachmentsModalEl = null;
+let attachmentsModal   = null;
+let currentAttachExpenseId = null;
+
+function ensureAttachmentsModal() {
+    if (attachmentsModal) return attachmentsModal;
+    attachmentsModalEl = document.getElementById('attachments-modal');
+    attachmentsModal   = new bootstrap.Modal(attachmentsModalEl);
+    const form = document.getElementById('attachment-upload-form');
+    form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(form);
+        try {
+            const r = await fetch(`${BASE}/attachments/upload`, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-CSRF-Token': getCsrfToken() },
+            });
+            const json = await r.json();
+            if (!json.ok) throw new Error(json.error?.message ?? 'Upload fallito.');
+            toast.success('Allegato caricato.');
+            form.querySelector('input[name="file"]').value = '';
+            loadAttachmentsList(currentAttachExpenseId);
+        } catch (err) {
+            toast.error(err.message ?? 'Upload fallito.');
+        }
+    });
+    document.getElementById('attachments-list').addEventListener('click', async (ev) => {
+        const del = ev.target.closest('[data-att-action="delete"]');
+        if (!del) return;
+        if (!confirm('Eliminare l\'allegato?')) return;
+        const params = new URLSearchParams();
+        params.set('id',     del.dataset.id);
+        params.set('_csrf',  getCsrfToken());
+        try {
+            await send(`${BASE}/attachments/delete`, params);
+            toast.success('Allegato eliminato.');
+            loadAttachmentsList(currentAttachExpenseId);
+        } catch (err) {
+            toast.error(err.message ?? 'Errore eliminazione.');
+        }
+    });
+    return attachmentsModal;
+}
+
+async function loadAttachmentsList(expenseId) {
+    const box = document.getElementById('attachments-list');
+    box.innerHTML = '<div class="text-muted small text-center py-2">Caricamento…</div>';
+    try {
+        const r = await apiGuard(api.get(`${BASE}/attachments/list`, { expense_id: expenseId }));
+        const items = r.data?.attachments ?? [];
+        if (!items.length) {
+            box.innerHTML = '<div class="text-muted small text-center py-2">Nessun allegato.</div>';
+            return;
+        }
+        box.innerHTML = items.map(a => {
+            const isImg = (a.mime_type || '').startsWith('image/');
+            const icon  = isImg ? 'bi-image' : 'bi-file-earmark-pdf';
+            return `
+            <div class="d-flex align-items-center mb-2 border rounded p-2">
+                <i class="bi ${icon} fs-4 me-2 text-muted"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold small">${escHtml(a.original_name)}</div>
+                    <div class="text-muted small">${escHtml(a.mime_type)} · ${fmtBytes(a.size_bytes)}</div>
+                </div>
+                <a href="${BASE}/attachments/download?id=${a.id}" target="_blank" class="btn btn-sm btn-outline-primary me-1" title="Apri">
+                    <i class="bi bi-eye"></i>
+                </a>
+                <a href="${BASE}/attachments/download?id=${a.id}&download=1" class="btn btn-sm btn-outline-secondary me-1" title="Scarica">
+                    <i class="bi bi-download"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-danger" data-att-action="delete" data-id="${a.id}" title="Elimina">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        box.innerHTML = `<div class="alert alert-danger small mb-0">${escHtml(err.message ?? 'Errore.')}</div>`;
+    }
+}
+
+function openAttachmentsModal(expenseId) {
+    ensureAttachmentsModal();
+    currentAttachExpenseId = expenseId;
+    document.querySelector('#attachment-upload-form input[name="expense_id"]').value = expenseId;
+    loadAttachmentsList(expenseId);
+    attachmentsModal.show();
+}
 
 function wireCsvButtons() {
     const exportBtn = document.getElementById('btn-export-csv');

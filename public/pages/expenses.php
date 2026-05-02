@@ -197,4 +197,33 @@ $paymentLabels  = [
     </div>
 </div>
 
+<!-- ── Modal: allegati ────────────────────────────────────────────────────── -->
+<div class="modal fade" id="attachments-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-paperclip me-1"></i>Allegati spesa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <div id="attachments-list" class="mb-3">
+                    <div class="text-muted small text-center py-2">Caricamento…</div>
+                </div>
+                <hr>
+                <form id="attachment-upload-form" enctype="multipart/form-data" class="mb-0">
+                    <?= Csrf::field() ?>
+                    <input type="hidden" name="expense_id" value="">
+                    <label class="form-label small">Aggiungi file (jpg, png, gif, webp, pdf — max 8 MB)</label>
+                    <div class="input-group">
+                        <input type="file" name="file" accept="image/*,application/pdf" class="form-control" required>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload me-1"></i>Carica
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script type="module" src="<?= htmlspecialchars($base . '/js/pages/expenses.js', ENT_QUOTES, 'UTF-8') ?>"></script>
