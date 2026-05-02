@@ -38,7 +38,7 @@ $values = $old + $cat;
     <div class="col-lg-8">
         <div class="card shadow-sm">
             <div class="card-body p-4">
-                <form method="post" action="<?= htmlspecialchars($base . '/categories/update', ENT_QUOTES, 'UTF-8') ?>">
+                <form id="category-update-form" autocomplete="off">
                     <?= Csrf::field() ?>
                     <input type="hidden" name="id" value="<?= (int) $cat['id'] ?>">
 
@@ -86,3 +86,5 @@ $values = $old + $cat;
         </div>
     </div>
 </div>
+
+<script type="module" src="<?= htmlspecialchars($base . '/js/pages/categories.js', ENT_QUOTES, 'UTF-8') ?>"></script>

@@ -1,4 +1,4 @@
-import FetchLogger from '/javascript/FetchLogger.js';
+import FetchLogger from './FetchLogger.js';
 // ─── FetchRequest.js ─────────────────────────────────────────────────────────
 
 class FetchRequest {
@@ -18,7 +18,8 @@ class FetchRequest {
         loggerOptions: {
             service: `${window.location.origin}-API`,
             level: 'WARN',
-            transport: `${window.location.origin}/endpoints/logs/ingest.php`,
+            // Logger remoto disabilitato: my-expense non ha un endpoint di ingest log.
+            transport: null,
             flushInterval: 10000,
         },
     };

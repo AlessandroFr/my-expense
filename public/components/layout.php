@@ -23,7 +23,7 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
-<body class="bg-body-tertiary">
+<body class="bg-body-tertiary" data-base-url="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>">
 
 <?php if (Auth::check()): ?>
 <nav class="navbar navbar-expand bg-white border-bottom shadow-sm">
