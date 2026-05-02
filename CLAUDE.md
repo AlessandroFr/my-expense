@@ -15,7 +15,7 @@ dark mode, PWA installable + offline cache, full ZIP backup, client-side OCR
   (`001_categories.sql`, `002_expenses.sql`, `003_budgets.sql`,
   `004_incomes.sql`, `005_recurring_expenses.sql`, `006_tags.sql`,
   `007_attachments.sql`, `008_accounts.sql`, `009_saved_filters.sql`,
-  `010_expense_split.sql`)
+  `010_expense_split.sql`, `011_bank_import.sql`)
 - **Auth**: one-time setup at `/setup`, login at `/login`, POST logout, session
   + bcrypt + dual-source CSRF (hidden `_csrf` field + `csrf_token` cookie consumed
   by `public/js/FetchRequest.js` as `X-CSRF-Token` header)
@@ -90,6 +90,26 @@ dark mode, PWA installable + offline cache, full ZIP backup, client-side OCR
   picker (con `capture=environment` su mobile per camera). Estrae importo
   più grande (regex `\d+[.,]\d{2}`) e data (DD/MM/YYYY o YYYY-MM-DD),
   pre-popola i campi.
+- **Import estratto conto bancario** (`POST /import/bank-statement`,
+  modal "Estratto conto" su `/expenses`): parser per CSV Banca Sella /
+  Patavina (`App\BankStatementImporter`). Encoding Windows-1252 auto-rilevato
+  e convertito in UTF-8. Trova header
+  `Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate`
+  saltando metadata account. Per riga: `Uscite` → Expense (categoria via
+  Tipologia + MCC code), `Entrate` → Income (source = "Stipendio" /
+  "Bonifico da NOME" / "P2P" / ecc.). Le righe `RICARICA/RIMBORSO CARTA/E
+  PREPAGATA/E` generano **partita doppia** (opzionale, default ON):
+  expense sul conto sorgente + income su account "Carta Prepagata"
+  (auto-creato se mancante). Account selector obbligatorio nella modal.
+  Migration `011_bank_import.sql` aggiunge colonne `value_date` (data
+  valuta della banca, distinta da `expense_date` che resta data operazione)
+  e `import_hash` (SHA-256 con UNIQUE su `(user_id, hash)`) su
+  expenses/incomes — re-import dello stesso file è idempotente, le righe
+  duplicate vengono saltate e contate come `skipped_duplicate`. Mapping MCC
+  → categoria in `BankStatementImporter::MCC_MAP` (5411=Spesa,
+  5812/5814=Ristorazione, 5912=Farmacia, 5541/5542=Carburante, 7941=Sport,
+  ecc.). Le commissioni 1€ delle ricariche restano spese normali categoria
+  "Commissioni bancarie".
 
 **Conventions**:
 

@@ -5,6 +5,7 @@ namespace App;
 
 use DateTime;
 use InvalidArgumentException;
+use PDOException;
 
 final class Income
 {
@@ -70,6 +71,47 @@ final class Income
         $stmt->execute([
             $userId, $accountId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
         ]);
+        return (int) Database::pdo()->lastInsertId();
+    }
+
+    /**
+     * Insert per import bancario: include value_date + import_hash; ritorna l'id
+     * inserito oppure null se la riga e' un duplicato (unique constraint su
+     * (user_id, import_hash) sollevata).
+     */
+    public static function createImported(
+        int $userId,
+        string $source,
+        ?string $description,
+        string|float $amount,
+        string $incomeDate,
+        ?int $accountId,
+        ?string $valueDate,
+        string $importHash
+    ): ?int {
+        $row = self::validate($source, $description, $amount, $incomeDate);
+        $accountId = self::checkAccount($userId, $accountId);
+        if ($valueDate !== null && !self::isValidDate($valueDate)) {
+            throw new InvalidArgumentException('Data valuta non valida.');
+        }
+
+        try {
+            $stmt = Database::pdo()->prepare(
+                'INSERT INTO incomes (user_id, account_id, source, description, amount,
+                                      income_date, value_date, import_hash)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([
+                $userId, $accountId, $row['source'], $row['description'], $row['amount'],
+                $row['income_date'], $valueDate, $importHash,
+            ]);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000' && (int) ($e->errorInfo[1] ?? 0) === 1062) {
+                return null;
+            }
+            throw $e;
+        }
+
         return (int) Database::pdo()->lastInsertId();
     }
 

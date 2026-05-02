@@ -597,6 +597,60 @@ function wireCsvButtons() {
     }
 }
 
+// ── Bank statement import ──────────────────────────────────────────────────
+
+function wireBankImport() {
+    const form      = document.getElementById('bank-import-form');
+    const resultBox = document.getElementById('bank-import-result');
+    if (!form) return;
+
+    form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        resultBox.innerHTML = `<div class="text-muted small">
+            <span class="spinner-border spinner-border-sm me-2"></span>Importazione estratto conto in corso...</div>`;
+        try {
+            const fd = new FormData(form);
+            const r  = await fetch(`${BASE}/import/bank-statement`, {
+                method:  'POST',
+                body:    fd,
+                headers: { 'X-CSRF-Token': getCsrfToken() },
+            });
+            const json = await r.json();
+            if (!json.ok) {
+                throw new Error(json.error?.message ?? 'Errore import.');
+            }
+            const d = json.data ?? {};
+            const errs = (d.errors ?? []).slice(0, 10);
+            const ibanInfo = d.account_iban_detected
+                ? `<div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>IBAN rilevato nel file: <code>${escHtml(d.account_iban_detected)}</code></div>`
+                : '';
+            let html = ibanInfo + `<div class="alert alert-success small mb-2">
+                <strong>${d.imported_expenses}</strong> spese, <strong>${d.imported_incomes}</strong> entrate importate.<br>
+                <strong>${d.transfers_paired}</strong> ricariche con partita doppia.
+                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_empty}</strong> righe vuote.
+            </div>`;
+            if (errs.length) {
+                html += `<div class="small text-muted">Prime ${errs.length} righe scartate (su ${(d.errors ?? []).length}):</div>
+                    <ul class="small mb-0">` +
+                    errs.map(e => `<li>Riga ${e.row}: ${escHtml(e.message)}</li>`).join('') +
+                    `</ul>`;
+            }
+            resultBox.innerHTML = html;
+            const tot = (d.imported_expenses ?? 0) + (d.imported_incomes ?? 0) + (d.transfers_paired ?? 0);
+            toast.success(`Estratto conto importato: ${tot} righe.`);
+            loadList();
+        } catch (err) {
+            resultBox.innerHTML = `<div class="alert alert-danger small mb-0">
+                ${escHtml(err.message ?? 'Errore import.')}</div>`;
+            toast.error(err.message ?? 'Errore import.');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+}
+
 // ── Saved filters ──────────────────────────────────────────────────────────
 
 let savedFiltersCache = [];
@@ -726,6 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireCreateForm();
     wireTableActions();
     wireCsvButtons();
+    wireBankImport();
     wireOcr();
     loadTags();
     loadSavedFilters();

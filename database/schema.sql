@@ -199,6 +199,14 @@ CREATE TABLE IF NOT EXISTS `accounts` (
 -- ALTER TABLE expenses ADD COLUMN shared_with VARCHAR(255) NULL AFTER description;
 -- ALTER TABLE expenses ADD COLUMN share_amount DECIMAL(12,2) NULL AFTER shared_with;
 -- (gestiti via migration; non duplicati qui per evitare rebuild da zero invasivo)
+--
+-- Bank import (Migration: 011_bank_import.sql)
+-- ALTER TABLE expenses ADD COLUMN value_date  DATE     NULL AFTER expense_date;
+-- ALTER TABLE expenses ADD COLUMN import_hash CHAR(64) NULL AFTER updated_at;
+-- ALTER TABLE expenses ADD UNIQUE KEY uq_expenses_user_imphash (user_id, import_hash);
+-- ALTER TABLE incomes  ADD COLUMN value_date  DATE     NULL AFTER income_date;
+-- ALTER TABLE incomes  ADD COLUMN import_hash CHAR(64) NULL AFTER updated_at;
+-- ALTER TABLE incomes  ADD UNIQUE KEY uq_incomes_user_imphash  (user_id, import_hash);
 
 CREATE TABLE IF NOT EXISTS `saved_filters` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,

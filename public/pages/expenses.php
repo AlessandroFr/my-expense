@@ -4,6 +4,7 @@
  * La tabella e il totale sono popolati lato client da public/js/pages/expenses.js.
  */
 
+use App\Account;
 use App\Auth;
 use App\Category;
 use App\Config;
@@ -13,6 +14,7 @@ use App\Expense;
 $base       = rtrim(Config::get('app')['base_url'] ?? '', '/');
 $userId     = (int) Auth::userId();
 $categories = Category::allForUser($userId);
+$accounts   = Account::allForUser($userId, false);
 $today      = date('Y-m-d');
 $paymentMethods = Expense::PAYMENT_METHODS;
 $paymentLabels  = [
@@ -40,8 +42,11 @@ $paymentLabels  = [
         <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
             <i class="bi bi-download me-1"></i>Esporta
         </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal">
+        <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal" title="Importa CSV semplice">
             <i class="bi bi-upload me-1"></i>Importa
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="btn-import-bank" data-bs-toggle="modal" data-bs-target="#bank-import-modal" title="Importa estratto conto bancario">
+            <i class="bi bi-bank me-1"></i>Estratto conto
         </button>
         <span class="text-muted small">Totale filtrato: </span>
         <span id="expenses-total" class="fw-semibold fs-5">EUR 0,00</span>
@@ -77,6 +82,65 @@ $paymentLabels  = [
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-upload me-1"></i>Importa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: import estratto conto bancario ──────────────────────────────── -->
+<div class="modal fade" id="bank-import-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="bank-import-form" enctype="multipart/form-data">
+                <?= Csrf::field() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-bank me-1"></i>Importa estratto conto bancario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">
+                        Formato Banca Sella / Patavina (header
+                        <code>Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate</code>,
+                        encoding Windows-1252, date <code>DD/MM/YYYY</code>).
+                        Le righe in <strong>Uscite</strong> diventano spese, quelle in <strong>Entrate</strong> diventano entrate.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Conto su cui importare</label>
+                        <?php if (empty($accounts)): ?>
+                            <div class="alert alert-warning small mb-0">
+                                Nessun conto attivo. <a href="<?= htmlspecialchars($base . '/accounts', ENT_QUOTES, 'UTF-8') ?>">Crea prima un conto</a>.
+                            </div>
+                        <?php else: ?>
+                            <select name="account_id" class="form-select" required>
+                                <option value="">— Seleziona conto —</option>
+                                <?php foreach ($accounts as $a): ?>
+                                    <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) $a['type'], ENT_QUOTES, 'UTF-8') ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php endif; ?>
+                    </div>
+                    <input type="file" name="file" accept=".csv" class="form-control mb-2" required>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="bank-create-cats" name="create_missing_categories" value="1" checked>
+                        <label class="form-check-label small" for="bank-create-cats">
+                            Crea automaticamente le categorie mancanti (per Tipologia / MCC)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="bank-pair-ricariche" name="auto_pair_ricariche" value="1" checked>
+                        <label class="form-check-label small" for="bank-pair-ricariche">
+                            Partita doppia per ricariche carta prepagata
+                            <span class="text-muted">(crea spesa sul conto + entrata su account "Carta Prepagata")</span>
+                        </label>
+                    </div>
+                    <div id="bank-import-result" class="mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                    <button type="submit" class="btn btn-primary" <?= empty($accounts) ? 'disabled' : '' ?>>
+                        <i class="bi bi-bank me-1"></i>Importa
                     </button>
                 </div>
             </form>

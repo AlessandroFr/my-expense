@@ -5,6 +5,7 @@ namespace App;
 
 use DateTime;
 use InvalidArgumentException;
+use PDOException;
 
 final class Expense
 {
@@ -122,6 +123,55 @@ final class Expense
             $row['payment_method'],
             $row['expense_date'],
         ]);
+
+        return (int) Database::pdo()->lastInsertId();
+    }
+
+    /**
+     * Insert per import bancario: include value_date + import_hash; ritorna l'id
+     * inserito oppure null se la riga e' un duplicato (unique constraint su
+     * (user_id, import_hash) sollevata).
+     */
+    public static function createImported(
+        int $userId,
+        ?int $categoryId,
+        string|float $amount,
+        ?string $description,
+        string $paymentMethod,
+        string $expenseDate,
+        ?int $accountId,
+        ?string $valueDate,
+        string $importHash
+    ): ?int {
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId);
+        if ($valueDate !== null && !self::isValidDate($valueDate)) {
+            throw new InvalidArgumentException('Data valuta non valida.');
+        }
+
+        try {
+            $stmt = Database::pdo()->prepare(
+                'INSERT INTO expenses (user_id, category_id, account_id, amount, description,
+                                       payment_method, expense_date, value_date, import_hash)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([
+                $userId,
+                $row['category_id'],
+                $row['account_id'],
+                $row['amount'],
+                $row['description'],
+                $row['payment_method'],
+                $row['expense_date'],
+                $valueDate,
+                $importHash,
+            ]);
+        } catch (PDOException $e) {
+            // 23000 + errno 1062 = duplicate key on (user_id, import_hash)
+            if ($e->getCode() === '23000' && (int) ($e->errorInfo[1] ?? 0) === 1062) {
+                return null;
+            }
+            throw $e;
+        }
 
         return (int) Database::pdo()->lastInsertId();
     }
