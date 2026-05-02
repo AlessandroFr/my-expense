@@ -4,24 +4,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`my-expense` is a personal expense tracker the user is building from scratch.
-As of 2026-05-02 the **MVP is complete**:
+`my-expense` is a personal expense tracker. **Phase 2 complete (2026-05-02)** —
+beyond MVP: budget per category, income tracking, recurring expenses with
+auto-generator, CSV import/export.
 
 - `composer.json` (PSR-4 autoload of `App\` from `src/class/`)
 - `database/schema.sql` cumulative + numbered migrations in `database/migrations/`
-  (`001_categories.sql`, `002_expenses.sql`)
+  (`001_categories.sql`, `002_expenses.sql`, `003_budgets.sql`,
+  `004_incomes.sql`, `005_recurring_expenses.sql`)
 - **Auth**: one-time setup at `/setup`, login at `/login`, POST logout, session
   + bcrypt + dual-source CSRF (hidden `_csrf` field + `csrf_token` cookie consumed
   by `public/js/FetchRequest.js` as `X-CSRF-Token` header)
 - **Categorie** (`/categories`, `/categories/edit?id=N`): per-user CRUD with name
   (UNIQUE per user), color, Bootstrap Icon, sort order; AJAX via FetchRequest +
   JSON envelope (`App\Json::ok` / `App\Json::error`)
-- **Spese** (`/expenses`): full CRUD with inline create form, inline row edit
-  (row → form-row → save), delete with confirm; filter bar (date range, category,
-  amount min/max, text search, debounced); JOIN to categories with color/icon
-- **Dashboard** (`/dashboard`): 3 KPI cards (current month / previous month /
-  delta % colored red/green) + Chart.js doughnut (distribution by category) +
-  bar chart (last 6 months trend)
+- **Spese** (`/expenses`): full CRUD with inline create form, inline row edit,
+  delete with confirm; filter bar (date range, category, amount min/max,
+  text search, debounced); JOIN to categories with color/icon. **CSV
+  import/export** (UTF-8 BOM + `;` separator; header
+  `Data;Categoria;Descrizione;Importo;Pagamento`; auto-creates missing
+  categories; tolerant of `DD/MM/YYYY`, `,` decimal, IT payment labels).
+- **Entrate** (`/incomes`): mirror of expenses with free-form `source` field
+  (Stipendio/Freelance/Rimborso ecc.); same filter bar + inline CRUD.
+- **Budget mensili** (`/budgets`): set per-category cap per month (`YYYY-MM`),
+  view real-time progress bars (green <80% / yellow ≥80% / red ≥100%); also
+  rendered on dashboard for current month.
+- **Spese ricorrenti** (`/recurring`): templates (weekly/monthly/yearly) with
+  optional end date; `App\RecurringExpense::generatePending()` runs on every
+  `GET /dashboard` request and inserts pending occurrences into `expenses`,
+  idempotent via `last_generated_date`. Manual "Genera ora" button available.
+- **Dashboard** (`/dashboard`): 4 KPI cards (Spese mese / Entrate mese /
+  Bilancio netto / Variazione spese%), Chart.js doughnut (by category),
+  dual-bar chart (spese rosso + entrate verdi, ultimi 6 mesi), budget
+  progress widget.
 
 **Conventions**:
 

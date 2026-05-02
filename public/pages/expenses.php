@@ -23,11 +23,54 @@ $paymentLabels  = [
 ];
 ?>
 <div class="row mb-3 align-items-center">
-    <div class="col-md-6"><h1 class="h3 mb-0"><i class="bi bi-receipt me-2"></i>Spese</h1></div>
+    <div class="col-md-6">
+        <h1 class="h3 mb-0"><i class="bi bi-receipt me-2"></i>Spese</h1>
+    </div>
     <div class="col-md-6 text-md-end">
+        <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
+            <i class="bi bi-download me-1"></i>Esporta
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal">
+            <i class="bi bi-upload me-1"></i>Importa
+        </button>
         <span class="text-muted small">Totale filtrato: </span>
-        <span id="expenses-total" class="fw-semibold fs-5">€ 0,00</span>
+        <span id="expenses-total" class="fw-semibold fs-5">EUR 0,00</span>
         <span class="text-muted small ms-2" id="expenses-count">(0 voci)</span>
+    </div>
+</div>
+
+<!-- ── Modal: import CSV ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="csv-import-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="csv-import-form" enctype="multipart/form-data">
+                <?= Csrf::field() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload me-1"></i>Importa spese da CSV</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">
+                        Formato accettato: header <code>Data;Categoria;Descrizione;Importo;Pagamento</code>
+                        (separatore <code>;</code> o <code>,</code>). Data <code>YYYY-MM-DD</code> o <code>DD/MM/YYYY</code>.
+                    </p>
+                    <input type="file" name="file" accept=".csv" class="form-control mb-2" required>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="create-missing-cats" name="create_missing_categories" value="1" checked>
+                        <label class="form-check-label small" for="create-missing-cats">
+                            Crea automaticamente le categorie mancanti
+                        </label>
+                    </div>
+                    <div id="csv-import-result" class="mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i>Importa
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 

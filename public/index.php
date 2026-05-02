@@ -139,6 +139,12 @@ switch ($route) {
     case 'POST /expenses/delete':
         require __DIR__ . '/endpoints/expenses_delete.php';
         break;
+    case 'GET /expenses/export':
+        require __DIR__ . '/endpoints/expenses_export.php';
+        break;
+    case 'POST /expenses/import':
+        require __DIR__ . '/endpoints/expenses_import.php';
+        break;
 
     // ── Entrate ──────────────────────────────────────────────────────────
     case 'GET /incomes':

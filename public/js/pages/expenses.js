@@ -309,10 +309,70 @@ function wireTableActions() {
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
+function wireCsvButtons() {
+    const exportBtn = document.getElementById('btn-export-csv');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const params = new URLSearchParams();
+            for (const [k, v] of Object.entries(lastFilters)) {
+                if (v !== '' && v !== null && v !== undefined) params.set(k, v);
+            }
+            const qs  = params.toString();
+            const url = `${BASE}/expenses/export${qs ? '?' + qs : ''}`;
+            window.location.href = url;
+        });
+    }
+
+    const importForm = document.getElementById('csv-import-form');
+    const resultBox  = document.getElementById('csv-import-result');
+    if (importForm) {
+        importForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const submitBtn = importForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            resultBox.innerHTML = `<div class="text-muted small">
+                <span class="spinner-border spinner-border-sm me-2"></span>Importazione in corso...</div>`;
+            try {
+                const fd = new FormData(importForm);
+                const r  = await fetch(`${BASE}/expenses/import`, {
+                    method: 'POST',
+                    body:   fd,
+                    headers: { 'X-CSRF-Token': getCsrfToken() },
+                });
+                const json = await r.json();
+                if (!json.ok) {
+                    throw new Error(json.error?.message ?? 'Errore import.');
+                }
+                const d = json.data ?? {};
+                const errs = (d.errors ?? []).slice(0, 10);
+                let html = `<div class="alert alert-success small mb-2">
+                    Importate <strong>${d.imported}</strong> spese, saltate <strong>${d.skipped}</strong>.
+                </div>`;
+                if (errs.length) {
+                    html += `<div class="small text-muted">Prime ${errs.length} righe scartate:</div>
+                        <ul class="small mb-0">` +
+                        errs.map(e => `<li>Riga ${e.row}: ${escHtml(e.message)}</li>`).join('') +
+                        `</ul>`;
+                }
+                resultBox.innerHTML = html;
+                toast.success(`Importate ${d.imported} spese.`);
+                loadList();
+            } catch (err) {
+                resultBox.innerHTML = `<div class="alert alert-danger small mb-0">
+                    ${escHtml(err.message ?? 'Errore import.')}</div>`;
+                toast.error(err.message ?? 'Errore import.');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadCategoriesFromDom();
     wireFilters();
     wireCreateForm();
     wireTableActions();
+    wireCsvButtons();
     loadList();
 });
