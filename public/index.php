@@ -83,6 +83,25 @@ switch ($route) {
         renderPage('dashboard');
         break;
 
+    // ── Categorie ────────────────────────────────────────────────────────
+    case 'GET /categories':
+        Auth::requireLogin();
+        renderPage('categories');
+        break;
+    case 'GET /categories/edit':
+        Auth::requireLogin();
+        renderPage('category_edit', ['id' => (int) ($_GET['id'] ?? 0)]);
+        break;
+    case 'POST /categories/create':
+        require __DIR__ . '/endpoints/categories_create.php';
+        break;
+    case 'POST /categories/update':
+        require __DIR__ . '/endpoints/categories_update.php';
+        break;
+    case 'POST /categories/delete':
+        require __DIR__ . '/endpoints/categories_delete.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -91,19 +110,22 @@ switch ($route) {
 
 /**
  * Rende una pagina avvolta nel layout.
- * Il layout legge $contentFile e $title.
+ * Il layout legge $contentFile, $title, e qualsiasi variabile in $data.
  */
-function renderPage(string $page): void
+function renderPage(string $page, array $data = []): void
 {
     $root        = dirname(__DIR__);
     $pageFile    = $root . '/public/pages/' . $page . '.php';
     $layoutFile  = $root . '/public/components/layout.php';
     $contentFile = is_file($pageFile) ? $pageFile : null;
     $title       = match ($page) {
-        'setup'     => 'Configurazione iniziale',
-        'login'     => 'Login',
-        'dashboard' => 'Dashboard',
-        default     => 'Pagina non trovata',
+        'setup'         => 'Configurazione iniziale',
+        'login'         => 'Login',
+        'dashboard'     => 'Dashboard',
+        'categories'    => 'Categorie',
+        'category_edit' => 'Modifica categoria',
+        default         => 'Pagina non trovata',
     };
+    extract($data, EXTR_SKIP);
     require $layoutFile;
 }

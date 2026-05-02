@@ -31,6 +31,18 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
         <a class="navbar-brand fw-semibold" href="<?= htmlspecialchars($base . '/dashboard', ENT_QUOTES, 'UTF-8') ?>">
             <i class="bi bi-wallet2 me-1"></i><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>
         </a>
+        <ul class="navbar-nav flex-row gap-3 ms-3">
+            <li class="nav-item">
+                <a class="nav-link" href="<?= htmlspecialchars($base . '/dashboard', ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="<?= htmlspecialchars($base . '/categories', ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-tags me-1"></i>Categorie
+                </a>
+            </li>
+        </ul>
         <div class="ms-auto d-flex align-items-center gap-2">
             <span class="text-muted small">
                 <i class="bi bi-person-circle me-1"></i>
