@@ -6,6 +6,7 @@ declare(strict_types=1);
  */
 
 use App\Auth;
+use App\Budget;
 use App\Csrf;
 use App\Expense;
 use App\Json;
@@ -28,10 +29,15 @@ $userId        = (int) Auth::userId();
 try {
     $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate);
     $row = Expense::findForUser($id, $userId);
+    $ym  = substr($expenseDate, 0, 7);
+    $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);
 } catch (InvalidArgumentException $e) {
     Json::error($e->getMessage(), 'validation', 400);
 } catch (Throwable $e) {
     Json::error('Errore server: ' . $e->getMessage(), 'server', 500);
 }
 
-Json::ok(['expense' => $row]);
+Json::ok([
+    'expense'        => $row,
+    'budget_warning' => $budgetWarning,
+]);

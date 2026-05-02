@@ -38,6 +38,15 @@ function getCsrfToken() {
 }
 
 function fmtMoney(n) { return moneyFmt.format(Number(n) || 0); }
+
+function showBudgetWarning(w) {
+    if (!w) return;
+    if (w.exceeded) {
+        toast.error(`Budget "${w.name}" superato! Speso ${fmtMoney(w.spent)} su ${fmtMoney(w.amount)} (${w.progress_pct}%).`);
+    } else if (w.near_limit) {
+        toast.warning(`Attenzione: budget "${w.name}" all'${w.progress_pct}% (${fmtMoney(w.spent)} / ${fmtMoney(w.amount)}).`);
+    }
+}
 function fmtDate(iso) {
     if (!iso) return '';
     const d = new Date(iso + 'T00:00:00');
@@ -227,6 +236,7 @@ function wireCreateForm() {
             if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
 
             toast.success('Spesa registrata.');
+            showBudgetWarning(r.data?.budget_warning);
         } catch (err) {
             toast.error(err.message ?? 'Errore creazione spesa.');
         } finally {
@@ -298,6 +308,7 @@ function wireTableActions() {
                 tr.replaceWith(renderViewRow(exp));
                 updateTotalFromTable();
                 toast.success('Spesa aggiornata.');
+                showBudgetWarning(r.data?.budget_warning);
             } catch (err) {
                 btn.disabled = false;
                 toast.error(err.message ?? 'Errore aggiornamento spesa.');

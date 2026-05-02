@@ -90,6 +90,55 @@ final class Budget
         return (int) Database::pdo()->lastInsertId();
     }
 
+    /**
+     * Stato budget per (categoria, mese). Null se la categoria non ha budget per il mese.
+     *
+     * @return array{
+     *   name:string, amount:float, spent:float, remaining:float, progress_pct:float,
+     *   exceeded:bool, near_limit:bool
+     * }|null
+     */
+    public static function checkForCategory(int $userId, ?int $categoryId, string $yearMonth): ?array
+    {
+        if ($categoryId === null) return null;
+        if (!self::isValidYearMonth($yearMonth)) return null;
+
+        $start = $yearMonth . '-01';
+        $end   = date('Y-m-d', strtotime($start . ' +1 month'));
+
+        $stmt = Database::pdo()->prepare(
+            "SELECT b.amount, c.name,
+                    COALESCE(SUM(e.amount), 0) AS spent
+             FROM budgets b
+             INNER JOIN categories c ON c.id = b.category_id AND c.user_id = b.user_id
+             LEFT JOIN expenses e
+               ON e.user_id = b.user_id
+              AND e.category_id = b.category_id
+              AND e.expense_date >= ?
+              AND e.expense_date <  ?
+             WHERE b.user_id = ? AND b.category_id = ? AND b.year_month = ?
+             GROUP BY b.amount, c.name
+             LIMIT 1"
+        );
+        $stmt->execute([$start, $end, $userId, $categoryId, $yearMonth]);
+        $row = $stmt->fetch();
+        if ($row === false) return null;
+
+        $amount = (float) $row['amount'];
+        $spent  = (float) $row['spent'];
+        $pct    = $amount > 0 ? ($spent / $amount) * 100.0 : 0.0;
+
+        return [
+            'name'         => (string) $row['name'],
+            'amount'       => round($amount, 2),
+            'spent'        => round($spent, 2),
+            'remaining'    => round($amount - $spent, 2),
+            'progress_pct' => round($pct, 1),
+            'exceeded'     => $spent > $amount,
+            'near_limit'   => $pct >= 80.0 && $spent <= $amount,
+        ];
+    }
+
     public static function deleteForMonth(int $userId, int $categoryId, string $yearMonth): void
     {
         if (!self::isValidYearMonth($yearMonth)) {
