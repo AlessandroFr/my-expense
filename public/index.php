@@ -251,6 +251,11 @@ switch ($route) {
         require __DIR__ . '/endpoints/filters_delete.php';
         break;
 
+    // ── Backup ───────────────────────────────────────────────────────────
+    case 'GET /backup/download':
+        require __DIR__ . '/endpoints/backup_download.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');

@@ -109,6 +109,9 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
                     <li><a class="dropdown-item small" href="#" data-theme-mode="auto"><i class="bi bi-circle-half me-1"></i>Auto (sistema)</a></li>
                 </ul>
             </div>
+            <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($base . '/backup/download', ENT_QUOTES, 'UTF-8') ?>" title="Backup completo (ZIP)">
+                <i class="bi bi-cloud-download"></i>
+            </a>
             <span class="text-muted small">
                 <i class="bi bi-person-circle me-1"></i>
                 <?= htmlspecialchars(Auth::username() ?? '', ENT_QUOTES, 'UTF-8') ?>
