@@ -4,15 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`my-expense` is a personal expense tracker. **Phase 3 complete (2026-05-02)** —
-MVP + budgets + incomes + recurring + CSV (fase 2) + budget overrun warnings,
-free-form tags, annual report dashboard, expense file attachments (fase 3).
+`my-expense` is a personal expense tracker. **Phase 4 complete (2026-05-02)** —
+MVP + budgets + incomes + recurring + CSV (fase 2) + warnings + tags + reports +
+attachments (fase 3) + multi-account, saved searches, expense splitting,
+dark mode, PWA installable + offline cache, full ZIP backup, client-side OCR
+(fase 4).
 
 - `composer.json` (PSR-4 autoload of `App\` from `src/class/`)
 - `database/schema.sql` cumulative + numbered migrations in `database/migrations/`
   (`001_categories.sql`, `002_expenses.sql`, `003_budgets.sql`,
   `004_incomes.sql`, `005_recurring_expenses.sql`, `006_tags.sql`,
-  `007_attachments.sql`)
+  `007_attachments.sql`, `008_accounts.sql`, `009_saved_filters.sql`,
+  `010_expense_split.sql`)
 - **Auth**: one-time setup at `/setup`, login at `/login`, POST logout, session
   + bcrypt + dual-source CSRF (hidden `_csrf` field + `csrf_token` cookie consumed
   by `public/js/FetchRequest.js` as `X-CSRF-Token` header)
@@ -59,6 +62,34 @@ free-form tags, annual report dashboard, expense file attachments (fase 3).
   `/attachments/download?id=N` con auth + ownership check). Whitelist mime:
   jpg/png/gif/webp/pdf, max 8 MB. Bottone clip in ogni riga di `/expenses`
   apre modal con upload + lista + view/download/delete.
+- **Multi-conto** (`/accounts`): tabella `accounts` + colonna `account_id`
+  su expenses/incomes/recurring (FK SET NULL). Saldo live = opening + entrate
+  - spese (calcolato a runtime in `Account::withBalances()`). Tipi: checking/
+  card/cash/savings/other. Archivio invece di delete per preservare la
+  history. Filtro Conto in `/expenses`.
+- **Saved filters**: tabella `saved_filters` (user, scope, name, payload JSON).
+  Dropdown in toolbar `/expenses`: salva combinazione filtri corrente come
+  preset, applica con un click, elimina.
+- **Splitting**: colonne `shared_with` (string informale) + `share_amount`
+  (DECIMAL) su `expenses`. Se `share_amount` è impostato è la tua quota
+  effettiva; `amount` resta il totale dello scontrino. Badge `<i bi-people>`
+  nelle righe.
+- **Dark mode**: toggle in navbar (light/dark/auto) con persistenza via
+  `localStorage[mx-theme]`. Bootstrap 5.3 `data-bs-theme`. Inline script in
+  `<head>` previene FOUC. `js/theme.js` reagisce a system change quando in
+  modalità auto.
+- **PWA**: `public/manifest.webmanifest` + `public/sw.js` (cache-first per
+  asset CDN, network-first per HTML/JSON, fallback offline). Service worker
+  registrato da `layout.php`. Installable via Chrome/Edge/Safari "Install".
+- **Backup ZIP** (`GET /backup/download`): icona cloud-download in navbar.
+  `App\BackupService` produce `dump.sql` con INSERT statements scoped per
+  user_id su tutte le 11 tabelle + cartella `uploads/{user_id}/` zippata
+  via `ZipArchive`. Fallback `.sql` only se l'estensione manca.
+- **OCR scontrini**: `js/ocr.js` lazy-load Tesseract.js da CDN (ita+eng).
+  Bottone "Scansiona scontrino" nel create form di `/expenses` apre file
+  picker (con `capture=environment` su mobile per camera). Estrae importo
+  più grande (regex `\d+[.,]\d{2}`) e data (DD/MM/YYYY o YYYY-MM-DD),
+  pre-popola i campi.
 
 **Conventions**:
 

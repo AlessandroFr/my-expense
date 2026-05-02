@@ -185,6 +185,13 @@ $paymentLabels  = [
             <div class="col-md-1 d-grid">
                 <button type="submit" class="btn btn-primary" title="Aggiungi"><i class="bi bi-check-lg"></i></button>
             </div>
+            <div class="col-12">
+                <label class="btn btn-sm btn-outline-secondary mb-0">
+                    <i class="bi bi-camera me-1"></i>Scansiona scontrino (OCR)
+                    <input type="file" id="ocr-input" accept="image/*" capture="environment" hidden>
+                </label>
+                <span id="ocr-status" class="small text-muted ms-2"></span>
+            </div>
         </form>
     </div>
 </div>

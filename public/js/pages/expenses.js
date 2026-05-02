@@ -644,12 +644,55 @@ document.addEventListener('click', async (ev) => {
     }
 });
 
+function wireOcr() {
+    const input  = document.getElementById('ocr-input');
+    const status = document.getElementById('ocr-status');
+    if (!input) return;
+
+    input.addEventListener('change', async (ev) => {
+        const file = ev.target.files?.[0];
+        if (!file) return;
+        status.textContent = 'Caricamento OCR...';
+        try {
+            const { extractFromImage } = await import(`${BASE}/js/ocr.js`);
+            const result = await extractFromImage(file, (m) => {
+                if (m.status && m.progress != null) {
+                    status.textContent = `${m.status} ${(m.progress * 100).toFixed(0)}%`;
+                }
+            });
+            const form = document.getElementById('expense-create-form');
+            let parts = [];
+            if (result.amount) {
+                form.querySelector('input[name="amount"]').value = result.amount.toFixed(2);
+                parts.push(`importo ${result.amount.toFixed(2)}`);
+            }
+            if (result.date) {
+                form.querySelector('input[name="expense_date"]').value = result.date;
+                parts.push(`data ${result.date}`);
+            }
+            if (parts.length) {
+                status.textContent = 'Estratti: ' + parts.join(', ') + '. Verifica i campi prima di salvare.';
+                toast.success('OCR completato.');
+            } else {
+                status.textContent = 'Nessun importo o data riconosciuti. Compila a mano.';
+                toast.warning('OCR: nulla di riconoscibile.');
+            }
+        } catch (err) {
+            status.textContent = '';
+            toast.error(err.message ?? 'Errore OCR.');
+        } finally {
+            input.value = '';
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadCategoriesFromDom();
     wireFilters();
     wireCreateForm();
     wireTableActions();
     wireCsvButtons();
+    wireOcr();
     loadTags();
     loadSavedFilters();
     loadList();
