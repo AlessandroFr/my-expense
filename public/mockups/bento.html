@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup · Bento Apple Premium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F2F2F7; --bg-2: #E8E8ED; --surface: #FFFFFF;
+  --ink: #1D1D1F; --ink-2: #6E6E73; --ink-3: #AEAEB2;
+  --line: rgba(0,0,0,0.06);
+  --blue: #007AFF; --teal: #30D158; --orange: #FF9500;
+  --pink: #FF2D55; --indigo: #5856D6; --purple: #AF52DE;
+  --pos: #34C759; --neg: #FF3B30;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; line-height: 1.5; letter-spacing: -0.015em; -webkit-font-smoothing: antialiased; }
+.num { font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+
+.app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.side { background: var(--bg); padding: 24px 16px; border-right: 1px solid var(--line); }
+.brand { padding: 8px 12px 24px; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+.brand-icon { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--blue), var(--purple)); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 14px; box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
+.side-section { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); padding: 16px 12px 8px; font-weight: 600; }
+.side a { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 2px; border-radius: 8px; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500; }
+.side a:hover { background: var(--bg-2); color: var(--ink); }
+.side a.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.side a svg { width: 16px; height: 16px; opacity: 0.7; }
+
+.main { padding: 32px 40px 64px; max-width: 1280px; }
+.head-bar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; }
+.head-bar h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 4px; }
+.head-bar .sub { color: var(--ink-2); font-size: 14px; }
+.btn-pill { padding: 8px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink); }
+
+.bento { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 130px; gap: 16px; }
+.tile { background: var(--surface); border-radius: 24px; padding: 24px; position: relative; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -12px rgba(0,0,0,0.08); transition: transform .25s, box-shadow .25s; }
+.tile:hover { transform: translateY(-2px); box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 16px 32px -12px rgba(0,0,0,0.12); }
+.tile-label { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.t-hero { grid-column: span 4; grid-row: span 2; }
+.t-half { grid-column: span 3; grid-row: span 2; }
+.t-sq   { grid-column: span 2; grid-row: span 1; }
+.t-sq-2 { grid-column: span 2; grid-row: span 2; }
+
+.tile-hero { background: linear-gradient(135deg, #007AFF 0%, #5856D6 50%, #AF52DE 100%); color: white; padding: 32px; }
+.tile-hero::after { content: ''; position: absolute; right: -80px; bottom: -80px; width: 280px; height: 280px; background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%); }
+.tile-hero .tile-label { color: rgba(255,255,255,0.7); }
+.tile-hero .big { font-size: 56px; font-weight: 800; letter-spacing: -0.05em; line-height: 1; margin-top: 16px; }
+.tile-hero .delta { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(255,255,255,0.20); border-radius: 999px; font-size: 13px; font-weight: 600; backdrop-filter: blur(20px); }
+
+.tile-num { display: flex; flex-direction: column; justify-content: space-between; }
+.tile-num .big { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+.tile-num .big.pos { color: var(--pos); }
+.tile-num .big.neg { color: var(--neg); }
+
+.tile-trend { display: flex; flex-direction: column; }
+.tile-trend .bars { display: flex; align-items: flex-end; gap: 8px; flex: 1; padding-top: 16px; }
+.tile-trend .bar-col { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.tile-trend .bar-spese { background: var(--pink); border-radius: 4px 4px 0 0; }
+.tile-trend .bar-entrate { background: var(--blue); border-radius: 4px 4px 0 0; }
+.tile-trend .x { display: flex; gap: 8px; margin-top: 8px; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.tile-trend .x span { flex: 1; text-align: center; }
+
+.tile-list { padding: 20px 24px; }
+.tile-list .head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.list-item { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.list-item:last-child { border-bottom: none; }
+.li-icon { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+.li-name { font-weight: 500; font-size: 14px; }
+.li-meta { font-size: 12px; color: var(--ink-3); }
+.li-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.tile-donut { display: flex; flex-direction: column; align-items: stretch; }
+.donut-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
+.donut { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(var(--blue) 0 32%, var(--pink) 32% 56%, var(--orange) 56% 76%, var(--purple) 76% 90%, var(--teal) 90% 100%); position: relative; }
+.donut::after { content: ''; position: absolute; inset: 18px; background: var(--surface); border-radius: 50%; }
+.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-2); font-weight: 600; z-index: 1; }
+.donut-center b { font-size: 20px; color: var(--ink); display: block; }
+
+.tile-budget { padding: 20px 24px; }
+.bud { margin-bottom: 12px; }
+.bud:last-child { margin-bottom: 0; }
+.bud-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.bud-name { font-weight: 500; }
+.bud-amt { color: var(--ink-3); font-size: 12px; }
+.bud-track { height: 6px; background: var(--bg-2); border-radius: 999px; overflow: hidden; }
+.bud-fill { height: 100%; background: var(--blue); border-radius: 999px; }
+.bud-fill.warn { background: var(--orange); }
+.bud-fill.danger { background: var(--neg); }
+
+.tile-account { background: linear-gradient(135deg, #1D1D1F 0%, #4A4A4E 100%); color: white; padding: 24px; }
+.tile-account .tile-label { color: rgba(255,255,255,0.6); }
+.tile-account .num-big { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; margin-top: 12px; }
+.tile-account .meta-row { display: flex; justify-content: space-between; margin-top: 16px; font-size: 12px; color: rgba(255,255,255,0.7); }
+
+.tile-icon-stat { display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+.tile-icon-stat .icon-circle { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-2); color: var(--blue); font-size: 18px; }
+.tile-icon-stat .num { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.tile-icon-stat .delta { font-size: 12px; color: var(--ink-2); }
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 80px 1fr; }
+  .side a span { display: none; }
+  .brand span { display: none; }
+  .bento { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 700px) {
+  .app { grid-template-columns: 1fr; }
+  .side { display: none; }
+  .bento { grid-template-columns: 1fr 1fr; grid-auto-rows: 120px; }
+  .t-hero, .t-half { grid-column: span 2; }
+  .t-sq, .t-sq-2 { grid-column: span 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="side">
+    <div class="brand">
+      <span class="brand-icon">€</span>
+      <span>Expense</span>
+    </div>
+    <div class="side-section">Panoramica</div>
+    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span>Dashboard</span></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M2 17h20M2 7h20"/></svg><span>Spese</span></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span>Entrate</span></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>Budget</span></a>
+    <div class="side-section">Conti</div>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span>Conti</span></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 4-4"/></svg><span>Report</span></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg><span>Impostazioni</span></a>
+  </aside>
+
+  <main class="main">
+
+    <div class="head-bar">
+      <div>
+        <h1>Buongiorno, Alessandro</h1>
+        <div class="sub">Maggio 2026 · 23 transazioni · aggiornato 5 min fa</div>
+      </div>
+      <button class="btn-pill">+ Nuova spesa</button>
+    </div>
+
+    <div class="bento">
+
+      <div class="tile tile-hero t-hero">
+        <div class="tile-label">Bilancio netto · maggio</div>
+        <div class="big num">+€ 1.152,20</div>
+        <div class="delta">↑ 48% del netto risparmiato</div>
+      </div>
+
+      <div class="tile tile-num t-sq">
+        <div><div class="tile-label">Spese mese</div></div>
+        <div>
+          <div class="big num neg">€ 1.247,80</div>
+          <div style="font-size:12px;color:var(--neg);margin-top:4px;">↓ 12,4% vs aprile</div>
+        </div>
+      </div>
+
+      <div class="tile tile-num t-sq">
+        <div><div class="tile-label">Entrate</div></div>
+        <div>
+          <div class="big num pos">€ 2.400,00</div>
+          <div style="font-size:12px;color:var(--ink-2);margin-top:4px;">— stabile</div>
+        </div>
+      </div>
+
+      <div class="tile tile-trend t-half">
+        <div class="tile-label">Trend semestrale</div>
+        <div class="bars">
+          <div class="bar-col"><div class="bar-spese" style="height: 60px"></div><div class="bar-entrate" style="height: 80px"></div></div>
+          <div class="bar-col"><div class="bar-spese" style="height: 70px"></div><div class="bar-entrate" style="height: 80px"></div></div>
+          <div class="bar-col"><div class="bar-spese" style="height: 55px"></div><div class="bar-entrate" style="height: 80px"></div></div>
+          <div class="bar-col"><div class="bar-spese" style="height: 78px"></div><div class="bar-entrate" style="height: 85px"></div></div>
+          <div class="bar-col"><div class="bar-spese" style="height: 62px"></div><div class="bar-entrate" style="height: 80px"></div></div>
+          <div class="bar-col"><div class="bar-spese" style="height: 42px"></div><div class="bar-entrate" style="height: 80px"></div></div>
+        </div>
+        <div class="x"><span>Dic</span><span>Gen</span><span>Feb</span><span>Mar</span><span>Apr</span><span>Mag</span></div>
+      </div>
+
+      <div class="tile tile-donut t-half">
+        <div class="tile-label">Spese per categoria</div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <div class="donut-center"><b>5</b>categorie</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile tile-account t-sq-2">
+        <div class="tile-label">Conto corrente</div>
+        <div class="num-big num">€ 4.821,40</div>
+        <div class="meta-row">
+          <span>•••• 4392</span>
+          <span>BPER</span>
+        </div>
+      </div>
+
+      <div class="tile tile-icon-stat t-sq">
+        <div class="icon-circle" style="background: rgba(255,149,0,0.12); color: var(--orange);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18"/></svg>
+        </div>
+        <div>
+          <div class="tile-label">Media giorno</div>
+          <div class="num">€ 41,59</div>
+          <div class="delta">su 30 giorni</div>
+        </div>
+      </div>
+
+      <div class="tile tile-icon-stat t-sq">
+        <div class="icon-circle" style="background: rgba(48,209,88,0.12); color: var(--teal);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+        </div>
+        <div>
+          <div class="tile-label">Risparmio anno</div>
+          <div class="num">€ 4.288,00</div>
+          <div class="delta">obiettivo 6.000 €</div>
+        </div>
+      </div>
+
+      <div class="tile tile-list t-half" style="grid-row: span 2;">
+        <div class="head">
+          <div class="tile-label">Spese recenti</div>
+          <a href="#" style="font-size:12px;color:var(--blue);text-decoration:none;font-weight:600;">Tutte</a>
+        </div>
+        <div class="list-item">
+          <div class="li-icon" style="background: rgba(48,209,88,0.15); color: var(--teal);">🛒</div>
+          <div><div class="li-name">Spesa al supermercato</div><div class="li-meta">5 maggio · Alimentari</div></div>
+          <div class="li-amt">42,30</div>
+        </div>
+        <div class="list-item">
+          <div class="li-icon" style="background: rgba(255,59,48,0.12); color: var(--neg);">⛽</div>
+          <div><div class="li-name">Carburante Q8</div><div class="li-meta">4 maggio · Trasporti</div></div>
+          <div class="li-amt">65,00</div>
+        </div>
+        <div class="list-item">
+          <div class="li-icon" style="background: rgba(255,149,0,0.12); color: var(--orange);">🍽️</div>
+          <div><div class="li-name">Cena con Marta</div><div class="li-meta">3 maggio · Ristoranti</div></div>
+          <div class="li-amt">28,50</div>
+        </div>
+        <div class="list-item">
+          <div class="li-icon" style="background: rgba(175,82,222,0.12); color: var(--purple);">🎬</div>
+          <div><div class="li-name">Netflix</div><div class="li-meta">2 maggio · Abbonamenti</div></div>
+          <div class="li-amt">15,99</div>
+        </div>
+        <div class="list-item">
+          <div class="li-icon" style="background: rgba(0,122,255,0.12); color: var(--blue);">🏠</div>
+          <div><div class="li-name">Affitto maggio</div><div class="li-meta">1 maggio · Casa</div></div>
+          <div class="li-amt">850,00</div>
+        </div>
+      </div>
+
+      <div class="tile tile-budget t-half" style="grid-row: span 2;">
+        <div class="head" style="display:flex;justify-content:space-between;margin-bottom:16px;">
+          <div class="tile-label">Budget · 5 attivi</div>
+          <a href="#" style="font-size:12px;color:var(--blue);text-decoration:none;font-weight:600;">Gestisci</a>
+        </div>
+        <div class="bud">
+          <div class="bud-head"><span class="bud-name">Alimentari</span><span class="bud-amt">186 / 300 €</span></div>
+          <div class="bud-track"><div class="bud-fill" style="width: 62%"></div></div>
+        </div>
+        <div class="bud">
+          <div class="bud-head"><span class="bud-name">Trasporti</span><span class="bud-amt">142 / 150 €</span></div>
+          <div class="bud-track"><div class="bud-fill warn" style="width: 95%"></div></div>
+        </div>
+        <div class="bud">
+          <div class="bud-head"><span class="bud-name">Ristoranti</span><span class="bud-amt">89 / 100 €</span></div>
+          <div class="bud-track"><div class="bud-fill warn" style="width: 89%"></div></div>
+        </div>
+        <div class="bud">
+          <div class="bud-head"><span class="bud-name">Abbonamenti</span><span class="bud-amt">42 / 40 €</span></div>
+          <div class="bud-track"><div class="bud-fill danger" style="width: 100%"></div></div>
+        </div>
+        <div class="bud">
+          <div class="bud-head"><span class="bud-name">Tempo libero</span><span class="bud-amt">15 / 80 €</span></div>
+          <div class="bud-track"><div class="bud-fill" style="width: 19%"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:48px;color:var(--ink-3);font-size:12px;">
+      Mockup · Bento Apple Premium · <a href="index.html" style="color:var(--blue);text-decoration:none;">tutti i mockup</a>
+    </div>
+
+  </main>
+
+</div>
+
+</body>
+</html>

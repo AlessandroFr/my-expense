@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup · Y2K Vaporwave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Inter:wght@500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-1: #FFB8DC; --bg-2: #B8D4FF;
+  --chrome-1: #E8E8FF; --chrome-2: #6B6B99;
+  --neon-pink: #FF0080; --neon-cyan: #00FFFF;
+  --neon-yellow: #FFFF00; --neon-purple: #8000FF;
+  --neon-green: #00FF80;
+  --ink: #1A0033; --ink-2: #4A0080;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,0,128,0.12) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(0,255,255,0.12) 39px 40px),
+    linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 50%, #FFD8B8 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px; line-height: 1.4;
+  min-height: 100vh; position: relative;
+}
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: 'DM Mono', monospace; }
+.pixel { font-family: 'Press Start 2P', monospace; }
+.term { font-family: 'VT323', monospace; }
+
+.title-bar { margin: 16px; background: linear-gradient(180deg, #FFFFFF, #C8C8E0); border: 2px outset #FFFFFF; display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-family: 'VT323', monospace; font-size: 18px; color: var(--ink); box-shadow: 4px 4px 0 var(--neon-pink); }
+.title-bar .dots { display: flex; gap: 4px; }
+.title-bar .dot { width: 12px; height: 12px; border: 1px solid var(--ink-2); }
+.dot.r { background: linear-gradient(135deg, #FFB8B8, #FF4040); }
+.dot.y { background: linear-gradient(135deg, #FFFFB8, #FFD000); }
+.dot.g { background: linear-gradient(135deg, #B8FFB8, #00C040); }
+.title-bar .t { flex: 1; font-weight: 700; }
+
+.window { margin: 16px; background: var(--chrome-1); border: 2px outset #FFFFFF; box-shadow: 6px 6px 0 var(--neon-purple), 12px 12px 0 var(--neon-pink); padding: 0; overflow: hidden; }
+
+.nav-strip { background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple), var(--neon-cyan)); padding: 8px 16px; font-family: 'Press Start 2P', monospace; font-size: 11px; color: white; text-shadow: 2px 2px 0 var(--ink); display: flex; gap: 16px; flex-wrap: wrap; }
+.nav-strip a { color: white; text-decoration: none; padding: 4px 8px; }
+.nav-strip a.active { background: var(--neon-yellow); color: var(--ink); text-shadow: none; }
+.nav-strip a:hover { background: rgba(255,255,255,0.3); }
+
+.window-body { padding: 24px; background: white; }
+
+.balance-bar { background: linear-gradient(135deg, #1A0033 0%, #4A0080 50%, #FF0080 100%); color: white; padding: 24px; margin-bottom: 24px; border: 3px solid var(--neon-cyan); box-shadow: inset 0 0 30px rgba(0,255,255,0.3), 0 0 30px rgba(255,0,128,0.4); text-align: center; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; }
+.balance-bar::before { content: '★ NET BALANCE ★'; display: block; font-family: 'Press Start 2P', monospace; font-size: 11px; color: var(--neon-yellow); margin-bottom: 12px; text-shadow: 2px 2px 0 var(--neon-pink); }
+.balance-bar .big { font-size: 64px; font-weight: 900; letter-spacing: -0.04em; background: linear-gradient(180deg, #FFFFFF 0%, var(--neon-cyan) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 8px rgba(0,255,255,0.5)); font-style: italic; }
+.balance-bar .delta { margin-top: 8px; font-family: 'VT323', monospace; font-size: 22px; color: var(--neon-green); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.kpi-tile { background: linear-gradient(180deg, #FFFFFF, #E8E8FF); border: 2px outset #FFFFFF; padding: 16px; text-align: center; position: relative; }
+.kpi-tile.spese { background: linear-gradient(180deg, #FFE0E0, #FFB8DC); }
+.kpi-tile.entrate { background: linear-gradient(180deg, #E0FFE0, #B8F5D8); }
+.kpi-tile.media { background: linear-gradient(180deg, #FFFFE0, #FFE8B8); }
+.kpi-l { font-family: 'Press Start 2P', monospace; font-size: 8px; text-transform: uppercase; color: var(--ink-2); margin-bottom: 8px; }
+.kpi-v { font-size: 26px; font-weight: 900; letter-spacing: -0.03em; color: var(--ink); font-style: italic; font-family: 'Inter', sans-serif; }
+.kpi-d { font-family: 'VT323', monospace; font-size: 16px; color: var(--ink-2); margin-top: 4px; }
+
+.two-col { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
+
+.block { background: linear-gradient(180deg, #FFFFFF, #E8E8FF); border: 2px outset #FFFFFF; padding: 16px; margin-bottom: 16px; }
+.block-head { display: flex; justify-content: space-between; align-items: center; background: var(--ink); color: var(--neon-yellow); padding: 6px 12px; margin: -16px -16px 16px; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: 0.06em; }
+.block-head .meta { color: var(--neon-cyan); }
+
+.bars { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 8px 0; }
+.bar-col { flex: 1; display: flex; flex-direction: column; gap: 2px; align-items: stretch; }
+.bar-spese { background: linear-gradient(180deg, var(--neon-pink), #800040); border-top: 2px solid #FFFFFF; box-shadow: inset -2px 0 0 rgba(0,0,0,0.2); }
+.bar-entrate { background: linear-gradient(180deg, var(--neon-cyan), #008080); border-top: 2px solid #FFFFFF; box-shadow: inset -2px 0 0 rgba(0,0,0,0.2); }
+.bar-x { display: flex; gap: 8px; padding-top: 8px; font-family: 'VT323', monospace; font-size: 14px; color: var(--ink-2); }
+.bar-x span { flex: 1; text-align: center; }
+
+.tx-table { width: 100%; border-collapse: collapse; font-family: 'DM Mono', monospace; font-size: 13px; }
+.tx-table th { background: var(--ink); color: var(--neon-yellow); padding: 8px 12px; text-align: left; font-family: 'Press Start 2P', monospace; font-size: 9px; }
+.tx-table th:last-child { text-align: right; }
+.tx-table td { padding: 10px 12px; border-bottom: 1px dashed var(--ink-2); }
+.tx-table td:last-child { text-align: right; font-weight: 700; }
+.tx-table tr:nth-child(even) td { background: rgba(0,255,255,0.06); }
+.tx-table tr:hover td { background: var(--neon-yellow); }
+.tx-cat { display: inline-block; padding: 2px 6px; border: 1px solid var(--ink); font-family: 'Press Start 2P', monospace; font-size: 8px; text-transform: uppercase; }
+.tx-cat.alim { background: var(--neon-green); }
+.tx-cat.transp { background: var(--neon-pink); color: white; }
+.tx-cat.rist { background: var(--neon-yellow); }
+.tx-cat.abb { background: var(--neon-purple); color: white; }
+.tx-cat.casa { background: var(--neon-cyan); }
+
+.bud { padding: 10px 0; border-bottom: 1px dashed var(--ink-2); }
+.bud:last-child { border-bottom: none; }
+.bud-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-family: 'DM Mono', monospace; font-size: 12px; }
+.bud-head .n { font-weight: 700; }
+.bud-track { height: 14px; background: #FFFFFF; border: 2px inset #C8C8E0; position: relative; padding: 1px; }
+.bud-fill { height: 100%; background: repeating-linear-gradient(45deg, var(--neon-cyan) 0 4px, var(--neon-pink) 4px 8px); border-right: 1px solid var(--ink); }
+.bud-fill.warn { background: repeating-linear-gradient(45deg, var(--neon-yellow) 0 4px, #FF8000 4px 8px); }
+.bud-fill.danger { background: repeating-linear-gradient(45deg, var(--neon-pink) 0 4px, #800000 4px 8px); animation: blink 0.8s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.4; } }
+
+.sticker { position: relative; display: inline-block; background: var(--neon-yellow); padding: 4px 10px; border: 2px solid var(--ink); font-family: 'Press Start 2P', monospace; font-size: 9px; transform: rotate(-2deg); box-shadow: 3px 3px 0 var(--ink); }
+
+.foot { margin: 16px; padding: 16px; background: var(--ink); color: var(--neon-cyan); font-family: 'VT323', monospace; font-size: 18px; text-align: center; border: 2px outset #FFFFFF; box-shadow: 4px 4px 0 var(--neon-pink); }
+.foot a { color: var(--neon-yellow); text-decoration: none; }
+
+@media (max-width: 800px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+  .balance-bar .big { font-size: 40px; }
+}
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+  <div class="dots">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+  </div>
+  <div class="t">💾 my-expense.exe — [LOGGED IN: Alessandro]</div>
+  <div>14:32:08</div>
+</div>
+
+<div class="window">
+
+  <nav class="nav-strip">
+    <a href="#" class="active">▶ DASHBOARD</a>
+    <a href="#">SPESE</a>
+    <a href="#">ENTRATE</a>
+    <a href="#">BUDGET</a>
+    <a href="#">CONTI</a>
+    <a href="#">REPORT</a>
+  </nav>
+
+  <div class="window-body">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div class="pixel" style="font-size: 16px; color: var(--neon-purple);">💰 BANK 2.0</div>
+      <span class="sticker">★ MAGGIO 2026 ★</span>
+    </div>
+
+    <div class="balance-bar">
+      <div class="big num">+€ 1.152,20</div>
+      <div class="delta">// 48% saved this month //</div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-tile spese">
+        <div class="kpi-l">▼ MONTH SPEND</div>
+        <div class="kpi-v num">€ 1.247,80</div>
+        <div class="kpi-d">-12.4% vs APR</div>
+      </div>
+      <div class="kpi-tile entrate">
+        <div class="kpi-l">▲ INCOME</div>
+        <div class="kpi-v num">€ 2.400,00</div>
+        <div class="kpi-d">stable rate</div>
+      </div>
+      <div class="kpi-tile media">
+        <div class="kpi-l">★ DAILY AVG</div>
+        <div class="kpi-v num">€ 41,59</div>
+        <div class="kpi-d">over 30 days</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+
+      <div>
+        <div class="block">
+          <div class="block-head">
+            <span>▓ TREND // 6M</span>
+            <span class="meta">SPESE+ENTRATE</span>
+          </div>
+          <div class="bars">
+            <div class="bar-col"><div class="bar-spese" style="height: 60%"></div><div class="bar-entrate" style="height: 80%"></div></div>
+            <div class="bar-col"><div class="bar-spese" style="height: 70%"></div><div class="bar-entrate" style="height: 80%"></div></div>
+            <div class="bar-col"><div class="bar-spese" style="height: 55%"></div><div class="bar-entrate" style="height: 80%"></div></div>
+            <div class="bar-col"><div class="bar-spese" style="height: 78%"></div><div class="bar-entrate" style="height: 85%"></div></div>
+            <div class="bar-col"><div class="bar-spese" style="height: 62%"></div><div class="bar-entrate" style="height: 80%"></div></div>
+            <div class="bar-col"><div class="bar-spese" style="height: 42%"></div><div class="bar-entrate" style="height: 80%"></div></div>
+          </div>
+          <div class="bar-x"><span>DEC</span><span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span></div>
+        </div>
+
+        <div class="block">
+          <div class="block-head">
+            <span>▓ RECENT TRANSACTIONS</span>
+            <span class="meta">5 / 247</span>
+          </div>
+          <table class="tx-table">
+            <thead>
+              <tr><th>DATE</th><th>DESCRIPTION</th><th>CAT</th><th>EUR</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>05.MAY.26</td><td>SUPERMERCATO</td><td><span class="tx-cat alim">ALIM</span></td><td>42,30</td></tr>
+              <tr><td>04.MAY.26</td><td>CARBURANTE Q8</td><td><span class="tx-cat transp">TRSP</span></td><td>65,00</td></tr>
+              <tr><td>03.MAY.26</td><td>CENA CON MARTA</td><td><span class="tx-cat rist">RIST</span></td><td>28,50</td></tr>
+              <tr><td>02.MAY.26</td><td>NETFLIX</td><td><span class="tx-cat abb">ABBO</span></td><td>15,99</td></tr>
+              <tr><td>01.MAY.26</td><td>AFFITTO MAGGIO</td><td><span class="tx-cat casa">CASA</span></td><td>850,00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="block">
+          <div class="block-head">
+            <span>▓ BUDGET TRACKER</span>
+            <span class="meta">5 ATTIVI</span>
+          </div>
+          <div class="bud">
+            <div class="bud-head"><span class="n">ALIMENTARI</span><span>186/300</span></div>
+            <div class="bud-track"><div class="bud-fill" style="width: 62%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-head"><span class="n">TRASPORTI</span><span>142/150</span></div>
+            <div class="bud-track"><div class="bud-fill warn" style="width: 95%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-head"><span class="n">RISTORANTI</span><span>89/100</span></div>
+            <div class="bud-track"><div class="bud-fill warn" style="width: 89%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-head"><span class="n">ABBONAMENTI</span><span style="color: var(--neon-pink);">42/40 !!</span></div>
+            <div class="bud-track"><div class="bud-fill danger" style="width: 100%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-head"><span class="n">TEMPO_LIBERO</span><span>15/80</span></div>
+            <div class="bud-track"><div class="bud-fill" style="width: 19%"></div></div>
+          </div>
+        </div>
+
+        <div class="block" style="background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple)); color: white;">
+          <div class="block-head" style="background: var(--neon-yellow); color: var(--ink);">
+            <span>★ ACCOUNT</span>
+            <span class="meta" style="color: var(--ink);">BPER</span>
+          </div>
+          <div class="term" style="font-size: 32px; color: var(--neon-cyan); text-shadow: 2px 2px 0 var(--ink);">€ 4.821,40</div>
+          <div class="mono" style="font-size: 13px; margin-top: 8px; letter-spacing: 0.16em;">**** **** **** 4392</div>
+          <div class="pixel" style="font-size: 8px; margin-top: 12px; color: var(--neon-yellow);">▶ ALESSANDRO F. · EXP 05/29</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<footer class="foot">
+  ★ MOCKUP · Y2K VAPORWAVE · BUILT WITH ♥ IN 2026 · <a href="index.html">[ESC] BACK TO INDEX</a> · ENJOY ★
+</footer>
+
+</body>
+</html>

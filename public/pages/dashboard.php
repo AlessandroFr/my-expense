@@ -8,54 +8,63 @@ use App\Config;
 
 $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
 ?>
-<div class="row mb-3 align-items-center">
-    <div class="col-md-8">
-        <h1 class="h3 mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
-        <div class="text-muted small">Ciao, <strong><?= htmlspecialchars(Auth::username() ?? '', ENT_QUOTES, 'UTF-8') ?></strong> — riepilogo mese corrente.</div>
+<div class="mx-page-header">
+    <div>
+        <h1>Ciao <?= htmlspecialchars(Auth::username() ?? '', ENT_QUOTES, 'UTF-8') ?> 👋</h1>
+        <div class="sub">Eccoti il riepilogo del mese corrente.</div>
     </div>
-    <div class="col-md-4 text-md-end">
-        <a href="<?= htmlspecialchars($base . '/expenses', ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-1"></i>Nuova spesa
-        </a>
-    </div>
+    <a href="<?= htmlspecialchars($base . '/expenses', ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Nuova spesa
+    </a>
 </div>
 
-<!-- ── KPI cards ─────────────────────────────────────────────────────────── -->
+<!-- ── Hero: bilancio netto ─────────────────────────────────────────────── -->
+<div class="mx-hero mb-4">
+    <div class="mx-hero-label">Bilancio netto · mese corrente</div>
+    <div id="kpi-net" class="mx-hero-value">€ —</div>
+    <span class="mx-hero-pill"><i class="bi bi-graph-up-arrow"></i> Entrate meno spese</span>
+</div>
+
+<!-- ── Quick actions ────────────────────────────────────────────────────── -->
+<div class="mx-quick-actions mb-4">
+    <a href="<?= htmlspecialchars($base . '/expenses', ENT_QUOTES, 'UTF-8') ?>" class="mx-qa">
+        <span class="mx-qa-emoji">➕</span>Nuova spesa
+    </a>
+    <a href="<?= htmlspecialchars($base . '/incomes', ENT_QUOTES, 'UTF-8') ?>" class="mx-qa">
+        <span class="mx-qa-emoji">💰</span>Aggiungi entrata
+    </a>
+    <a href="<?= htmlspecialchars($base . '/budgets', ENT_QUOTES, 'UTF-8') ?>" class="mx-qa">
+        <span class="mx-qa-emoji">🎯</span>Budget
+    </a>
+    <a href="<?= htmlspecialchars($base . '/reports', ENT_QUOTES, 'UTF-8') ?>" class="mx-qa">
+        <span class="mx-qa-emoji">📊</span>Report
+    </a>
+</div>
+
+<!-- ── KPI stat cards ───────────────────────────────────────────────────── -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card shadow-sm h-100 border-start border-danger border-4">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase">Spese mese</div>
-                <div id="kpi-current" class="h3 fw-semibold mt-1 text-danger">EUR -</div>
-                <div class="small text-muted" id="kpi-current-month"></div>
-            </div>
+    <div class="col-md-4">
+        <div class="mx-stat-card spese h-100">
+            <div class="mx-stat-icon">💸</div>
+            <div class="mx-stat-l">Spese mese</div>
+            <div id="kpi-current" class="mx-stat-v">€ —</div>
+            <div class="mx-stat-d" id="kpi-current-month">&nbsp;</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card shadow-sm h-100 border-start border-success border-4">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase">Entrate mese</div>
-                <div id="kpi-income" class="h3 fw-semibold mt-1 text-success">EUR -</div>
-                <div class="small text-muted">Stipendio + altre entrate</div>
-            </div>
+    <div class="col-md-4">
+        <div class="mx-stat-card entrate h-100">
+            <div class="mx-stat-icon">💵</div>
+            <div class="mx-stat-l">Entrate mese</div>
+            <div id="kpi-income" class="mx-stat-v">€ —</div>
+            <div class="mx-stat-d">Stipendio + altre entrate</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card shadow-sm h-100 border-start border-primary border-4">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase">Bilancio netto</div>
-                <div id="kpi-net" class="h3 fw-semibold mt-1">EUR -</div>
-                <div class="small text-muted">Entrate - spese</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card shadow-sm h-100">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase">Variazione spese</div>
-                <div id="kpi-delta" class="h3 fw-semibold mt-1">-</div>
-                <div class="small text-muted">vs mese precedente</div>
-            </div>
+    <div class="col-md-4">
+        <div class="mx-stat-card lilac h-100">
+            <div class="mx-stat-icon">📈</div>
+            <div class="mx-stat-l">Variazione spese</div>
+            <div id="kpi-delta" class="mx-stat-v">—</div>
+            <div class="mx-stat-d">vs mese precedente</div>
         </div>
     </div>
 </div>

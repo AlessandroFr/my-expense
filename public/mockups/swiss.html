@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup · Swiss Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FFFFFF; --ink: #000000; --ink-2: #4A4A4A; --ink-3: #888888;
+  --line: #000000; --line-soft: #DDDDDD;
+  --red: #E60013; --pos: #00754A;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.4; letter-spacing: -0.01em; }
+.num { font-variant-numeric: tabular-nums; }
+
+.frame { max-width: 1280px; margin: 0 auto; padding: 32px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+
+.head { grid-column: 1 / -1; border-bottom: 4px solid var(--ink); padding-bottom: 24px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; align-items: end; margin-bottom: 24px; }
+.head .brand-mark { grid-column: 1 / span 1; width: 36px; height: 36px; background: var(--red); position: relative; }
+.head .brand-mark::before, .head .brand-mark::after { content: ''; position: absolute; background: white; }
+.head .brand-mark::before { left: 8px; right: 8px; top: 16px; height: 4px; }
+.head .brand-mark::after { top: 8px; bottom: 8px; left: 16px; width: 4px; }
+.head .title-block { grid-column: 2 / span 6; }
+.head h1 { margin: 0; font-size: 36px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+.head .sub { margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+.head .nav { grid-column: 8 / -1; display: flex; gap: 24px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.head .nav a { color: var(--ink-2); text-decoration: none; font-size: 12px; text-transform: uppercase; letter-spacing: 0.10em; font-weight: 500; }
+.head .nav a.active { color: var(--ink); border-bottom: 2px solid var(--red); padding-bottom: 2px; }
+
+.section { grid-column: 1 / -1; margin-top: 32px; }
+.section-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink); margin-bottom: 24px; }
+.section-num { font-size: 11px; font-weight: 900; letter-spacing: 0.10em; }
+.section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; font-weight: 600; }
+.section-meta { font-size: 11px; color: var(--ink-3); font-family: 'Inter'; }
+
+.kpi-row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+.kpi { padding: 16px 0 24px; border-top: 1px solid var(--line-soft); }
+.kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-3); font-weight: 500; margin-bottom: 8px; }
+.kpi-value { font-size: 40px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+.kpi-value.neg { color: var(--red); }
+.kpi-value.pos { color: var(--pos); }
+.kpi-meta { font-size: 11px; color: var(--ink-2); margin-top: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+.k-1 { grid-column: 1 / span 3; }
+.k-2 { grid-column: 4 / span 3; }
+.k-3 { grid-column: 7 / span 3; }
+.k-4 { grid-column: 10 / span 3; }
+
+.trend-block { grid-column: 1 / span 7; }
+.budget-block { grid-column: 8 / span 5; }
+
+.bars { display: flex; align-items: flex-end; gap: 12px; height: 240px; padding: 24px 0; border-bottom: 1px solid var(--line-soft); }
+.bar-col { flex: 1; display: flex; flex-direction: column; gap: 0; align-items: stretch; position: relative; }
+.bar-spese { background: var(--red); }
+.bar-entrate { background: var(--ink); }
+.bar-x { display: flex; gap: 12px; padding-top: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.bar-x span { flex: 1; text-align: center; }
+.legend { display: flex; gap: 24px; padding-top: 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.10em; }
+.sw { display: inline-block; width: 16px; height: 8px; margin-right: 6px; vertical-align: 1px; }
+
+.bud { padding: 12px 0; border-top: 1px solid var(--line-soft); display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+.bud:first-of-type { border-top: 1px solid var(--ink); }
+.bud .name { font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.bud .num-cell { font-size: 12px; font-variant-numeric: tabular-nums; }
+.bud-track { grid-column: 1 / -1; height: 4px; background: var(--line-soft); position: relative; }
+.bud-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--ink); }
+.bud-fill.warn { background: #C2920E; }
+.bud-fill.danger { background: var(--red); }
+
+.tx { grid-column: 1 / -1; }
+.tx-table { width: 100%; border-collapse: collapse; }
+.tx-table th { text-align: left; padding: 12px 16px 12px 0; border-bottom: 2px solid var(--ink); font-size: 11px; text-transform: uppercase; letter-spacing: 0.10em; font-weight: 600; color: var(--ink); }
+.tx-table th:last-child { text-align: right; }
+.tx-table td { padding: 16px 16px 16px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.tx-table td:last-child { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tx-cat { display: inline-block; padding: 2px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; font-weight: 600; }
+.tx-cat.alim { background: var(--ink); color: white; }
+.tx-cat.transp { background: var(--red); color: white; }
+.tx-cat.rist { background: white; color: var(--ink); border: 1px solid var(--ink); }
+.tx-cat.abb { background: var(--line-soft); color: var(--ink); }
+.tx-cat.casa { background: var(--ink); color: white; }
+
+.foot { grid-column: 1 / -1; border-top: 4px solid var(--ink); margin-top: 48px; padding-top: 16px; display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: 0.10em; color: var(--ink-2); }
+.foot a { color: var(--red); text-decoration: none; }
+
+@media (max-width: 900px) {
+  .head .title-block { grid-column: 2 / span 11; }
+  .head .nav { grid-column: 1 / -1; justify-content: flex-start; padding-top: 16px; }
+  .k-1, .k-2, .k-3, .k-4 { grid-column: span 6; }
+  .trend-block, .budget-block { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <header class="head">
+    <div class="brand-mark"></div>
+    <div class="title-block">
+      <h1>Expense</h1>
+      <div class="sub">Rapporto mensile · Maggio 2026</div>
+    </div>
+    <nav class="nav">
+      <a href="#" class="active">01 Dashboard</a>
+      <a href="#">02 Spese</a>
+      <a href="#">03 Entrate</a>
+      <a href="#">04 Budget</a>
+      <a href="#">05 Conti</a>
+      <a href="#">06 Report</a>
+    </nav>
+  </header>
+
+  <div class="section" style="margin-top:0;">
+    <div class="section-bar">
+      <div><span class="section-num">§ 01</span> &nbsp; <span class="section-title">Indicatori</span></div>
+      <div class="section-meta">Periodo 01.05.2026 – 31.05.2026 · 23 movimenti</div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi k-1">
+        <div class="kpi-label">Spese / Maggio</div>
+        <div class="kpi-value neg num">1 247,80</div>
+        <div class="kpi-meta">EUR · ↓ 12,4% vs aprile</div>
+      </div>
+      <div class="kpi k-2">
+        <div class="kpi-label">Entrate</div>
+        <div class="kpi-value num">2 400,00</div>
+        <div class="kpi-meta">EUR · stabile</div>
+      </div>
+      <div class="kpi k-3">
+        <div class="kpi-label">Bilancio</div>
+        <div class="kpi-value pos num">+1 152,20</div>
+        <div class="kpi-meta">EUR · +48,0% del netto</div>
+      </div>
+      <div class="kpi k-4">
+        <div class="kpi-label">Media / Giorno</div>
+        <div class="kpi-value num">41,59</div>
+        <div class="kpi-meta">EUR · n=30 giorni</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-bar">
+      <div><span class="section-num">§ 02</span> &nbsp; <span class="section-title">Andamento &amp; Budget</span></div>
+      <div class="section-meta">Sei mesi · Cinque categorie</div>
+    </div>
+
+    <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px;">
+
+      <div class="trend-block">
+        <div class="bars">
+          <div class="bar-col"><div class="bar-entrate" style="height: 80%"></div><div class="bar-spese" style="height: 60%"></div></div>
+          <div class="bar-col"><div class="bar-entrate" style="height: 80%"></div><div class="bar-spese" style="height: 70%"></div></div>
+          <div class="bar-col"><div class="bar-entrate" style="height: 80%"></div><div class="bar-spese" style="height: 55%"></div></div>
+          <div class="bar-col"><div class="bar-entrate" style="height: 85%"></div><div class="bar-spese" style="height: 78%"></div></div>
+          <div class="bar-col"><div class="bar-entrate" style="height: 80%"></div><div class="bar-spese" style="height: 62%"></div></div>
+          <div class="bar-col"><div class="bar-entrate" style="height: 80%"></div><div class="bar-spese" style="height: 42%"></div></div>
+        </div>
+        <div class="bar-x"><span>Dic 25</span><span>Gen 26</span><span>Feb 26</span><span>Mar 26</span><span>Apr 26</span><span>Mag 26</span></div>
+        <div class="legend">
+          <span><span class="sw" style="background: var(--ink)"></span>Entrate</span>
+          <span><span class="sw" style="background: var(--red)"></span>Spese</span>
+        </div>
+      </div>
+
+      <div class="budget-block">
+        <div class="bud">
+          <span class="name">Alimentari</span>
+          <span class="num-cell">186 / 300</span>
+          <div class="bud-track"><div class="bud-fill" style="width: 62%"></div></div>
+        </div>
+        <div class="bud">
+          <span class="name">Trasporti</span>
+          <span class="num-cell">142 / 150</span>
+          <div class="bud-track"><div class="bud-fill warn" style="width: 95%"></div></div>
+        </div>
+        <div class="bud">
+          <span class="name">Ristoranti</span>
+          <span class="num-cell">89 / 100</span>
+          <div class="bud-track"><div class="bud-fill warn" style="width: 89%"></div></div>
+        </div>
+        <div class="bud">
+          <span class="name">Abbonamenti</span>
+          <span class="num-cell" style="color: var(--red); font-weight: 700;">42 / 40</span>
+          <div class="bud-track"><div class="bud-fill danger" style="width: 100%"></div></div>
+        </div>
+        <div class="bud">
+          <span class="name">Tempo libero</span>
+          <span class="num-cell">15 / 80</span>
+          <div class="bud-track"><div class="bud-fill" style="width: 19%"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section tx">
+    <div class="section-bar">
+      <div><span class="section-num">§ 03</span> &nbsp; <span class="section-title">Movimenti recenti</span></div>
+      <div class="section-meta">5 di 247 · ordine: data discendente</div>
+    </div>
+
+    <table class="tx-table">
+      <thead>
+        <tr>
+          <th style="width: 110px;">Data</th>
+          <th>Descrizione</th>
+          <th style="width: 140px;">Categoria</th>
+          <th style="width: 110px;">Metodo</th>
+          <th style="width: 130px;">Importo (EUR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>05.05.2026</td><td>Spesa al supermercato</td><td><span class="tx-cat alim">Alimentari</span></td><td>Bancomat</td><td>42,30</td></tr>
+        <tr><td>04.05.2026</td><td>Carburante Q8</td><td><span class="tx-cat transp">Trasporti</span></td><td>Carta</td><td>65,00</td></tr>
+        <tr><td>03.05.2026</td><td>Cena con Marta</td><td><span class="tx-cat rist">Ristoranti</span></td><td>Carta</td><td>28,50</td></tr>
+        <tr><td>02.05.2026</td><td>Netflix</td><td><span class="tx-cat abb">Abbonamenti</span></td><td>Ricorrente</td><td>15,99</td></tr>
+        <tr><td>01.05.2026</td><td>Affitto maggio</td><td><span class="tx-cat casa">Casa</span></td><td>Bonifico</td><td>850,00</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="foot">
+    <span>Mockup · Swiss Grid</span>
+    <span><a href="index.html">↩ tutti i mockup</a></span>
+  </footer>
+
+</div>
+
+</body>
+</html>
