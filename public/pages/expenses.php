@@ -103,9 +103,15 @@ $paymentLabels  = [
                 <label class="form-label small">Max €</label>
                 <input type="number" step="0.01" min="0" name="amount_max" class="form-control form-control-sm">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small">Cerca</label>
                 <input type="text" name="search" class="form-control form-control-sm" placeholder="descrizione…">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small">Tag</label>
+                <select name="tag" class="form-select form-select-sm" id="filter-tag">
+                    <option value="">Tutti</option>
+                </select>
             </div>
             <div class="col-md-1 d-grid">
                 <button type="button" id="filters-reset" class="btn btn-sm btn-outline-secondary" title="Resetta filtri">
@@ -153,8 +159,13 @@ $paymentLabels  = [
                 <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
                 <input type="text" name="description" class="form-control" maxlength="255" placeholder="es. Pranzo bar">
             </div>
-            <div class="col-md-1 d-grid">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i></button>
+            <div class="col-md-9">
+                <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
+                <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
+                <datalist id="all-tags-datalist"></datalist>
+            </div>
+            <div class="col-md-3 d-grid">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi</button>
             </div>
         </form>
     </div>
@@ -169,6 +180,7 @@ $paymentLabels  = [
                     <th>Data</th>
                     <th>Categoria</th>
                     <th>Descrizione</th>
+                    <th>Tag</th>
                     <th>Pagamento</th>
                     <th class="text-end">Importo</th>
                     <th class="text-end" style="width:1%">Azioni</th>
@@ -176,7 +188,7 @@ $paymentLabels  = [
             </thead>
             <tbody id="expenses-tbody">
                 <tr id="expenses-loading">
-                    <td colspan="6" class="text-center text-muted py-4">
+                    <td colspan="7" class="text-center text-muted py-4">
                         <span class="spinner-border spinner-border-sm me-2"></span>Carico…
                     </td>
                 </tr>

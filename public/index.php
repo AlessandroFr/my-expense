@@ -188,6 +188,17 @@ switch ($route) {
         require __DIR__ . '/endpoints/recurring_run.php';
         break;
 
+    // ── Tag ──────────────────────────────────────────────────────────────
+    case 'GET /tags/list':
+        require __DIR__ . '/endpoints/tags_list.php';
+        break;
+    case 'POST /tags/assign':
+        require __DIR__ . '/endpoints/tags_assign.php';
+        break;
+    case 'POST /tags/delete':
+        require __DIR__ . '/endpoints/tags_delete.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');

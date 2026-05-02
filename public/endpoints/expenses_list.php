@@ -20,6 +20,7 @@ $filters = [
     'amount_min'  => $_GET['amount_min']  ?? null,
     'amount_max'  => $_GET['amount_max']  ?? null,
     'search'      => $_GET['search']      ?? null,
+    'tag'         => $_GET['tag']          ?? null,
     'limit'       => isset($_GET['limit'])  ? (int) $_GET['limit']  : 200,
     'offset'      => isset($_GET['offset']) ? (int) $_GET['offset'] : 0,
 ];

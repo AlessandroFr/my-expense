@@ -38,7 +38,35 @@ final class Expense
 
         $stmt = Database::pdo()->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+
+        // Tags batch-fetch (un singolo query per tutte le righe).
+        if (!empty($rows)) {
+            $ids = array_column($rows, 'id');
+            $in  = implode(',', array_fill(0, count($ids), '?'));
+            $tagStmt = Database::pdo()->prepare(
+                "SELECT et.expense_id, t.id, t.name, t.color
+                 FROM expense_tags et
+                 INNER JOIN tags t ON t.id = et.tag_id
+                 WHERE et.expense_id IN ({$in}) AND t.user_id = ?
+                 ORDER BY t.name ASC"
+            );
+            $tagStmt->execute([...$ids, $userId]);
+            $byExp = [];
+            foreach ($tagStmt->fetchAll() as $tr) {
+                $byExp[(int) $tr['expense_id']][] = [
+                    'id'    => (int) $tr['id'],
+                    'name'  => (string) $tr['name'],
+                    'color' => (string) $tr['color'],
+                ];
+            }
+            foreach ($rows as &$r) {
+                $r['tags'] = $byExp[(int) $r['id']] ?? [];
+            }
+            unset($r);
+        }
+
+        return $rows;
     }
 
     public static function findForUser(int $id, int $userId): ?array
@@ -224,6 +252,14 @@ final class Expense
         if (!empty($filters['search'])) {
             $clauses[] = 'e.description LIKE ?';
             $params[]  = '%' . $filters['search'] . '%';
+        }
+        if (!empty($filters['tag'])) {
+            $clauses[] = 'EXISTS (
+                SELECT 1 FROM expense_tags et2
+                INNER JOIN tags t2 ON t2.id = et2.tag_id
+                WHERE et2.expense_id = e.id AND t2.user_id = e.user_id AND t2.name = ?
+            )';
+            $params[]  = (string) $filters['tag'];
         }
 
         return ['WHERE ' . implode(' AND ', $clauses), $params];

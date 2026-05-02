@@ -21,7 +21,8 @@ const PAYMENT_LABELS = {
 const PAYMENT_OPTIONS = ['cash', 'card', 'transfer', 'other'];
 
 // State
-let categories = [];
+let categories  = [];
+let allTags     = [];   // tutti i tag dell'utente {id, name, color}
 let lastFilters = {};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -64,7 +65,15 @@ function rowDataFromExpense(e) {
         description: e.description,
         payment_method: e.payment_method,
         expense_date: e.expense_date,
+        tags: e.tags ?? [],
     };
+}
+
+function tagsCell(tags) {
+    if (!tags || !tags.length) return '<span class="text-muted">—</span>';
+    return tags.map(t =>
+        `<span class="badge me-1" style="background:${escHtml(t.color)}">${escHtml(t.name)}</span>`
+    ).join('');
 }
 
 function categoryCell(e) {
@@ -103,6 +112,7 @@ function renderViewRow(e) {
         <td>${escHtml(fmtDate(e.expense_date))}</td>
         <td>${categoryCell(e)}</td>
         <td>${escHtml(e.description ?? '')}</td>
+        <td>${tagsCell(e.tags)}</td>
         <td><span class="badge bg-light text-dark">${escHtml(PAYMENT_LABELS[e.payment_method] ?? e.payment_method)}</span></td>
         <td class="text-end fw-semibold">${escHtml(fmtMoney(e.amount))}</td>
         <td class="text-end text-nowrap">
@@ -114,6 +124,7 @@ function renderViewRow(e) {
 
 function replaceWithEditRow(tr) {
     const e = JSON.parse(tr.dataset.expense || '{}');
+    const tagNames = (e.tags ?? []).map(t => t.name).join(', ');
     const edit = document.createElement('tr');
     edit.dataset.id = String(e.id);
     edit.classList.add('table-warning');
@@ -121,6 +132,7 @@ function replaceWithEditRow(tr) {
         <td><input type="date"   name="expense_date"   class="form-control form-control-sm" required value="${escHtml(e.expense_date)}"></td>
         <td><select               name="category_id"    class="form-select form-select-sm">${buildCategoryOptions(e.category_id)}</select></td>
         <td><input type="text"   name="description"    class="form-control form-control-sm" maxlength="255" value="${escHtml(e.description ?? '')}"></td>
+        <td><input type="text"   name="tags"           class="form-control form-control-sm" list="all-tags-datalist" placeholder="tag, separati, da, virgola" value="${escHtml(tagNames)}"></td>
         <td><select               name="payment_method" class="form-select form-select-sm">${buildPaymentOptions(e.payment_method)}</select></td>
         <td><input type="number" name="amount"         class="form-control form-control-sm text-end" step="0.01" min="0.01" required value="${escHtml(e.amount)}"></td>
         <td class="text-end text-nowrap">
@@ -184,6 +196,46 @@ function loadCategoriesFromDom() {
         .map(o => ({ id: Number(o.value), name: o.textContent.trim() }));
 }
 
+async function loadTags() {
+    try {
+        const r = await apiGuard(api.get(`${BASE}/tags/list`));
+        allTags = r.data?.tags ?? [];
+        renderTagDataList();
+        renderTagFilter();
+    } catch (err) {
+        // Silent: la lista tag non è critica.
+    }
+}
+
+function renderTagDataList() {
+    const dl = document.getElementById('all-tags-datalist');
+    if (!dl) return;
+    dl.innerHTML = allTags.map(t => `<option value="${escHtml(t.name)}"></option>`).join('');
+}
+
+function renderTagFilter() {
+    const sel = document.getElementById('filter-tag');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tutti</option>' +
+        allTags.map(t => `<option value="${escHtml(t.name)}"${t.name === cur ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('');
+}
+
+async function assignTags(expenseId, tagsCsv) {
+    if (tagsCsv === undefined || tagsCsv === null) return null;
+    const params = new URLSearchParams();
+    params.set('expense_id', expenseId);
+    params.set('names',      tagsCsv);
+    params.set('_csrf',      getCsrfToken());
+    try {
+        const r = await send(`${BASE}/tags/assign`, params);
+        return r.data?.tags ?? [];
+    } catch (err) {
+        toast.error(err.message ?? 'Errore assegnazione tag.');
+        return null;
+    }
+}
+
 // ── Wiring ──────────────────────────────────────────────────────────────────
 
 function wireFilters() {
@@ -224,6 +276,13 @@ function wireCreateForm() {
             const r = await send(`${BASE}/expenses/create`, params);
             const exp = r.data?.expense;
             if (!exp) throw new Error('Risposta server inattesa.');
+
+            const tagsCsv = form.querySelector('input[name="tags"]')?.value ?? '';
+            if (tagsCsv.trim() !== '') {
+                const tags = await assignTags(exp.id, tagsCsv);
+                if (tags) exp.tags = tags;
+                await loadTags();
+            }
 
             const tbody = document.getElementById('expenses-tbody');
             const empty = tbody.querySelector('td[colspan]')?.closest('tr');
@@ -298,13 +357,20 @@ function wireTableActions() {
             const params = new URLSearchParams();
             params.set('id', id);
             params.set('_csrf', getCsrfToken());
-            inputs.forEach(i => params.set(i.name, i.value));
+            const tagsCsv = tr.querySelector('input[name="tags"]')?.value ?? '';
+            inputs.forEach(i => {
+                if (i.name === 'tags') return; // gestito separatamente
+                params.set(i.name, i.value);
+            });
 
             btn.disabled = true;
             try {
                 const r = await send(`${BASE}/expenses/update`, params);
                 const exp = r.data?.expense;
                 if (!exp) throw new Error('Risposta server inattesa.');
+                const tags = await assignTags(id, tagsCsv);
+                if (tags) exp.tags = tags;
+                await loadTags();
                 tr.replaceWith(renderViewRow(exp));
                 updateTotalFromTable();
                 toast.success('Spesa aggiornata.');
@@ -385,5 +451,6 @@ document.addEventListener('DOMContentLoaded', () => {
     wireCreateForm();
     wireTableActions();
     wireCsvButtons();
+    loadTags();
     loadList();
 });
