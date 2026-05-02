@@ -14,7 +14,9 @@ declare(strict_types=1);
  */
 
 use App\Auth;
+use App\Budget;
 use App\Expense;
+use App\Income;
 use App\Json;
 
 if (!Auth::check()) {
@@ -32,8 +34,15 @@ try {
         ? (($totalCurrent - $totalPrevious) / $totalPrevious) * 100.0
         : null;
 
-    $byCategory = Expense::totalsByCategoryForMonth($userId, $currentMonth);
-    $byMonth    = Expense::totalsByMonth($userId, 6);
+    $incomeCurrent  = Income::monthlyTotal($userId, $currentMonth);
+    $incomePrevious = Income::monthlyTotal($userId, $prevMonth);
+    $netCurrent     = $incomeCurrent - $totalCurrent;
+
+    $byCategory   = Expense::totalsByCategoryForMonth($userId, $currentMonth);
+    $byMonth      = Expense::totalsByMonth($userId, 6);
+    $incomeByMonth = Income::totalsByMonth($userId, 6);
+
+    $budgetProgress = Budget::progressForMonth($userId, $currentMonth);
 } catch (Throwable $e) {
     Json::error('Errore caricamento dashboard: ' . $e->getMessage(), 'server', 500);
 }
@@ -41,10 +50,15 @@ try {
 Json::ok([
     'current_month' => $currentMonth,
     'totals' => [
-        'current'   => round($totalCurrent, 2),
-        'previous'  => round($totalPrevious, 2),
-        'delta_pct' => $deltaPct === null ? null : round($deltaPct, 1),
+        'current'         => round($totalCurrent, 2),
+        'previous'        => round($totalPrevious, 2),
+        'delta_pct'       => $deltaPct === null ? null : round($deltaPct, 1),
+        'income_current'  => round($incomeCurrent, 2),
+        'income_previous' => round($incomePrevious, 2),
+        'net_current'     => round($netCurrent, 2),
     ],
-    'by_category' => $byCategory,
-    'by_month'    => $byMonth,
+    'by_category'     => $byCategory,
+    'by_month'        => $byMonth,
+    'income_by_month' => $incomeByMonth,
+    'budget_progress' => $budgetProgress,
 ]);

@@ -138,6 +138,24 @@ switch ($route) {
         require __DIR__ . '/endpoints/expenses_delete.php';
         break;
 
+    // ── Entrate ──────────────────────────────────────────────────────────
+    case 'GET /incomes':
+        Auth::requireLogin();
+        renderPage('incomes');
+        break;
+    case 'GET /incomes/list':
+        require __DIR__ . '/endpoints/incomes_list.php';
+        break;
+    case 'POST /incomes/create':
+        require __DIR__ . '/endpoints/incomes_create.php';
+        break;
+    case 'POST /incomes/update':
+        require __DIR__ . '/endpoints/incomes_update.php';
+        break;
+    case 'POST /incomes/delete':
+        require __DIR__ . '/endpoints/incomes_delete.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -161,6 +179,7 @@ function renderPage(string $page, array $data = []): void
         'categories'    => 'Categorie',
         'category_edit' => 'Modifica categoria',
         'expenses'      => 'Spese',
+        'incomes'       => 'Entrate',
         'budgets'       => 'Budget mensili',
         default         => 'Pagina non trovata',
     };

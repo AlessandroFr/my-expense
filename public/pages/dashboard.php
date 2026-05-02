@@ -22,32 +22,49 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
 
 <!-- ── KPI cards ─────────────────────────────────────────────────────────── -->
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card shadow-sm h-100">
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-start border-danger border-4">
             <div class="card-body">
-                <div class="text-muted small text-uppercase">Mese corrente</div>
-                <div id="kpi-current" class="display-6 fw-semibold mt-1">€ —</div>
+                <div class="text-muted small text-uppercase">Spese mese</div>
+                <div id="kpi-current" class="h3 fw-semibold mt-1 text-danger">EUR -</div>
                 <div class="small text-muted" id="kpi-current-month"></div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm h-100">
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-start border-success border-4">
             <div class="card-body">
-                <div class="text-muted small text-uppercase">Mese precedente</div>
-                <div id="kpi-previous" class="display-6 fw-semibold mt-1">€ —</div>
-                <div class="small text-muted">Confronto storico</div>
+                <div class="text-muted small text-uppercase">Entrate mese</div>
+                <div id="kpi-income" class="h3 fw-semibold mt-1 text-success">EUR -</div>
+                <div class="small text-muted">Stipendio + altre entrate</div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-start border-primary border-4">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Bilancio netto</div>
+                <div id="kpi-net" class="h3 fw-semibold mt-1">EUR -</div>
+                <div class="small text-muted">Entrate - spese</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card shadow-sm h-100">
             <div class="card-body">
-                <div class="text-muted small text-uppercase">Variazione</div>
-                <div id="kpi-delta" class="display-6 fw-semibold mt-1">—</div>
+                <div class="text-muted small text-uppercase">Variazione spese</div>
+                <div id="kpi-delta" class="h3 fw-semibold mt-1">-</div>
                 <div class="small text-muted">vs mese precedente</div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ── Budget progress ─────────────────────────────────────────────────── -->
+<div class="card shadow-sm mb-4 d-none" id="budget-card">
+    <div class="card-body">
+        <h2 class="h6 mb-3"><i class="bi bi-bullseye me-1"></i>Budget mese corrente</h2>
+        <div id="budget-progress" class="row g-2"></div>
     </div>
 </div>
 

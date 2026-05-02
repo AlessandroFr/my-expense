@@ -1,9 +1,9 @@
 // ─── pages/dashboard.js ──────────────────────────────────────────────────────
 // Carica /dashboard/data, aggiorna KPI, render Chart.js (doughnut + bar).
 
-import FetchRequest    from '../FetchRequest.js';
-import { apiGuard }    from '../componentBase.js';
-import { toast }       from '../toast.js';
+import FetchRequest                from '../FetchRequest.js';
+import { apiGuard, escapeHtml }    from '../componentBase.js';
+import { toast }                   from '../toast.js';
 
 const api  = FetchRequest.getInstance();
 const BASE = document.body.dataset.baseUrl ?? '';
@@ -30,21 +30,54 @@ function fmtMonthShort(ym) {
 
 function renderKpi(d) {
     document.getElementById('kpi-current').textContent       = fmtMoney(d.totals.current);
-    document.getElementById('kpi-previous').textContent      = fmtMoney(d.totals.previous);
+    document.getElementById('kpi-income').textContent        = fmtMoney(d.totals.income_current ?? 0);
     document.getElementById('kpi-current-month').textContent = fmtMonthLong(d.current_month);
+
+    const netEl  = document.getElementById('kpi-net');
+    const netVal = Number(d.totals.net_current ?? 0);
+    netEl.textContent = fmtMoney(netVal);
+    netEl.className   = 'h3 fw-semibold mt-1 ' +
+        (netVal > 0 ? 'text-success' : (netVal < 0 ? 'text-danger' : 'text-muted'));
 
     const deltaEl = document.getElementById('kpi-delta');
     if (d.totals.delta_pct === null) {
-        deltaEl.textContent = '—';
-        deltaEl.className   = 'display-6 fw-semibold mt-1 text-muted';
+        deltaEl.textContent = '-';
+        deltaEl.className   = 'h3 fw-semibold mt-1 text-muted';
     } else {
         const sign = d.totals.delta_pct > 0 ? '+' : '';
         deltaEl.textContent = `${sign}${d.totals.delta_pct.toFixed(1)}%`;
-        // Rosso se sale (spendi di più), verde se scende.
-        deltaEl.className = 'display-6 fw-semibold mt-1 ' +
+        deltaEl.className = 'h3 fw-semibold mt-1 ' +
             (d.totals.delta_pct > 0 ? 'text-danger'
                 : (d.totals.delta_pct < 0 ? 'text-success' : 'text-muted'));
     }
+}
+
+function renderBudgetProgress(items) {
+    const card = document.getElementById('budget-card');
+    const box  = document.getElementById('budget-progress');
+    if (!items || !items.length) {
+        card.classList.add('d-none');
+        return;
+    }
+    card.classList.remove('d-none');
+    box.innerHTML = items.map(b => {
+        const pct      = Math.min(b.progress_pct, 100);
+        const overFlag = b.progress_pct > 100;
+        const cls      = b.progress_pct >= 100 ? 'bg-danger'
+                       : (b.progress_pct >= 80 ? 'bg-warning' : 'bg-success');
+        return `
+        <div class="col-md-6 col-lg-4">
+            <div class="d-flex justify-content-between small mb-1">
+                <span><span class="badge me-1" style="background:${escapeHtml(b.color)}">&nbsp;</span>${escapeHtml(b.name)}</span>
+                <span class="${overFlag ? 'text-danger fw-semibold' : 'text-muted'}">
+                    ${fmtMoney(b.spent)} / ${fmtMoney(b.amount)}
+                </span>
+            </div>
+            <div class="progress" style="height:8px">
+                <div class="progress-bar ${cls}" style="width:${pct}%"></div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function renderByCategory(data) {
@@ -83,27 +116,43 @@ function renderByCategory(data) {
     });
 }
 
-function renderByMonth(data) {
+function renderByMonth(expenses, incomes) {
     const canvas = document.getElementById('chart-by-month');
+    // Unifica i mesi presenti in entrambi i dataset.
+    const months = Array.from(new Set([
+        ...expenses.map(m => m.month),
+        ...incomes.map(m => m.month),
+    ])).sort();
+    const expMap = new Map(expenses.map(m => [m.month, Number(m.total)]));
+    const incMap = new Map(incomes.map(m => [m.month, Number(m.total)]));
+
     new Chart(canvas, {
         type: 'bar',
         data: {
-            labels: data.map(m => fmtMonthShort(m.month)),
-            datasets: [{
-                label: 'Totale',
-                data:           data.map(m => Number(m.total)),
-                backgroundColor: '#0d6efd',
-                borderRadius: 4,
-            }],
+            labels: months.map(fmtMonthShort),
+            datasets: [
+                {
+                    label: 'Spese',
+                    data:  months.map(m => expMap.get(m) ?? 0),
+                    backgroundColor: '#dc3545',
+                    borderRadius: 4,
+                },
+                {
+                    label: 'Entrate',
+                    data:  months.map(m => incMap.get(m) ?? 0),
+                    backgroundColor: '#198754',
+                    borderRadius: 4,
+                },
+            ],
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
+                legend: { position: 'top' },
                 tooltip: {
                     callbacks: {
-                        label: (ctx) => fmtMoney(ctx.parsed.y),
+                        label: (ctx) => `${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y)}`,
                     },
                 },
             },
@@ -122,8 +171,9 @@ async function loadData() {
         const r = await apiGuard(api.get(`${BASE}/dashboard/data`));
         const d = r.data ?? {};
         renderKpi(d);
+        renderBudgetProgress(d.budget_progress ?? []);
         renderByCategory(d.by_category ?? []);
-        renderByMonth(d.by_month ?? []);
+        renderByMonth(d.by_month ?? [], d.income_by_month ?? []);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento dashboard.');
     }
