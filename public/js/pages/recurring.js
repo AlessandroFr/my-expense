@@ -86,15 +86,38 @@ async function loadList() {
 createForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const fd = new FormData(createForm);
+    const optimisticIt = {
+        id: 'pending-' + Date.now(),
+        category_id: fd.get('category_id'),
+        category_color: '#6c757d',
+        category_name: '',
+        description: fd.get('description'),
+        frequency:   fd.get('frequency'),
+        start_date:  fd.get('start_date'),
+        end_date:    fd.get('end_date'),
+        last_generated_date: null,
+        amount:      fd.get('amount'),
+        active:      1,
+    };
+    const empty = tbody.querySelector('td[colspan]')?.closest('tr');
+    if (empty) tbody.innerHTML = '';
     try {
-        await send(`${BASE}/recurring/create`, Object.fromEntries(fd.entries()));
+        await optimisticCreate({
+            container: tbody,
+            makeOptimisticRow: () => {
+                const t = document.createElement('tbody');
+                t.innerHTML = renderRow(optimisticIt);
+                return t.firstElementChild;
+            },
+            makeFinalRow: () => null,
+            call: () => send(`${BASE}/recurring/create`, Object.fromEntries(fd.entries())),
+            position: 'prepend',
+        });
         toast.success('Ricorrenza aggiunta.');
         createForm.reset();
         createForm.querySelector('input[name="start_date"]').value = new Date().toISOString().slice(0, 10);
         loadList();
-    } catch (err) {
-        toast.error(err.message ?? 'Errore creazione ricorrenza.');
-    }
+    } catch { /* toast already shown */ }
 });
 
 runBtn.addEventListener('click', async () => {
@@ -116,25 +139,39 @@ delegateTableClick(tbody, {
         const it = cache.find(x => x.id == id);
         if (!it) return;
         const newActive = Number(it.active) === 1 ? 0 : 1;
+        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
         try {
-            await send(`${BASE}/recurring/toggle`, { id, active: newActive });
+            await optimisticUpdate({
+                row: tr,
+                applyValues: () => {
+                    const badge = tr.querySelector('.badge.bg-success, .badge.bg-secondary');
+                    if (badge) {
+                        badge.className = newActive === 1 ? 'badge bg-success' : 'badge bg-secondary';
+                        badge.textContent = newActive === 1 ? 'attiva' : 'disattiva';
+                    }
+                    const ic = tr.querySelector('button[data-action="toggle"] i');
+                    if (ic) ic.className = 'bi ' + (newActive === 1 ? 'bi-pause-circle' : 'bi-play-circle');
+                },
+                makeFinalRow: () => null,
+                call: () => send(`${BASE}/recurring/toggle`, { id, active: newActive }),
+            });
             loadList();
-        } catch (err) {
-            toast.error(err.message ?? 'Errore aggiornamento stato.');
-        }
+        } catch { /* toast shown */ }
     },
     delete: async (id) => {
         const ok = await confirmDialog('Eliminare questa ricorrenza? Le spese gia generate restano.', {
             confirmText: 'Elimina', confirmClass: 'btn-danger',
         });
         if (!ok) return;
+        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
+        if (!tr) return;
         try {
-            await send(`${BASE}/recurring/delete`, { id });
+            await optimisticDelete({
+                row: tr,
+                call: () => send(`${BASE}/recurring/delete`, { id }),
+            });
             toast.success('Ricorrenza eliminata.');
-            loadList();
-        } catch (err) {
-            toast.error(err.message ?? 'Errore eliminazione.');
-        }
+        } catch { /* toast shown */ }
     },
 });
 

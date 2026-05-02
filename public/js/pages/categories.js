@@ -143,19 +143,19 @@ function wireDeleteButtons() {
         if (!confirm(`Eliminare la categoria "${name}"? Le spese collegate perderanno il riferimento.`)) {
             return;
         }
-        btn.disabled = true;
 
         try {
-            const params = new URLSearchParams();
-            params.set('id', id);
-            params.set('_csrf', getCsrfToken());
-            await send(`${BASE}/categories/delete`, params);
-            tr.remove();
+            await optimisticDelete({
+                row: tr,
+                call: () => {
+                    const params = new URLSearchParams();
+                    params.set('id', id);
+                    params.set('_csrf', getCsrfToken());
+                    return send(`${BASE}/categories/delete`, params);
+                },
+            });
             toast.success(`Categoria "${name}" eliminata.`);
-        } catch (err) {
-            btn.disabled = false;
-            toast.error(err.message ?? 'Errore eliminazione categoria.');
-        }
+        } catch { /* toast already shown */ }
     });
 }
 

@@ -104,15 +104,32 @@ resetBtn.addEventListener('click', () => { filtersForm.reset(); loadList(); });
 createForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const fd = new FormData(createForm);
+    const optimisticIt = {
+        id: 'pending-' + Date.now(),
+        income_date: fd.get('income_date'),
+        source:      fd.get('source'),
+        description: fd.get('description'),
+        amount:      fd.get('amount'),
+    };
+    const empty = tbody.querySelector('td[colspan]')?.closest('tr');
+    if (empty) tbody.innerHTML = '';
     try {
-        await send(`${BASE}/incomes/create`, Object.fromEntries(fd.entries()));
+        await optimisticCreate({
+            container: tbody,
+            makeOptimisticRow: () => {
+                const t = document.createElement('tbody');
+                t.innerHTML = renderRow(optimisticIt);
+                return t.firstElementChild;
+            },
+            makeFinalRow: () => null,
+            call: () => send(`${BASE}/incomes/create`, Object.fromEntries(fd.entries())),
+            position: 'prepend',
+        });
         toast.success('Entrata aggiunta.');
         createForm.reset();
         createForm.querySelector('input[name="income_date"]').value = new Date().toISOString().slice(0, 10);
         loadList();
-    } catch (err) {
-        toast.error(err.message ?? 'Errore creazione entrata.');
-    }
+    } catch { /* toast already shown */ }
 });
 
 delegateTableClick(tbody, {
@@ -143,24 +160,30 @@ delegateTableClick(tbody, {
             income_date: tr.querySelector('input[name="income_date"]').value,
         };
         try {
-            await send(`${BASE}/incomes/update`, data);
+            await optimisticUpdate({
+                row: tr,
+                applyValues: () => { /* values in inputs */ },
+                makeFinalRow: () => null,
+                call: () => send(`${BASE}/incomes/update`, data),
+            });
             toast.success('Entrata aggiornata.');
             editingId = null;
             loadList();
-        } catch (err) {
-            toast.error(err.message ?? 'Errore aggiornamento entrata.');
-        }
+        } catch { /* toast shown */ }
     },
     delete: async (id) => {
         const ok = await confirmDialog('Eliminare questa entrata?', { confirmText: 'Elimina', confirmClass: 'btn-danger' });
         if (!ok) return;
+        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
+        if (!tr) return;
         try {
-            await send(`${BASE}/incomes/delete`, { id });
+            await optimisticDelete({
+                row: tr,
+                call: () => send(`${BASE}/incomes/delete`, { id }),
+            });
             toast.success('Entrata eliminata.');
             loadList();
-        } catch (err) {
-            toast.error(err.message ?? 'Errore eliminazione entrata.');
-        }
+        } catch { /* toast already shown */ }
     },
 });
 
