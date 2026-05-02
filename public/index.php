@@ -82,6 +82,9 @@ switch ($route) {
         Auth::requireLogin();
         renderPage('dashboard');
         break;
+    case 'GET /dashboard/data':
+        require __DIR__ . '/endpoints/dashboard_data.php';
+        break;
 
     // ── Categorie ────────────────────────────────────────────────────────
     case 'GET /categories':
