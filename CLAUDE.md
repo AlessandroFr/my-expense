@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`my-expense` is a personal expense tracker. **Phase 2 complete (2026-05-02)** —
-beyond MVP: budget per category, income tracking, recurring expenses with
-auto-generator, CSV import/export.
+`my-expense` is a personal expense tracker. **Phase 3 complete (2026-05-02)** —
+MVP + budgets + incomes + recurring + CSV (fase 2) + budget overrun warnings,
+free-form tags, annual report dashboard, expense file attachments (fase 3).
 
 - `composer.json` (PSR-4 autoload of `App\` from `src/class/`)
 - `database/schema.sql` cumulative + numbered migrations in `database/migrations/`
   (`001_categories.sql`, `002_expenses.sql`, `003_budgets.sql`,
-  `004_incomes.sql`, `005_recurring_expenses.sql`)
+  `004_incomes.sql`, `005_recurring_expenses.sql`, `006_tags.sql`,
+  `007_attachments.sql`)
 - **Auth**: one-time setup at `/setup`, login at `/login`, POST logout, session
   + bcrypt + dual-source CSRF (hidden `_csrf` field + `csrf_token` cookie consumed
   by `public/js/FetchRequest.js` as `X-CSRF-Token` header)
@@ -37,6 +38,27 @@ auto-generator, CSV import/export.
   Bilancio netto / Variazione spese%), Chart.js doughnut (by category),
   dual-bar chart (spese rosso + entrate verdi, ultimi 6 mesi), budget
   progress widget.
+- **Tag liberi**: tabelle `tags` + `expense_tags` (many-to-many); `App\Tag`
+  classe con `setForExpense($expenseId, $userId, $names)` che fa upsert dei
+  nomi. UI in `/expenses`: input testuale CSV con datalist autocomplete dai
+  tag esistenti; chip colorate nelle righe; filtro select per tag.
+  `Expense::listForUser` espone `tags` per riga via batch query.
+- **Budget warnings**: `App\Budget::checkForCategory()` chiamato dopo
+  `expenses/create` e `expenses/update`; il JSON envelope espone
+  `data.budget_warning` `{name, amount, spent, progress_pct, exceeded,
+  near_limit}`. Frontend mostra `toast.warning` a >=80% e `toast.error` a
+  >100%.
+- **Report annuale** (`/reports`): selettore anno + 4 KPI (spese tot /
+  entrate tot / bilancio anno / media mensile), Chart.js bar+line (spese
+  rosse + entrate verdi + linea bilancio blu), doughnut categorie anno,
+  heatmap top-5 categorie x 12 mesi (alpha proporzionale al massimo),
+  top-10 spese singole.
+- **Allegati spese**: tabella `expense_attachments`; storage filesystem in
+  `{root}/uploads/expenses/{user_id}/{stored_name}` (uploads/ ha .htaccess
+  `deny from all`, file gitignored, accessibili solo via endpoint
+  `/attachments/download?id=N` con auth + ownership check). Whitelist mime:
+  jpg/png/gif/webp/pdf, max 8 MB. Bottone clip in ogni riga di `/expenses`
+  apre modal con upload + lista + view/download/delete.
 
 **Conventions**:
 
