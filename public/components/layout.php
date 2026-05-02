@@ -23,6 +23,18 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
+    <!-- PWA -->
+    <link rel="manifest" href="<?= htmlspecialchars($base . '/manifest.webmanifest', ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='28' fill='%230d6efd'/><text x='50%25' y='52%25' font-family='system-ui' font-size='110' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>%E2%82%AC</text></svg>">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('<?= htmlspecialchars($base . '/sw.js', ENT_QUOTES, 'UTF-8') ?>').catch(function(){});
+            });
+        }
+    </script>
+
     <!-- Tema: applicato in head per evitare FOUC -->
     <script>
         (function() {
