@@ -1,0 +1,24 @@
+# Composer
+/vendor/
+
+# Local config (real DB credentials — never commit)
+/config/config.php
+
+# Runtime logs
+/logs/*
+!/logs/.gitkeep
+
+# Editor / IDE
+/.idea/
+/.vscode/
+
+# Claude Code (user-local settings)
+/.claude/
+
+# OS / OneDrive cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local-only files
+*.local
