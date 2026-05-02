@@ -47,6 +47,11 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
                     <i class="bi bi-tags me-1"></i>Categorie
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="<?= htmlspecialchars($base . '/budgets', ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-bullseye me-1"></i>Budget
+                </a>
+            </li>
         </ul>
         <div class="ms-auto d-flex align-items-center gap-2">
             <span class="text-muted small">

@@ -105,6 +105,21 @@ switch ($route) {
         require __DIR__ . '/endpoints/categories_delete.php';
         break;
 
+    // ── Budget mensili ───────────────────────────────────────────────────
+    case 'GET /budgets':
+        Auth::requireLogin();
+        renderPage('budgets');
+        break;
+    case 'GET /budgets/list':
+        require __DIR__ . '/endpoints/budgets_list.php';
+        break;
+    case 'POST /budgets/set':
+        require __DIR__ . '/endpoints/budgets_set.php';
+        break;
+    case 'POST /budgets/delete':
+        require __DIR__ . '/endpoints/budgets_delete.php';
+        break;
+
     // ── Spese ────────────────────────────────────────────────────────────
     case 'GET /expenses':
         Auth::requireLogin();
@@ -146,6 +161,7 @@ function renderPage(string $page, array $data = []): void
         'categories'    => 'Categorie',
         'category_edit' => 'Modifica categoria',
         'expenses'      => 'Spese',
+        'budgets'       => 'Budget mensili',
         default         => 'Pagina non trovata',
     };
     extract($data, EXTR_SKIP);
