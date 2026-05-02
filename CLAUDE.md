@@ -5,19 +5,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 `my-expense` is a personal expense tracker the user is building from scratch.
-As of 2026-05-02 the **schema + authentication layer is implemented**:
+As of 2026-05-02 the **MVP is complete**:
 
-- `composer.json` exists (PSR-4 autoload of `App\` from `src/class/`)
-- `database/schema.sql` defines a `users` table (single-user app for now)
-- One-time setup page at `/setup` (active only when `users` is empty),
-  login at `/login`, logout (POST) at `/logout`, protected dashboard
-  placeholder at `/dashboard`
-- Session-based auth, bcrypt password hashing, CSRF token (dual-source:
-  hidden `_csrf` form field **and** `csrf_token` cookie consumed by
-  `public/js/FetchRequest.js` as `X-CSRF-Token` header)
+- `composer.json` (PSR-4 autoload of `App\` from `src/class/`)
+- `database/schema.sql` cumulative + numbered migrations in `database/migrations/`
+  (`001_categories.sql`, `002_expenses.sql`)
+- **Auth**: one-time setup at `/setup`, login at `/login`, POST logout, session
+  + bcrypt + dual-source CSRF (hidden `_csrf` field + `csrf_token` cookie consumed
+  by `public/js/FetchRequest.js` as `X-CSRF-Token` header)
+- **Categorie** (`/categories`, `/categories/edit?id=N`): per-user CRUD with name
+  (UNIQUE per user), color, Bootstrap Icon, sort order; AJAX via FetchRequest +
+  JSON envelope (`App\Json::ok` / `App\Json::error`)
+- **Spese** (`/expenses`): full CRUD with inline create form, inline row edit
+  (row → form-row → save), delete with confirm; filter bar (date range, category,
+  amount min/max, text search, debounced); JOIN to categories with color/icon
+- **Dashboard** (`/dashboard`): 3 KPI cards (current month / previous month /
+  delta % colored red/green) + Chart.js doughnut (distribution by category) +
+  bar chart (last 6 months trend)
 
-Expense tracking features (categories, entries, dashboard charts, budgets)
-are not yet built — they will arrive in subsequent steps.
+**Conventions**:
+
+- Auth areas use `FetchRequest` + JSON envelope (`{ok: true, data: {...}}` /
+  `{ok: false, error: {code, message}}`); `setup`/`login`/`logout` stay form-POST
+  (pre-auth, no JS).
+- DB changes: structure → numbered migration in `database/migrations/` **and**
+  cumulative update of `database/schema.sql`; data → seed in `database/seeds/`.
+- After every change: deploy to `C:\xampp\htdocs\my-expense\` (robocopy with
+  exclusions: `.git`, `.claude`, `node_modules`, `CLAUDE.md`, `.gitignore`) and
+  create a git commit.
 
 The application runs **locally on XAMPP** (Apache + MySQL/MariaDB + PHP).
 There is no separate `php -S` or Docker workflow.
