@@ -862,9 +862,14 @@ function wireBankImport() {
         newCatBtn.disabled = true;
         try {
             const r = await send(`${BASE}/categories/create`, { name, color, icon: '', sort_order: 0 });
-            const newId = Number(r?.data?.id ?? 0);
+            const cat = r?.data?.category ?? null;
+            const newId = Number(cat?.id ?? 0);
             if (newId > 0) {
-                bankPreviewState.categories.push({ id: newId, name, color });
+                bankPreviewState.categories.push({
+                    id:    newId,
+                    name:  cat.name ?? name,
+                    color: cat.color ?? color,
+                });
                 tbody.querySelectorAll('select[data-field="category_id"]').forEach(sel => {
                     const cur = sel.value;
                     sel.innerHTML = bankRenderCategoryOptions(cur === '' ? null : Number(cur));
