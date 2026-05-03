@@ -24,6 +24,14 @@ try {
         ($_POST['icon'] ?? '') === '' ? null : (string) $_POST['icon'],
         (string) ($_POST['opening_balance'] ?? '0'),
         (int)    ($_POST['sort_order']      ?? 0),
+        [
+            'iban'           => (string) ($_POST['iban']           ?? ''),
+            'bic'            => (string) ($_POST['bic']            ?? ''),
+            'bank_name'      => (string) ($_POST['bank_name']      ?? ''),
+            'account_holder' => (string) ($_POST['account_holder'] ?? ''),
+            'account_number' => (string) ($_POST['account_number'] ?? ''),
+            'notes'          => (string) ($_POST['notes']          ?? ''),
+        ],
     );
 } catch (Throwable $e) {
     Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);

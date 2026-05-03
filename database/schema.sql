@@ -172,14 +172,21 @@ CREATE TABLE IF NOT EXISTS `expense_attachments` (
 
 -- ── Multi-conto ──────────────────────────────────────────────────────────────
 -- Migration: 008_accounts.sql (+ ALTER su expenses/incomes/recurring per account_id)
+-- Migration: 012_accounts_bank_details.sql (IBAN/BIC/banca/intestatario + tipo investment)
 CREATE TABLE IF NOT EXISTS `accounts` (
     `id`              INT UNSIGNED   NOT NULL AUTO_INCREMENT,
     `user_id`         INT UNSIGNED   NOT NULL,
     `name`            VARCHAR(64)    NOT NULL,
-    `type`            ENUM('checking','card','cash','savings','other') NOT NULL DEFAULT 'checking',
+    `type`            ENUM('checking','card','cash','savings','investment','other') NOT NULL DEFAULT 'checking',
     `color`           VARCHAR(7)     NOT NULL DEFAULT '#6c757d',
     `icon`            VARCHAR(32)    NULL,
     `opening_balance` DECIMAL(12,2)  NOT NULL DEFAULT 0,
+    `iban`            VARCHAR(34)    NULL,
+    `bic`             VARCHAR(11)    NULL,
+    `bank_name`       VARCHAR(128)   NULL,
+    `account_holder`  VARCHAR(128)   NULL,
+    `account_number`  VARCHAR(64)    NULL,
+    `notes`           VARCHAR(255)   NULL,
     `archived`        TINYINT(1)     NOT NULL DEFAULT 0,
     `sort_order`      INT            NOT NULL DEFAULT 0,
     `created_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,

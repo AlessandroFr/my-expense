@@ -9,12 +9,16 @@ use RuntimeException;
 
 final class Account
 {
-    public const TYPES = ['checking', 'card', 'cash', 'savings', 'other'];
+    public const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'other'];
+
+    private const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
 
     /** @return array<int, array<string,mixed>> */
     public static function allForUser(int $userId, bool $includeArchived = false): array
     {
-        $sql = 'SELECT id, name, type, color, icon, opening_balance, archived, sort_order, created_at, updated_at
+        $sql = 'SELECT id, name, type, color, icon, opening_balance,
+                       iban, bic, bank_name, account_holder, account_number, notes,
+                       archived, sort_order, created_at, updated_at
                 FROM accounts
                 WHERE user_id = ?'
              . ($includeArchived ? '' : ' AND archived = 0')
@@ -27,7 +31,9 @@ final class Account
     public static function findForUser(int $id, int $userId): ?array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT id, user_id, name, type, color, icon, opening_balance, archived, sort_order
+            'SELECT id, user_id, name, type, color, icon, opening_balance,
+                    iban, bic, bank_name, account_holder, account_number, notes,
+                    archived, sort_order
              FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
         );
         $stmt->execute([$id, $userId]);
@@ -78,19 +84,28 @@ final class Account
         return $accounts;
     }
 
+    /**
+     * @param array<string,mixed> $details Optional: iban, bic, bank_name, account_holder, account_number, notes
+     */
     public static function create(
         int $userId, string $name, string $type, string $color,
-        ?string $icon, string|float $openingBalance, int $sortOrder = 0
+        ?string $icon, string|float $openingBalance, int $sortOrder = 0,
+        array $details = []
     ): int {
-        $row = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder);
+        $row     = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder);
+        $details = self::normalizeDetails($details);
         try {
             $stmt = Database::pdo()->prepare(
-                'INSERT INTO accounts (user_id, name, type, color, icon, opening_balance, sort_order)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO accounts
+                    (user_id, name, type, color, icon, opening_balance, sort_order,
+                     iban, bic, bank_name, account_holder, account_number, notes)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $userId, $row['name'], $row['type'], $row['color'], $row['icon'],
                 $row['opening_balance'], $row['sort_order'],
+                $details['iban'], $details['bic'], $details['bank_name'],
+                $details['account_holder'], $details['account_number'], $details['notes'],
             ]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
@@ -101,22 +116,30 @@ final class Account
         return (int) Database::pdo()->lastInsertId();
     }
 
+    /**
+     * @param array<string,mixed> $details Optional: iban, bic, bank_name, account_holder, account_number, notes
+     */
     public static function update(
         int $id, int $userId, string $name, string $type, string $color,
         ?string $icon, string|float $openingBalance, int $sortOrder = 0,
-        bool $archived = false
+        bool $archived = false, array $details = []
     ): void {
-        $row = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder);
+        $row     = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder);
+        $details = self::normalizeDetails($details);
         try {
             $stmt = Database::pdo()->prepare(
                 'UPDATE accounts
                  SET name = ?, type = ?, color = ?, icon = ?,
-                     opening_balance = ?, sort_order = ?, archived = ?
+                     opening_balance = ?, sort_order = ?, archived = ?,
+                     iban = ?, bic = ?, bank_name = ?,
+                     account_holder = ?, account_number = ?, notes = ?
                  WHERE id = ? AND user_id = ?'
             );
             $stmt->execute([
                 $row['name'], $row['type'], $row['color'], $row['icon'],
                 $row['opening_balance'], $row['sort_order'], $archived ? 1 : 0,
+                $details['iban'], $details['bic'], $details['bank_name'],
+                $details['account_holder'], $details['account_number'], $details['notes'],
                 $id, $userId,
             ]);
         } catch (PDOException $e) {
@@ -171,5 +194,46 @@ final class Account
             'opening_balance' => number_format($obF, 2, '.', ''),
             'sort_order'      => $sortOrder,
         ];
+    }
+
+    /**
+     * @param  array<string,mixed> $details
+     * @return array{iban:?string, bic:?string, bank_name:?string, account_holder:?string, account_number:?string, notes:?string}
+     */
+    private static function normalizeDetails(array $details): array
+    {
+        $out = [];
+        foreach (self::DETAIL_FIELDS as $f) {
+            $v = isset($details[$f]) ? trim((string) $details[$f]) : '';
+            $out[$f] = $v === '' ? null : $v;
+        }
+
+        if ($out['iban'] !== null) {
+            $iban = strtoupper(preg_replace('/\s+/', '', $out['iban']));
+            if (mb_strlen($iban) > 34) {
+                throw new InvalidArgumentException('IBAN troppo lungo (max 34 caratteri).');
+            }
+            if (!preg_match('/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/', $iban)) {
+                throw new InvalidArgumentException('Formato IBAN non valido.');
+            }
+            $out['iban'] = $iban;
+        }
+
+        if ($out['bic'] !== null) {
+            $bic = strtoupper(preg_replace('/\s+/', '', $out['bic']));
+            if (!preg_match('/^[A-Z0-9]{8}([A-Z0-9]{3})?$/', $bic)) {
+                throw new InvalidArgumentException('Formato BIC/SWIFT non valido (8 o 11 caratteri).');
+            }
+            $out['bic'] = $bic;
+        }
+
+        $maxLen = ['bank_name' => 128, 'account_holder' => 128, 'account_number' => 64, 'notes' => 255];
+        foreach ($maxLen as $f => $max) {
+            if ($out[$f] !== null && mb_strlen((string) $out[$f]) > $max) {
+                throw new InvalidArgumentException("Campo {$f} troppo lungo (max {$max}).");
+            }
+        }
+
+        return $out;
     }
 }
