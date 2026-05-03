@@ -1,0 +1,14 @@
+{
+  "name": "my-expense-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JS unit tests harness for my-expense (Node native test runner, zero deps).",
+  "scripts": {
+    "test": "node --test --test-reporter=spec \"tests/js/**/*.test.js\"",
+    "test:watch": "node --test --watch --test-reporter=spec \"tests/js/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

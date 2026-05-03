@@ -1,0 +1,23 @@
+# my-expense — root rewrite
+# Apache DocumentRoot e' htdocs/, il front controller vive in public/.
+# Inoltra ogni request al sotto-percorso public/ cosi' /my-expense/dashboard
+# viene servita da public/index.php senza che l'utente debba digitare /public/.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Lascia passare i file/dir reali a livello root
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Tutto il resto -> public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Blocca accesso diretto a file sensibili al root
+<FilesMatch "^(composer\.(json|lock)|\.env.*|\.git.*|\.htaccess|phpunit\.xml|package\.json|package-lock\.json)$">
+    Require all denied
+</FilesMatch>

@@ -27,3 +27,11 @@ desktop.ini
 
 # Local-only files
 *.local
+
+# Node / JS test harness
+/node_modules/
+/package-lock.json
+
+# PHPUnit
+/.phpunit.cache/
+/.phpunit.result.cache
