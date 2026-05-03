@@ -89,17 +89,19 @@ $paymentLabels  = [
     </div>
 </div>
 
-<!-- ── Modal: import estratto conto bancario ──────────────────────────────── -->
+<!-- ── Modal: import estratto conto bancario (wizard preview + commit) ────── -->
 <div class="modal fade" id="bank-import-modal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bank me-1"></i>Importa estratto conto bancario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+
+            <!-- Step 1: upload + opzioni -->
             <form id="bank-import-form" enctype="multipart/form-data">
                 <?= Csrf::field() ?>
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-bank me-1"></i>Importa estratto conto bancario</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
-                </div>
-                <div class="modal-body">
+                <div class="modal-body" id="bank-import-step1">
                     <p class="small text-muted mb-2">
                         Formato Banca Sella / Patavina (header
                         <code>Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate</code>,
@@ -123,27 +125,72 @@ $paymentLabels  = [
                     </div>
                     <input type="file" name="file" accept=".csv" class="form-control mb-2" required>
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="bank-create-cats" name="create_missing_categories" value="1" checked>
-                        <label class="form-check-label small" for="bank-create-cats">
-                            Crea automaticamente le categorie mancanti (per Tipologia / MCC)
-                        </label>
-                    </div>
-                    <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="bank-pair-ricariche" name="auto_pair_ricariche" value="1" checked>
                         <label class="form-check-label small" for="bank-pair-ricariche">
                             Partita doppia per ricariche carta prepagata
                             <span class="text-muted">(crea spesa sul conto + entrata su account "Carta Prepagata")</span>
                         </label>
                     </div>
-                    <div id="bank-import-result" class="mt-3"></div>
+                    <p class="small text-muted mt-2 mb-0">
+                        Dopo l'analisi del file potrai rivedere e modificare ogni riga prima di confermare l'import.
+                    </p>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" id="bank-step1-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
                     <button type="submit" class="btn btn-primary" <?= empty($accounts) ? 'disabled' : '' ?>>
-                        <i class="bi bi-bank me-1"></i>Importa
+                        <i class="bi bi-search me-1"></i>Anteprima
                     </button>
                 </div>
             </form>
+
+            <!-- Step 2: tabella editabile + commit -->
+            <div id="bank-import-step2" class="d-none">
+                <div class="modal-body">
+                    <div id="bank-preview-summary" class="mb-2"></div>
+
+                    <!-- Toolbar: nuova categoria inline -->
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 border rounded bg-light">
+                        <strong class="small">Categorie</strong>
+                        <input type="text" id="bank-new-category-name" class="form-control form-control-sm" placeholder="Nome nuova categoria" style="max-width:220px">
+                        <input type="color" id="bank-new-category-color" class="form-control form-control-color form-control-sm" value="#6c757d" title="Colore">
+                        <button type="button" id="bank-new-category-btn" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-plus-circle me-1"></i>Crea categoria
+                        </button>
+                        <span class="text-muted small ms-auto">
+                            Suggerimento: deseleziona "Importa" per saltare una riga.
+                        </span>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 60vh">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width:40px"><input type="checkbox" id="bank-toggle-all" checked title="Seleziona/deseleziona tutte"></th>
+                                    <th style="width:110px">Data</th>
+                                    <th style="width:130px">Tipo</th>
+                                    <th>Descrizione</th>
+                                    <th style="width:200px">Categoria / Source</th>
+                                    <th style="width:120px">Pagamento</th>
+                                    <th style="width:110px" class="text-end">Importo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bank-preview-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="bank-parse-errors" class="mt-2"></div>
+                    <div id="bank-import-result" class="mt-2"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link me-auto" id="bank-back-btn">
+                        <i class="bi bi-arrow-left me-1"></i>Indietro
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-primary" id="bank-commit-btn">
+                        <i class="bi bi-check-circle me-1"></i>Conferma import
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -9,25 +9,30 @@ use RuntimeException;
 /**
  * Importer per estratti conto bancari in formato Banca Sella / Patavina.
  *
- * Caratteristiche del formato:
+ * Flusso a due step:
+ *   - preview()  -> parsa il file, classifica, ritorna un array di righe
+ *                   con suggerimenti (categoria, source, payment, kind, dedup
+ *                   flag); NON scrive nulla.
+ *   - commit()   -> riceve un array di righe (eventualmente editate dall'utente)
+ *                   e scrive su DB (Expense / Income / partita doppia).
+ *
+ * Caratteristiche del formato sorgente:
  *   - encoding Windows-1252 (auto-converte a UTF-8)
  *   - header con metadata (intestatario, IBAN, saldi) seguito da righe vuote
  *   - tabella con header: Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate
  *   - data formato DD/MM/YYYY (sia Operazione che Valuta)
  *   - importi formato "-NN.NN €" (negativi in Uscite, positivi in Entrate)
  *
- * Routing per riga:
- *   - Uscite valorizzata  -> crea Expense
- *   - Entrate valorizzata -> crea Income
- *   - Tipologia "Ricariche" + descrizione "RICARICA/RIMBORSO CARTA/E PREPAGATA/E"
- *     opzionalmente genera partita doppia: expense sul conto + income sull'account
- *     "Carta Prepagata" (auto-creato se mancante).
- *
- * Idempotenza: ogni riga produce un import_hash SHA-256; re-import dello stesso
- * file salta automaticamente le righe gia' presenti.
+ * Idempotenza: ogni riga produce un import_hash SHA-256; sia preview() che
+ * commit() ricontrollano la presenza in DB → re-import dello stesso file
+ * salta automaticamente le righe gia' presenti.
  */
 final class BankStatementImporter
 {
+    public const KIND_EXPENSE       = 'expense';
+    public const KIND_INCOME        = 'income';
+    public const KIND_TRANSFER_PAIR = 'transfer_pair';
+
     /** @var array<int,string> MCC -> categoria suggerita */
     private const MCC_MAP = [
         '5411' => 'Spesa',
@@ -64,30 +69,29 @@ final class BankStatementImporter
         '0742' => 'Veterinario',
     ];
 
+    // ── PREVIEW ────────────────────────────────────────────────────────────
     /**
+     * Parsa il file e ritorna un anteprima delle righe SENZA scrivere su DB.
+     *
      * @return array{
-     *   imported_expenses: int,
-     *   imported_incomes:  int,
-     *   transfers_paired:  int,
-     *   skipped_duplicate: int,
-     *   skipped_empty:     int,
-     *   errors: array<int, array{row:int, message:string}>,
-     *   account_iban_detected: ?string
+     *   account: array{id:int, name:string},
+     *   account_iban_detected: ?string,
+     *   categories: array<int, array{id:int,name:string,color:string}>,
+     *   skipped_empty: int,
+     *   parse_errors: array<int, array{row:int, message:string}>,
+     *   rows: array<int, array<string,mixed>>,
      * }
      */
-    public static function importFromUpload(
+    public static function preview(
         int $userId,
         int $accountId,
         string $tmpPath,
-        bool $createMissingCategories = true,
-        bool $autoPairRicariche = true,
-        string $prepaidAccountName = 'Carta Prepagata'
+        bool $autoPairRicariche = true
     ): array {
         if (!is_uploaded_file($tmpPath) && !is_file($tmpPath)) {
             throw new InvalidArgumentException('File non valido.');
         }
 
-        // Verifica account appartiene all'utente.
         $sourceAccount = Account::findForUser($accountId, $userId);
         if ($sourceAccount === null) {
             throw new InvalidArgumentException('Conto sorgente non trovato.');
@@ -105,22 +109,24 @@ final class BankStatementImporter
 
         $iban = self::extractIban(array_slice($lines, 0, $headerIdx));
 
-        // Carica cache categorie (lowercase -> id).
-        $catCache = [];
+        $categories = [];
+        $catByName  = [];
         foreach (Category::allForUser($userId) as $c) {
-            $catCache[mb_strtolower((string) $c['name'])] = (int) $c['id'];
+            $categories[] = [
+                'id'    => (int) $c['id'],
+                'name'  => (string) $c['name'],
+                'color' => (string) ($c['color'] ?? '#6c757d'),
+            ];
+            $catByName[mb_strtolower((string) $c['name'])] = (int) $c['id'];
         }
 
-        // Lazy lookup/create del conto prepagato (solo se servira').
-        $prepaidAccountId = null;
+        $existingHashes = self::loadExistingHashes($userId);
 
-        $importedExp = 0;
-        $importedInc = 0;
-        $pairedCnt   = 0;
-        $dupCnt      = 0;
-        $emptyCnt    = 0;
-        $errors      = [];
-        $lineNum     = $headerIdx + 1; // riga header (1-based)
+        $rows         = [];
+        $emptyCnt     = 0;
+        $parseErrors  = [];
+        $lineNum      = $headerIdx + 1;
+        $idx          = 0;
 
         for ($i = $headerIdx + 1; $i < count($lines); $i++) {
             $lineNum++;
@@ -143,7 +149,6 @@ final class BankStatementImporter
 
                 $isExpense = $uscitaRaw  !== '';
                 $isIncome  = $entrataRaw !== '';
-
                 if (!$isExpense && !$isIncome) { $emptyCnt++; continue; }
                 if ($isExpense && $isIncome) {
                     throw new InvalidArgumentException('Riga con sia Uscita che Entrata: non supportato.');
@@ -156,16 +161,123 @@ final class BankStatementImporter
                     throw new InvalidArgumentException('Importo non valido (zero o negativo dopo parsing).');
                 }
 
-                // Rilevamento ricarica carta prepagata (solo lato Uscita).
                 $isPrepaidRecharge = $isExpense
                     && stripos($tipologia, 'Ricariche') !== false
                     && stripos($descrizione, 'RICARICA/RIMBORSO') !== false;
 
-                $signed     = $isExpense ? -$amount : $amount;
-                $importHash = self::computeImportHash($accountId, $opDate, $signed, $descrizione);
+                $kind = $isPrepaidRecharge && $autoPairRicariche
+                    ? self::KIND_TRANSFER_PAIR
+                    : ($isExpense ? self::KIND_EXPENSE : self::KIND_INCOME);
 
-                if ($isPrepaidRecharge && $autoPairRicariche) {
-                    // Lazy-init account prepagato.
+                $signed = $isExpense ? -$amount : $amount;
+                $hash   = self::computeImportHash($accountId, $opDate, $signed, $descrizione);
+
+                $row = [
+                    'idx'                => $idx++,
+                    'csv_row'            => $lineNum,
+                    'kind'               => $kind,
+                    'op_date'            => $opDate,
+                    'value_date'         => $valDate,
+                    'tipologia'          => $tipologia,
+                    'description'        => $descrizione,
+                    'amount'             => round($amount, 2),
+                    'is_duplicate'       => isset($existingHashes[$hash]),
+                    'skip'               => isset($existingHashes[$hash]),
+                    'category_id'        => null,
+                    'category_suggested' => null,
+                    'source'             => null,
+                    'payment_method'     => null,
+                ];
+
+                if ($kind === self::KIND_EXPENSE || $kind === self::KIND_TRANSFER_PAIR) {
+                    if ($kind === self::KIND_TRANSFER_PAIR) {
+                        $catName = 'Trasferimenti interni';
+                    } else {
+                        $cls     = self::classifyExpense($tipologia, $descrizione);
+                        $catName = $cls['category'];
+                    }
+                    $row['category_suggested'] = $catName;
+                    $row['category_id']        = $catByName[mb_strtolower($catName)] ?? null;
+                    $row['payment_method']     = self::guessPaymentMethod($tipologia, $descrizione);
+                } else {
+                    $row['source']         = self::classifyIncomeSource($tipologia, $descrizione);
+                    $row['payment_method'] = null;
+                }
+
+                $rows[] = $row;
+            } catch (\Throwable $e) {
+                $parseErrors[] = ['row' => $lineNum, 'message' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'account' => [
+                'id'   => (int) $sourceAccount['id'],
+                'name' => (string) $sourceAccount['name'],
+            ],
+            'account_iban_detected' => $iban,
+            'categories'            => $categories,
+            'skipped_empty'         => $emptyCnt,
+            'parse_errors'          => $parseErrors,
+            'rows'                  => $rows,
+        ];
+    }
+
+    // ── COMMIT ─────────────────────────────────────────────────────────────
+    /**
+     * Scrive su DB le righe (potenzialmente editate dall'utente).
+     *
+     * @param array<int, array<string,mixed>> $rows
+     * @return array{
+     *   imported_expenses: int,
+     *   imported_incomes:  int,
+     *   transfers_paired:  int,
+     *   skipped_duplicate: int,
+     *   skipped_user:      int,
+     *   errors: array<int, array{idx:int, message:string}>,
+     * }
+     */
+    public static function commit(
+        int $userId,
+        int $accountId,
+        array $rows,
+        string $prepaidAccountName = 'Carta Prepagata'
+    ): array {
+        $sourceAccount = Account::findForUser($accountId, $userId);
+        if ($sourceAccount === null) {
+            throw new InvalidArgumentException('Conto sorgente non trovato.');
+        }
+        if ($prepaidAccountName === '') {
+            $prepaidAccountName = 'Carta Prepagata';
+        }
+
+        $importedExp = 0;
+        $importedInc = 0;
+        $pairedCnt   = 0;
+        $dupCnt      = 0;
+        $skipUser    = 0;
+        $errors      = [];
+
+        $prepaidAccountId = null;
+
+        foreach ($rows as $rowIn) {
+            $idx = (int) ($rowIn['idx'] ?? -1);
+            try {
+                if (!empty($rowIn['skip'])) { $skipUser++; continue; }
+
+                $kind        = (string) ($rowIn['kind'] ?? '');
+                $opDate      = self::ensureIsoDate((string) ($rowIn['op_date'] ?? ''));
+                $valueDate   = isset($rowIn['value_date']) && $rowIn['value_date'] !== ''
+                    ? self::ensureIsoDate((string) $rowIn['value_date'])
+                    : null;
+                $description = trim((string) ($rowIn['description'] ?? ''));
+                $amount      = self::ensurePositiveAmount($rowIn['amount'] ?? 0);
+
+                if (!in_array($kind, [self::KIND_EXPENSE, self::KIND_INCOME, self::KIND_TRANSFER_PAIR], true)) {
+                    throw new InvalidArgumentException('Tipo riga non valido.');
+                }
+
+                if ($kind === self::KIND_TRANSFER_PAIR) {
                     if ($prepaidAccountId === null) {
                         $prepaidAccountId = self::resolvePrepaidAccount($userId, $prepaidAccountName);
                     }
@@ -174,23 +286,25 @@ final class BankStatementImporter
                             "Il conto sorgente coincide con '{$prepaidAccountName}': impossibile fare partita doppia."
                         );
                     }
+                    $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
+                        ? (int) $rowIn['category_id']
+                        : null;
 
-                    $catId = self::resolveCategoryId('Trasferimenti interni', $catCache, $userId, $createMissingCategories);
-
-                    $expHash = $importHash . ':exp';
-                    $incHash = $importHash . ':inc';
+                    $signed   = -$amount;
+                    $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
+                    $expHash  = $baseHash . ':exp';
+                    $incHash  = $baseHash . ':inc';
 
                     $expId = Expense::createImported(
                         $userId, $catId, (string) $amount,
                         'Ricarica → ' . $prepaidAccountName,
-                        'transfer', $opDate, $accountId, $valDate, $expHash
+                        'transfer', $opDate, $accountId, $valueDate, $expHash
                     );
                     $incId = Income::createImported(
                         $userId, 'Trasferimento da conto',
                         'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $prepaidAccountId, $valDate, $incHash
+                        (string) $amount, $opDate, $prepaidAccountId, $valueDate, $incHash
                     );
-
                     if ($expId === null && $incId === null) {
                         $dupCnt++;
                     } else {
@@ -201,51 +315,81 @@ final class BankStatementImporter
                     continue;
                 }
 
-                if ($isExpense) {
-                    $classification = self::classifyExpense($tipologia, $descrizione);
-                    $catId = self::resolveCategoryId(
-                        $classification['category'], $catCache, $userId, $createMissingCategories
-                    );
-                    $payment = self::guessPaymentMethod($tipologia, $descrizione);
+                if ($kind === self::KIND_EXPENSE) {
+                    $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
+                        ? (int) $rowIn['category_id']
+                        : null;
+                    $payment = (string) ($rowIn['payment_method'] ?? 'card');
+                    $signed  = -$amount;
+                    $hash    = self::computeImportHash($accountId, $opDate, $signed, $description);
 
                     $id = Expense::createImported(
-                        $userId, $catId, (string) $amount, $descrizione,
-                        $payment, $opDate, $accountId, $valDate, $importHash
+                        $userId, $catId, (string) $amount, $description,
+                        $payment, $opDate, $accountId, $valueDate, $hash
                     );
-                    if ($id === null) {
-                        $dupCnt++;
-                    } else {
-                        $importedExp++;
-                    }
+                    if ($id === null) $dupCnt++; else $importedExp++;
                 } else {
-                    $source = self::classifyIncomeSource($tipologia, $descrizione);
+                    $source = trim((string) ($rowIn['source'] ?? ''));
+                    if ($source === '') $source = 'Entrata';
+                    $hash = self::computeImportHash($accountId, $opDate, $amount, $description);
+
                     $id = Income::createImported(
-                        $userId, $source, $descrizione, (string) $amount,
-                        $opDate, $accountId, $valDate, $importHash
+                        $userId, $source, $description, (string) $amount,
+                        $opDate, $accountId, $valueDate, $hash
                     );
-                    if ($id === null) {
-                        $dupCnt++;
-                    } else {
-                        $importedInc++;
-                    }
+                    if ($id === null) $dupCnt++; else $importedInc++;
                 }
             } catch (\Throwable $e) {
-                $errors[] = ['row' => $lineNum, 'message' => $e->getMessage()];
+                $errors[] = ['idx' => $idx, 'message' => $e->getMessage()];
             }
         }
 
         return [
-            'imported_expenses'     => $importedExp,
-            'imported_incomes'      => $importedInc,
-            'transfers_paired'      => $pairedCnt,
-            'skipped_duplicate'     => $dupCnt,
-            'skipped_empty'         => $emptyCnt,
-            'errors'                => $errors,
-            'account_iban_detected' => $iban,
+            'imported_expenses' => $importedExp,
+            'imported_incomes'  => $importedInc,
+            'transfers_paired'  => $pairedCnt,
+            'skipped_duplicate' => $dupCnt,
+            'skipped_user'      => $skipUser,
+            'errors'            => $errors,
         ];
     }
 
-    // ── Pipeline helpers ──────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    /** @return array<string, true> */
+    private static function loadExistingHashes(int $userId): array
+    {
+        $out = [];
+        $pdo = Database::pdo();
+        $stmt = $pdo->prepare('SELECT import_hash FROM expenses WHERE user_id = ? AND import_hash IS NOT NULL');
+        $stmt->execute([$userId]);
+        foreach ($stmt->fetchAll() as $r) {
+            $out[(string) $r['import_hash']] = true;
+        }
+        $stmt = $pdo->prepare('SELECT import_hash FROM incomes WHERE user_id = ? AND import_hash IS NOT NULL');
+        $stmt->execute([$userId]);
+        foreach ($stmt->fetchAll() as $r) {
+            $out[(string) $r['import_hash']] = true;
+        }
+        return $out;
+    }
+
+    private static function ensureIsoDate(string $s): string
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $s)) {
+            throw new InvalidArgumentException("Data non valida: '{$s}' (atteso YYYY-MM-DD).");
+        }
+        return $s;
+    }
+
+    private static function ensurePositiveAmount(mixed $v): float
+    {
+        $f = is_string($v) ? (float) str_replace(',', '.', $v) : (float) $v;
+        if ($f <= 0 || !is_finite($f)) {
+            throw new InvalidArgumentException('Importo non valido.');
+        }
+        return round($f, 2);
+    }
 
     private static function loadAndDecode(string $path): string
     {
@@ -253,11 +397,9 @@ final class BankStatementImporter
         if ($raw === false) {
             throw new RuntimeException('Impossibile leggere il file.');
         }
-        // Strip BOM se presente.
         if (str_starts_with($raw, "\xEF\xBB\xBF")) {
             $raw = substr($raw, 3);
         }
-        // Auto-detect encoding: se non e' UTF-8 valido lo trattiamo come Windows-1252.
         if (!mb_check_encoding($raw, 'UTF-8')) {
             $converted = mb_convert_encoding($raw, 'UTF-8', 'Windows-1252');
             if ($converted === false) {
@@ -268,9 +410,7 @@ final class BankStatementImporter
         return $raw;
     }
 
-    /**
-     * @param array<int,string> $lines
-     */
+    /** @param array<int,string> $lines */
     private static function findHeaderRow(array $lines): ?int
     {
         foreach ($lines as $i => $line) {
@@ -285,9 +425,7 @@ final class BankStatementImporter
         return null;
     }
 
-    /**
-     * @param array<int,string> $preHeaderLines
-     */
+    /** @param array<int,string> $preHeaderLines */
     private static function extractIban(array $preHeaderLines): ?string
     {
         foreach ($preHeaderLines as $line) {
@@ -315,15 +453,8 @@ final class BankStatementImporter
         throw new InvalidArgumentException("Data non valida: '{$raw}'.");
     }
 
-    /**
-     * Parsa un importo in formato Banca Sella: "-298.00 €" o "5.039,56 €".
-     * Per le transazioni il punto e' separatore decimale; per il saldo
-     * l'italiano usa virgola decimale + punto migliaia.
-     * Ritorna sempre il valore assoluto (segno gestito a monte).
-     */
     private static function parseBankAmount(string $raw): float
     {
-        // Rimuovi simbolo €, byte NBSP, spazi normali, byte di controllo CP1252 residui.
         $clean = preg_replace('/[\x{20AC}\x{00A0}\s]/u', '', $raw) ?? '';
         $clean = str_replace(['EUR', '€'], '', $clean);
         $clean = trim($clean);
@@ -342,14 +473,11 @@ final class BankStatementImporter
         $hasDot   = str_contains($clean, '.');
         $hasComma = str_contains($clean, ',');
         if ($hasDot && $hasComma) {
-            // Formato italiano "5.039,56" -> punto = migliaia, virgola = decimale.
             $clean = str_replace('.', '', $clean);
             $clean = str_replace(',', '.', $clean);
         } elseif ($hasComma && !$hasDot) {
-            // Solo virgola: e' decimale.
             $clean = str_replace(',', '.', $clean);
         }
-        // Solo punto, o nessuno: gia' OK.
 
         if (!is_numeric($clean)) {
             throw new InvalidArgumentException("Importo non valido: '{$raw}'.");
@@ -365,42 +493,27 @@ final class BankStatementImporter
         return hash('sha256', $key);
     }
 
-    /**
-     * @return array{category: string}
-     */
+    /** @return array{category: string} */
     private static function classifyExpense(string $tipologia, string $descrizione): array
     {
         $tlow = mb_strtolower($tipologia);
 
-        if (str_contains($tlow, 'stipendi')) {
-            return ['category' => 'Trasferimenti']; // raro lato uscita
-        }
-        if (str_contains($tlow, 'bonifici')) {
-            return ['category' => 'Bonifici'];
-        }
-        if (str_contains($tlow, 'bancomat pay')) {
-            return ['category' => 'P2P'];
-        }
+        if (str_contains($tlow, 'stipendi'))      return ['category' => 'Trasferimenti'];
+        if (str_contains($tlow, 'bonifici'))      return ['category' => 'Bonifici'];
+        if (str_contains($tlow, 'bancomat pay'))  return ['category' => 'P2P'];
         if (str_contains($tlow, 'addebiti diretti')) {
             $cat = stripos($descrizione, 'AMAZON') !== false ? 'Acquisti online' : 'Addebiti SDD';
             return ['category' => $cat];
         }
-        if (str_contains($tlow, 'bollettini')) {
-            return ['category' => 'Utenze'];
-        }
-        if (str_contains($tlow, 'ricariche')) {
-            // Solo le commissioni 1€ arrivano qui (le ricariche vere sono gia' state pairate).
-            return ['category' => 'Commissioni bancarie'];
-        }
+        if (str_contains($tlow, 'bollettini'))    return ['category' => 'Utenze'];
+        if (str_contains($tlow, 'ricariche'))     return ['category' => 'Commissioni bancarie'];
 
-        // Tenta MCC dalla descrizione.
         if (preg_match('/COD\.\s*MCC\s*(\d{4})/i', $descrizione, $m)) {
             $mcc = $m[1];
             if (isset(self::MCC_MAP[$mcc])) {
                 return ['category' => self::MCC_MAP[$mcc]];
             }
         }
-        // Prelievo contante puro (no MCC ma "PRELIEVO DI CONTANTE").
         if (stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false) {
             return ['category' => 'Prelievo contante'];
         }
@@ -410,10 +523,9 @@ final class BankStatementImporter
     private static function classifyIncomeSource(string $tipologia, string $descrizione): string
     {
         $tlow = mb_strtolower($tipologia);
-        if (str_contains($tlow, 'stipendi')) return 'Stipendio';
+        if (str_contains($tlow, 'stipendi'))     return 'Stipendio';
         if (str_contains($tlow, 'bancomat pay')) return 'P2P';
         if (str_contains($tlow, 'bonifici')) {
-            // Estrai "DA <NOME>" se presente nella descrizione.
             if (preg_match('/\bDA\s+([A-Z][A-Z\s\.\']+?)(?:\s+NOTE:|\s+VAL\.|\s+DATA|\s+CRO|$)/u', $descrizione, $m)) {
                 $name = trim($m[1]);
                 if ($name !== '' && mb_strlen($name) <= 60) {
@@ -428,35 +540,12 @@ final class BankStatementImporter
     private static function guessPaymentMethod(string $tipologia, string $descrizione): string
     {
         $tlow = mb_strtolower($tipologia);
-        if (str_contains($tlow, 'bonifici')) return 'transfer';
+        if (str_contains($tlow, 'bonifici'))         return 'transfer';
         if (str_contains($tlow, 'bollettini') || str_contains($tlow, 'addebiti diretti')) return 'transfer';
-        if (str_contains($tlow, 'bancomat pay')) return 'transfer';
-        if (str_contains($tlow, 'ricariche')) return 'transfer';
+        if (str_contains($tlow, 'bancomat pay'))     return 'transfer';
+        if (str_contains($tlow, 'ricariche'))        return 'transfer';
         if (stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false) return 'cash';
         return 'card';
-    }
-
-    /**
-     * @param array<string,int> $catCache modificato per riferimento
-     */
-    private static function resolveCategoryId(
-        string $name,
-        array &$catCache,
-        int $userId,
-        bool $createMissing
-    ): ?int {
-        $name = trim($name);
-        if ($name === '') return null;
-        $key = mb_strtolower($name);
-        if (isset($catCache[$key])) {
-            return $catCache[$key];
-        }
-        if (!$createMissing) {
-            return null;
-        }
-        $id = Category::create($userId, $name, '#6c757d', null, 0);
-        $catCache[$key] = $id;
-        return $id;
     }
 
     private static function resolvePrepaidAccount(int $userId, string $name): int

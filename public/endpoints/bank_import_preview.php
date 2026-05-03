@@ -15,10 +15,7 @@ if (!Csrf::check()) {
 
 $userId    = (int) Auth::userId();
 $accountId = (int) ($_POST['account_id'] ?? 0);
-$create    = (bool) (int) ($_POST['create_missing_categories'] ?? 1);
 $pair      = (bool) (int) ($_POST['auto_pair_ricariche'] ?? 1);
-$prepaid   = trim((string) ($_POST['prepaid_account_name'] ?? 'Carta Prepagata'));
-if ($prepaid === '') $prepaid = 'Carta Prepagata';
 
 if ($accountId <= 0) {
     Json::error('Seleziona il conto su cui importare i movimenti.', Json::ERR_VALIDATION, 400);
@@ -36,13 +33,11 @@ if (!preg_match('/\.csv$/i', $origName)) {
 }
 
 try {
-    $result = BankStatementImporter::importFromUpload(
-        $userId, $accountId, $tmpPath, $create, $pair, $prepaid
-    );
+    $result = BankStatementImporter::preview($userId, $accountId, $tmpPath, $pair);
 } catch (InvalidArgumentException $e) {
     Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);
 } catch (Throwable $e) {
-    Json::serverError($e, 'Errore durante l\'importazione.');
+    Json::serverError($e, 'Errore durante l\'anteprima.');
 }
 
 Json::ok($result);

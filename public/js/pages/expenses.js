@@ -597,56 +597,334 @@ function wireCsvButtons() {
     }
 }
 
-// ── Bank statement import ──────────────────────────────────────────────────
+// ── Bank statement import (preview + commit wizard) ───────────────────────
+
+const BANK_KINDS = [
+    { value: 'expense',       label: 'Spesa' },
+    { value: 'income',        label: 'Entrata' },
+    { value: 'transfer_pair', label: 'Ricarica (pair)' },
+];
+
+let bankPreviewState = {
+    accountId: 0,
+    accountName: '',
+    pair: 1,
+    rows: [],
+    categories: [],
+};
+
+function bankRenderCategoryOptions(selectedId) {
+    const opts = [`<option value="">— nessuna —</option>`];
+    for (const c of bankPreviewState.categories) {
+        const sel = (selectedId !== null && Number(selectedId) === Number(c.id)) ? ' selected' : '';
+        opts.push(`<option value="${c.id}"${sel}>${escHtml(c.name)}</option>`);
+    }
+    return opts.join('');
+}
+
+function bankRenderPaymentOptions(selected) {
+    return PAYMENT_OPTIONS.map(p => {
+        const sel = p === selected ? ' selected' : '';
+        return `<option value="${p}"${sel}>${escHtml(PAYMENT_LABELS[p])}</option>`;
+    }).join('');
+}
+
+function bankRenderKindOptions(selected) {
+    return BANK_KINDS.map(k => {
+        const sel = k.value === selected ? ' selected' : '';
+        return `<option value="${k.value}"${sel}>${escHtml(k.label)}</option>`;
+    }).join('');
+}
+
+function bankRenderRow(r) {
+    const dupBadge = r.is_duplicate
+        ? `<span class="badge bg-warning text-dark ms-1" title="Gia' presente in DB">duplicato</span>`
+        : '';
+    const suggHint = r.category_suggested
+        ? `<div class="form-text small mt-0">sugg.: ${escHtml(r.category_suggested)}</div>`
+        : '';
+
+    let classCol;
+    if (r.kind === 'income') {
+        classCol = `<input type="text" class="form-control form-control-sm bank-cell" data-field="source"
+                          value="${escHtml(r.source ?? '')}" placeholder="Es. Bonifico da X">`;
+    } else {
+        classCol = `<select class="form-select form-select-sm bank-cell" data-field="category_id">
+                        ${bankRenderCategoryOptions(r.category_id)}
+                    </select>${suggHint}`;
+    }
+
+    const payCol = r.kind === 'income'
+        ? `<span class="text-muted small">—</span>`
+        : `<select class="form-select form-select-sm bank-cell" data-field="payment_method">
+              ${bankRenderPaymentOptions(r.payment_method ?? 'card')}
+           </select>`;
+
+    return `<tr data-idx="${r.idx}" class="${r.skip ? 'table-secondary text-muted' : ''}">
+        <td class="text-center">
+            <input type="checkbox" class="bank-cell" data-field="include" ${r.skip ? '' : 'checked'} title="Importa questa riga">
+        </td>
+        <td>
+            <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escHtml(r.op_date)}">
+        </td>
+        <td>
+            <select class="form-select form-select-sm bank-cell" data-field="kind">
+                ${bankRenderKindOptions(r.kind)}
+            </select>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm bank-cell" data-field="description"
+                   value="${escHtml(r.description ?? '')}">
+            <div class="form-text small mt-0">
+                <span class="text-muted">${escHtml(r.tipologia ?? '')}</span> ${dupBadge}
+            </div>
+        </td>
+        <td>${classCol}</td>
+        <td>${payCol}</td>
+        <td>
+            <input type="number" step="0.01" min="0.01" class="form-control form-control-sm text-end bank-cell"
+                   data-field="amount" value="${Number(r.amount ?? 0).toFixed(2)}">
+        </td>
+    </tr>`;
+}
+
+function bankRenderRows() {
+    const tbody = document.getElementById('bank-preview-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = bankPreviewState.rows.map(bankRenderRow).join('');
+}
+
+function bankRenderSummary(d) {
+    const summary = document.getElementById('bank-preview-summary');
+    if (!summary) return;
+    const counts = bankPreviewState.rows.reduce((acc, r) => {
+        acc[r.kind] = (acc[r.kind] ?? 0) + 1;
+        if (r.is_duplicate) acc.dup++;
+        return acc;
+    }, { expense: 0, income: 0, transfer_pair: 0, dup: 0 });
+
+    const ibanLine = d.account_iban_detected
+        ? ` &middot; IBAN file <code>${escHtml(d.account_iban_detected)}</code>`
+        : '';
+    summary.innerHTML = `
+        <div class="alert alert-info small mb-0 py-2">
+            <strong>${bankPreviewState.rows.length}</strong> righe parsate su conto
+            <strong>${escHtml(bankPreviewState.accountName)}</strong>${ibanLine}.
+            Spese ${counts.expense}, entrate ${counts.income}, ricariche pair ${counts.transfer_pair},
+            duplicate ${counts.dup}.
+        </div>`;
+
+    const errs = d.parse_errors ?? [];
+    const errBox = document.getElementById('bank-parse-errors');
+    if (errs.length) {
+        errBox.innerHTML = `<div class="small text-muted">Righe non parsabili (${errs.length}):</div>
+            <ul class="small mb-0">${errs.slice(0, 20).map(e => `<li>Riga CSV ${e.row}: ${escHtml(e.message)}</li>`).join('')}</ul>`;
+    } else {
+        errBox.innerHTML = '';
+    }
+}
+
+function bankShowStep(n) {
+    document.getElementById('bank-import-step1').classList.toggle('d-none', n !== 1);
+    document.getElementById('bank-step1-footer').classList.toggle('d-none', n !== 1);
+    document.getElementById('bank-import-step2').classList.toggle('d-none', n !== 2);
+}
+
+function bankReadRowFromTr(tr) {
+    const idx = Number(tr.dataset.idx);
+    const get = (f) => tr.querySelector(`[data-field="${f}"]`);
+    const original = bankPreviewState.rows.find(r => r.idx === idx) ?? {};
+    const include = get('include')?.checked ?? true;
+    const kindEl  = get('kind');
+    const kind    = kindEl ? kindEl.value : original.kind;
+    const out = {
+        idx,
+        kind,
+        op_date:     get('op_date')?.value || original.op_date,
+        value_date:  original.value_date,
+        description: get('description')?.value ?? original.description ?? '',
+        amount:      Number(get('amount')?.value ?? original.amount ?? 0),
+        skip:        !include,
+    };
+    if (kind === 'income') {
+        out.source = get('source')?.value ?? original.source ?? '';
+    } else {
+        const catEl = get('category_id');
+        out.category_id = catEl && catEl.value !== '' ? Number(catEl.value) : null;
+        const payEl = get('payment_method');
+        out.payment_method = payEl ? payEl.value : (original.payment_method ?? 'card');
+    }
+    return out;
+}
 
 function wireBankImport() {
-    const form      = document.getElementById('bank-import-form');
-    const resultBox = document.getElementById('bank-import-result');
+    const form = document.getElementById('bank-import-form');
     if (!form) return;
+
+    const modal      = document.getElementById('bank-import-modal');
+    const resultBox  = document.getElementById('bank-import-result');
+    const tbody      = document.getElementById('bank-preview-tbody');
+    const toggleAll  = document.getElementById('bank-toggle-all');
+    const backBtn    = document.getElementById('bank-back-btn');
+    const commitBtn  = document.getElementById('bank-commit-btn');
+    const newCatBtn  = document.getElementById('bank-new-category-btn');
+    const newCatName = document.getElementById('bank-new-category-name');
+    const newCatCol  = document.getElementById('bank-new-category-color');
 
     form.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
-        resultBox.innerHTML = `<div class="text-muted small">
-            <span class="spinner-border spinner-border-sm me-2"></span>Importazione estratto conto in corso...</div>`;
         try {
             const fd = new FormData(form);
-            const r  = await fetch(`${BASE}/import/bank-statement`, {
-                method:  'POST',
-                body:    fd,
+            bankPreviewState.accountId   = Number(fd.get('account_id') ?? 0);
+            bankPreviewState.accountName = form.querySelector('select[name="account_id"] option:checked')?.textContent ?? '';
+            bankPreviewState.pair        = fd.get('auto_pair_ricariche') ? 1 : 0;
+
+            const r = await fetch(`${BASE}/import/bank-statement/preview`, {
+                method: 'POST',
+                body: fd,
                 headers: { 'X-CSRF-Token': getCsrfToken() },
             });
             const json = await r.json();
-            if (!json.ok) {
-                throw new Error(json.error?.message ?? 'Errore import.');
+            if (!json.ok) throw new Error(json.error?.message ?? 'Errore anteprima.');
+            const d = json.data ?? {};
+            bankPreviewState.rows       = d.rows ?? [];
+            bankPreviewState.categories = d.categories ?? [];
+            if (toggleAll) toggleAll.checked = bankPreviewState.rows.some(r => !r.skip);
+
+            if (resultBox) resultBox.innerHTML = '';
+            bankRenderRows();
+            bankRenderSummary(d);
+            bankShowStep(2);
+        } catch (err) {
+            toast.error(err.message ?? 'Errore anteprima.');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    toggleAll?.addEventListener('change', () => {
+        const checked = toggleAll.checked;
+        tbody.querySelectorAll('input[data-field="include"]').forEach(cb => {
+            cb.checked = checked;
+            const tr = cb.closest('tr');
+            tr.classList.toggle('table-secondary', !checked);
+            tr.classList.toggle('text-muted', !checked);
+        });
+    });
+
+    tbody?.addEventListener('change', (ev) => {
+        const cell = ev.target.closest('.bank-cell');
+        if (!cell) return;
+        const tr = cell.closest('tr');
+        if (!tr) return;
+        const field = cell.dataset.field;
+
+        if (field === 'include') {
+            tr.classList.toggle('table-secondary', !cell.checked);
+            tr.classList.toggle('text-muted', !cell.checked);
+            return;
+        }
+        if (field === 'kind') {
+            const idx = Number(tr.dataset.idx);
+            const r = bankPreviewState.rows.find(x => x.idx === idx);
+            if (!r) return;
+            const merged = bankReadRowFromTr(tr);
+            r.kind = merged.kind;
+            r.description = merged.description;
+            r.amount = merged.amount;
+            r.op_date = merged.op_date;
+            r.skip = merged.skip;
+            if (merged.kind === 'income') {
+                r.source = r.source ?? '';
+                r.category_id = null;
+                r.payment_method = null;
+            } else {
+                r.payment_method = r.payment_method ?? 'card';
             }
+            tr.outerHTML = bankRenderRow(r);
+        }
+    });
+
+    backBtn?.addEventListener('click', () => bankShowStep(1));
+
+    modal?.addEventListener('hidden.bs.modal', () => {
+        bankShowStep(1);
+        if (resultBox) resultBox.innerHTML = '';
+        bankPreviewState.rows = [];
+    });
+
+    newCatBtn?.addEventListener('click', async () => {
+        const name = (newCatName?.value ?? '').trim();
+        if (name === '') { toast.warning('Inserisci un nome categoria.'); return; }
+        const color = (newCatCol?.value ?? '#6c757d');
+        newCatBtn.disabled = true;
+        try {
+            const r = await send(`${BASE}/categories/create`, { name, color, icon: '', sort_order: 0 });
+            const newId = Number(r?.data?.id ?? 0);
+            if (newId > 0) {
+                bankPreviewState.categories.push({ id: newId, name, color });
+                tbody.querySelectorAll('select[data-field="category_id"]').forEach(sel => {
+                    const cur = sel.value;
+                    sel.innerHTML = bankRenderCategoryOptions(cur === '' ? null : Number(cur));
+                });
+                toast.success(`Categoria "${name}" creata.`);
+                newCatName.value = '';
+            }
+        } catch (err) {
+            toast.error(err.message ?? 'Errore creazione categoria.');
+        } finally {
+            newCatBtn.disabled = false;
+        }
+    });
+
+    commitBtn?.addEventListener('click', async () => {
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr')).map(bankReadRowFromTr);
+        const toImport = rows.filter(r => !r.skip).length;
+        if (toImport === 0) { toast.warning('Nessuna riga selezionata.'); return; }
+
+        commitBtn.disabled = true;
+        if (resultBox) {
+            resultBox.innerHTML = `<div class="text-muted small">
+                <span class="spinner-border spinner-border-sm me-2"></span>Conferma import in corso...</div>`;
+        }
+        try {
+            const fd = new FormData();
+            fd.append('account_id', String(bankPreviewState.accountId));
+            fd.append('rows', JSON.stringify(rows));
+            const r = await fetch(`${BASE}/import/bank-statement/commit`, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-CSRF-Token': getCsrfToken() },
+            });
+            const json = await r.json();
+            if (!json.ok) throw new Error(json.error?.message ?? 'Errore conferma import.');
             const d = json.data ?? {};
             const errs = (d.errors ?? []).slice(0, 10);
-            const ibanInfo = d.account_iban_detected
-                ? `<div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>IBAN rilevato nel file: <code>${escHtml(d.account_iban_detected)}</code></div>`
-                : '';
-            let html = ibanInfo + `<div class="alert alert-success small mb-2">
+            let html = `<div class="alert alert-success small mb-2">
                 <strong>${d.imported_expenses}</strong> spese, <strong>${d.imported_incomes}</strong> entrate importate.<br>
                 <strong>${d.transfers_paired}</strong> ricariche con partita doppia.
-                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_empty}</strong> righe vuote.
+                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_user}</strong> deselezionate dall'utente.
             </div>`;
             if (errs.length) {
-                html += `<div class="small text-muted">Prime ${errs.length} righe scartate (su ${(d.errors ?? []).length}):</div>
+                html += `<div class="small text-muted">Errori (${(d.errors ?? []).length}):</div>
                     <ul class="small mb-0">` +
-                    errs.map(e => `<li>Riga ${e.row}: ${escHtml(e.message)}</li>`).join('') +
+                    errs.map(e => `<li>Riga ${e.idx}: ${escHtml(e.message)}</li>`).join('') +
                     `</ul>`;
             }
-            resultBox.innerHTML = html;
+            if (resultBox) resultBox.innerHTML = html;
             const tot = (d.imported_expenses ?? 0) + (d.imported_incomes ?? 0) + (d.transfers_paired ?? 0);
             toast.success(`Estratto conto importato: ${tot} righe.`);
             loadList();
         } catch (err) {
-            resultBox.innerHTML = `<div class="alert alert-danger small mb-0">
-                ${escHtml(err.message ?? 'Errore import.')}</div>`;
-            toast.error(err.message ?? 'Errore import.');
+            if (resultBox) {
+                resultBox.innerHTML = `<div class="alert alert-danger small mb-0">${escHtml(err.message ?? 'Errore.')}</div>`;
+            }
+            toast.error(err.message ?? 'Errore conferma import.');
         } finally {
-            submitBtn.disabled = false;
+            commitBtn.disabled = false;
         }
     });
 }
