@@ -99,7 +99,7 @@ $paymentLabels  = [
             </div>
 
             <!-- Step 1: upload + opzioni -->
-            <form id="bank-import-form" enctype="multipart/form-data">
+            <form id="bank-import-form" enctype="multipart/form-data" action="javascript:void(0)" method="post" onsubmit="return false">
                 <?= Csrf::field() ?>
                 <div class="modal-body" id="bank-import-step1">
                     <p class="small text-muted mb-2">
@@ -137,7 +137,7 @@ $paymentLabels  = [
                 </div>
                 <div class="modal-footer" id="bank-step1-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
-                    <button type="submit" class="btn btn-primary" <?= empty($accounts) ? 'disabled' : '' ?>>
+                    <button type="button" id="bank-preview-btn" class="btn btn-primary" <?= empty($accounts) ? 'disabled' : '' ?>>
                         <i class="bi bi-search me-1"></i>Anteprima
                     </button>
                 </div>

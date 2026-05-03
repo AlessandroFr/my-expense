@@ -771,10 +771,20 @@ function wireBankImport() {
     const newCatName = document.getElementById('bank-new-category-name');
     const newCatCol  = document.getElementById('bank-new-category-color');
 
-    form.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
+    const runPreview = async (ev) => {
+        if (ev) ev.preventDefault();
+        const submitBtn = form.querySelector('#bank-preview-btn, button[type="submit"]');
+        const fileInput = form.querySelector('input[name="file"]');
+        const accSelect = form.querySelector('select[name="account_id"]');
+        if (accSelect && !accSelect.value) {
+            toast.warning('Seleziona un conto.');
+            return;
+        }
+        if (fileInput && (!fileInput.files || fileInput.files.length === 0)) {
+            toast.warning('Seleziona il file CSV dell\'estratto conto.');
+            return;
+        }
+        if (submitBtn) submitBtn.disabled = true;
         try {
             const fd = new FormData(form);
             bankPreviewState.accountId   = Number(fd.get('account_id') ?? 0);
@@ -800,9 +810,15 @@ function wireBankImport() {
         } catch (err) {
             toast.error(err.message ?? 'Errore anteprima.');
         } finally {
-            submitBtn.disabled = false;
+            if (submitBtn) submitBtn.disabled = false;
         }
-    });
+    };
+
+    // Belt-and-suspenders: ascolta sia il submit event sia il click sul bottone.
+    // Se per qualche ragione il submit listener non si aggancia in tempo
+    // (deferred module + DOMContentLoaded race), il click sul bottone scatta lo stesso.
+    form.addEventListener('submit', runPreview);
+    form.querySelector('#bank-preview-btn')?.addEventListener('click', runPreview);
 
     toggleAll?.addEventListener('change', () => {
         const checked = toggleAll.checked;
