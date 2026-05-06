@@ -17,6 +17,24 @@ const moneyFmt = new Intl.NumberFormat('it-IT', {
 });
 const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
+const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso) + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
+}
+
+function accountCell(it) {
+    if (!it.account_id) return '<span class="text-muted">—</span>';
+    const color = it.account_color || '#6c757d';
+    const icon  = it.account_icon ? `<i class="bi bi-${escapeHtml(it.account_icon)} me-1"></i>` : '<i class="bi bi-bank me-1"></i>';
+    return `
+        <span class="d-inline-block rounded-circle me-1"
+              style="width:.7rem;height:.7rem;background-color:${escapeHtml(color)}"></span>
+        ${icon}${escapeHtml(it.account_name ?? '')}
+    `;
+}
+
 const filtersForm = document.getElementById('income-filters');
 const createForm  = document.getElementById('income-create-form');
 const tbody       = document.getElementById('income-tbody');
@@ -37,7 +55,8 @@ function renderRow(it) {
     const desc = it.description ? escapeHtml(it.description) : '<span class="text-muted">-</span>';
     return `
         <tr data-id="${it.id}">
-            <td>${escapeHtml(it.income_date)}</td>
+            <td>${escapeHtml(fmtDate(it.income_date))}</td>
+            <td>${accountCell(it)}</td>
             <td><span class="badge bg-success-subtle text-success-emphasis">${escapeHtml(it.source)}</span></td>
             <td>${desc}</td>
             <td class="text-end fw-semibold text-success">${fmtMoney(it.amount)}</td>
@@ -48,12 +67,27 @@ function renderRow(it) {
         </tr>`;
 }
 
+function buildAccountOptions(selected) {
+    const sel = selected != null ? Number(selected) : null;
+    const accSel = document.querySelector('#income-create-form select[name="account_id"]');
+    const opts = ['<option value="">— Nessuno —</option>'];
+    if (accSel) {
+        for (const o of accSel.querySelectorAll('option[value]')) {
+            if (o.value === '') continue;
+            const s = Number(o.value) === sel ? ' selected' : '';
+            opts.push(`<option value="${o.value}"${s}>${escapeHtml(o.textContent.trim())}</option>`);
+        }
+    }
+    return opts.join('');
+}
+
 function renderEditRow(it) {
     return `
         <tr data-id="${it.id}" class="table-warning">
             <td><input type="date" class="form-control form-control-sm" name="income_date" value="${escapeAttr(it.income_date)}" required></td>
+            <td><select class="form-select form-select-sm" name="account_id">${buildAccountOptions(it.account_id)}</select></td>
             <td><input type="text" class="form-control form-control-sm" name="source" value="${escapeAttr(it.source)}" maxlength="64" required></td>
-            <td><input type="text" class="form-control form-control-sm" name="description" value="${escapeAttr(it.description ?? '')}" maxlength="255"></td>
+            <td><input type="text" class="form-control form-control-sm" name="description" value="${escapeAttr(it.description ?? '')}" maxlength="512"></td>
             <td><input type="text" class="form-control form-control-sm text-end" name="amount" value="${escapeAttr(it.amount)}" inputmode="decimal" required></td>
             <td class="text-end">
                 <button type="button" class="btn btn-sm btn-success" data-action="save"   data-id="${it.id}"><i class="bi bi-check-lg"></i></button>
@@ -70,7 +104,7 @@ function getFilters() {
 function renderTable(items) {
     cache = items;
     if (!items.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Nessuna entrata.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Nessuna entrata.</td></tr>`;
         totalEl.textContent = fmtMoney(0);
         return;
     }
@@ -158,6 +192,7 @@ delegateTableClick(tbody, {
             description: tr.querySelector('input[name="description"]').value,
             amount:      tr.querySelector('input[name="amount"]').value,
             income_date: tr.querySelector('input[name="income_date"]').value,
+            account_id:  tr.querySelector('select[name="account_id"]')?.value ?? '',
         };
         try {
             await optimisticUpdate({

@@ -3,9 +3,13 @@
  * Entrate — CRUD speculare alle spese ma con `source` libero (no categoria).
  */
 
+use App\Account;
+use App\Auth;
 use App\Config;
 
-$base = rtrim(Config::get('app')['base_url'] ?? '', '/');
+$base     = rtrim(Config::get('app')['base_url'] ?? '', '/');
+$userId   = (int) Auth::userId();
+$accounts = Account::allForUser($userId, false);
 ?>
 <div class="row mb-3 align-items-center">
     <div class="col-md-8">
@@ -25,13 +29,22 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                 <label class="form-label small mb-1">A</label>
                 <input type="date" name="date_to" class="form-control form-control-sm">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small mb-1">Origine</label>
                 <select name="source" class="form-select form-select-sm">
                     <option value="">Tutte</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Conto</label>
+                <select name="account_id" class="form-select form-select-sm">
+                    <option value="">Tutti</option>
+                    <?php foreach ($accounts as $a): ?>
+                        <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label small mb-1">Cerca</label>
                 <input type="text" name="search" class="form-control form-control-sm" placeholder="origine o descrizione">
             </div>
@@ -59,11 +72,20 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
             </div>
             <div class="col-md-3">
                 <label class="form-label small mb-1">Descrizione</label>
-                <input type="text" name="description" class="form-control" maxlength="255" placeholder="Note opzionali">
+                <input type="text" name="description" class="form-control" maxlength="512" placeholder="Note opzionali">
             </div>
             <div class="col-md-2">
                 <label class="form-label small mb-1">Importo (EUR)</label>
                 <input type="text" name="amount" class="form-control" inputmode="decimal" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Conto <span class="text-muted">(opz.)</span></label>
+                <select name="account_id" class="form-select">
+                    <option value="">— Nessuno —</option>
+                    <?php foreach ($accounts as $a): ?>
+                        <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="col-md-2 d-grid">
                 <button type="submit" class="btn btn-success">
@@ -80,6 +102,7 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
             <thead class="table-light">
                 <tr>
                     <th style="width:100px">Data</th>
+                    <th style="width:140px">Conto</th>
                     <th style="width:160px">Origine</th>
                     <th>Descrizione</th>
                     <th class="text-end" style="width:120px">Importo</th>
@@ -87,13 +110,13 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                 </tr>
             </thead>
             <tbody id="income-tbody">
-                <tr><td colspan="5" class="text-center text-muted py-4">
+                <tr><td colspan="6" class="text-center text-muted py-4">
                     <div class="spinner-border spinner-border-sm me-2"></div>Caricamento...
                 </td></tr>
             </tbody>
             <tfoot>
                 <tr class="table-light">
-                    <th colspan="3" class="text-end">Totale visibile</th>
+                    <th colspan="4" class="text-end">Totale visibile</th>
                     <th class="text-end" id="income-total">EUR -</th>
                     <th></th>
                 </tr>

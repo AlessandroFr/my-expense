@@ -167,10 +167,11 @@ $paymentLabels  = [
                             <thead class="table-light sticky-top">
                                 <tr>
                                     <th style="width:40px"><input type="checkbox" id="bank-toggle-all" checked title="Seleziona/deseleziona tutte"></th>
-                                    <th style="width:110px">Data</th>
-                                    <th style="width:130px">Tipo</th>
+                                    <th style="width:120px" title="Data operazione (data applicazione)">Data op.</th>
+                                    <th style="width:120px" title="Data valuta">Valuta</th>
+                                    <th style="width:120px">Tipo</th>
                                     <th>Descrizione</th>
-                                    <th style="width:200px">Categoria / Source</th>
+                                    <th style="width:200px">Categoria / Origine</th>
                                     <th style="width:120px">Pagamento</th>
                                     <th style="width:110px" class="text-end">Importo</th>
                                 </tr>
@@ -178,6 +179,11 @@ $paymentLabels  = [
                             <tbody id="bank-preview-tbody"></tbody>
                         </table>
                     </div>
+
+                    <nav id="bank-preview-pager" class="d-flex justify-content-between align-items-center mt-2 small">
+                        <div class="text-muted" id="bank-preview-pager-info"></div>
+                        <ul class="pagination pagination-sm mb-0" id="bank-preview-pager-list"></ul>
+                    </nav>
 
                     <div id="bank-parse-errors" class="mt-2"></div>
                     <div id="bank-import-result" class="mt-2"></div>
@@ -235,6 +241,15 @@ $paymentLabels  = [
                     <option value="">Tutti</option>
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label small">Conto</label>
+                <select name="account_id" class="form-select form-select-sm">
+                    <option value="">Tutti</option>
+                    <?php foreach ($accounts as $a): ?>
+                        <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div class="col-md-1 d-grid">
                 <button type="button" id="filters-reset" class="btn btn-sm btn-outline-secondary" title="Resetta filtri">
                     <i class="bi bi-x-lg"></i>
@@ -277,9 +292,18 @@ $paymentLabels  = [
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>
+                <select name="account_id" class="form-select">
+                    <option value="">— Nessuno —</option>
+                    <?php foreach ($accounts as $a): ?>
+                        <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div class="col-md-3">
                 <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
-                <input type="text" name="description" class="form-control" maxlength="255" placeholder="es. Pranzo bar">
+                <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
             </div>
             <div class="col-md-6">
                 <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
@@ -315,6 +339,7 @@ $paymentLabels  = [
             <thead class="table-light">
                 <tr>
                     <th>Data</th>
+                    <th>Conto</th>
                     <th>Categoria</th>
                     <th>Descrizione</th>
                     <th>Tag</th>
@@ -325,7 +350,7 @@ $paymentLabels  = [
             </thead>
             <tbody id="expenses-tbody">
                 <tr id="expenses-loading">
-                    <td colspan="7" class="text-center text-muted py-4">
+                    <td colspan="8" class="text-center text-muted py-4">
                         <span class="spinner-border spinner-border-sm me-2"></span>Carico…
                     </td>
                 </tr>

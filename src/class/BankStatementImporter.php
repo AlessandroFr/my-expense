@@ -120,6 +120,26 @@ final class BankStatementImporter
             $catByName[mb_strtolower((string) $c['name'])] = (int) $c['id'];
         }
 
+        // Auto-crea le categorie suggerite mancanti durante la preview.
+        // Cosi' nel modal l'utente vede gia' la categoria selezionata
+        // (proposta == esistente) invece di "— nessuna —" + hint testuale.
+        $ensureCategory = static function (string $name) use (&$categories, &$catByName, $userId): int {
+            $key = mb_strtolower($name);
+            if (isset($catByName[$key])) return $catByName[$key];
+            try {
+                $newId = Category::create($userId, $name, '#6c757d', null, 0);
+            } catch (\Throwable $e) {
+                // Se la create fallisce (es. race su unique key), ricarica e riprova.
+                foreach (Category::allForUser($userId) as $c) {
+                    if (mb_strtolower((string) $c['name']) === $key) return (int) $c['id'];
+                }
+                throw $e;
+            }
+            $categories[] = ['id' => $newId, 'name' => $name, 'color' => '#6c757d'];
+            $catByName[$key] = $newId;
+            return $newId;
+        };
+
         $existingHashes = self::loadExistingHashes($userId);
 
         $rows         = [];
@@ -197,11 +217,11 @@ final class BankStatementImporter
                         $catName = $cls['category'];
                     }
                     $row['category_suggested'] = $catName;
-                    $row['category_id']        = $catByName[mb_strtolower($catName)] ?? null;
+                    $row['category_id']        = $ensureCategory($catName);
                     $row['payment_method']     = self::guessPaymentMethod($tipologia, $descrizione);
                 } else {
                     $row['source']         = self::classifyIncomeSource($tipologia, $descrizione);
-                    $row['payment_method'] = null;
+                    $row['payment_method'] = self::guessIncomePaymentMethod($tipologia, $descrizione);
                 }
 
                 $rows[] = $row;
@@ -303,7 +323,7 @@ final class BankStatementImporter
                     $incId = Income::createImported(
                         $userId, 'Trasferimento da conto',
                         'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $prepaidAccountId, $valueDate, $incHash
+                        (string) $amount, $opDate, $prepaidAccountId, $valueDate, $incHash, 'transfer'
                     );
                     if ($expId === null && $incId === null) {
                         $dupCnt++;
@@ -331,11 +351,12 @@ final class BankStatementImporter
                 } else {
                     $source = trim((string) ($rowIn['source'] ?? ''));
                     if ($source === '') $source = 'Entrata';
+                    $payment = (string) ($rowIn['payment_method'] ?? 'transfer');
                     $hash = self::computeImportHash($accountId, $opDate, $amount, $description);
 
                     $id = Income::createImported(
                         $userId, $source, $description, (string) $amount,
-                        $opDate, $accountId, $valueDate, $hash
+                        $opDate, $accountId, $valueDate, $hash, $payment
                     );
                     if ($id === null) $dupCnt++; else $importedInc++;
                 }
@@ -546,6 +567,16 @@ final class BankStatementImporter
         if (str_contains($tlow, 'ricariche'))        return 'transfer';
         if (stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false) return 'cash';
         return 'card';
+    }
+
+    private static function guessIncomePaymentMethod(string $tipologia, string $descrizione): string
+    {
+        $tlow = mb_strtolower($tipologia);
+        if (str_contains($tlow, 'bancomat pay')) return 'card';
+        if (str_contains($tlow, 'contante') || str_contains($tlow, 'cash')) return 'cash';
+        // Default: la stragrande maggioranza degli accrediti su conto bancario
+        // e' bonifico / SDD / stipendio = transfer.
+        return 'transfer';
     }
 
     private static function resolvePrepaidAccount(int $userId, string $name): int

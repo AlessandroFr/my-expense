@@ -63,6 +63,10 @@ function rowDataFromExpense(e) {
         category_name: e.category_name,
         category_color: e.category_color || '#6c757d',
         category_icon: e.category_icon,
+        account_id: e.account_id,
+        account_name: e.account_name,
+        account_color: e.account_color || '#6c757d',
+        account_icon: e.account_icon,
         amount: e.amount,
         description: e.description,
         shared_with: e.shared_with,
@@ -98,6 +102,31 @@ function categoryCell(e) {
     `;
 }
 
+function accountCell(e) {
+    if (!e.account_id) return '<span class="text-muted">—</span>';
+    const color = e.account_color || '#6c757d';
+    const icon  = e.account_icon ? `<i class="bi bi-${escHtml(e.account_icon)} me-1"></i>` : '<i class="bi bi-bank me-1"></i>';
+    return `
+        <span class="d-inline-block rounded-circle me-1"
+              style="width:.7rem;height:.7rem;background-color:${escHtml(color)}"></span>
+        ${icon}${escHtml(e.account_name ?? '')}
+    `;
+}
+
+function buildAccountOptions(selected) {
+    const sel = selected != null ? Number(selected) : null;
+    const accSel = document.querySelector('#expense-create-form select[name="account_id"]');
+    const opts = ['<option value="">— Nessuno —</option>'];
+    if (accSel) {
+        for (const o of accSel.querySelectorAll('option[value]')) {
+            if (o.value === '') continue;
+            const s = Number(o.value) === sel ? ' selected' : '';
+            opts.push(`<option value="${o.value}"${s}>${escHtml(o.textContent.trim())}</option>`);
+        }
+    }
+    return opts.join('');
+}
+
 function buildCategoryOptions(selected) {
     const sel = selected != null ? Number(selected) : null;
     let opts = '<option value="">— Nessuna —</option>';
@@ -122,6 +151,7 @@ function renderViewRow(e) {
     tr.dataset.expense = JSON.stringify(rowDataFromExpense(e));
     tr.innerHTML = `
         <td>${escHtml(fmtDate(e.expense_date))}</td>
+        <td>${accountCell(e)}</td>
         <td>${categoryCell(e)}</td>
         <td>${escHtml(e.description ?? '')}</td>
         <td>${tagsCell(e.tags)}</td>
@@ -143,9 +173,10 @@ function replaceWithEditRow(tr) {
     edit.classList.add('table-warning');
     edit.innerHTML = `
         <td><input type="date"   name="expense_date"   class="form-control form-control-sm" required value="${escHtml(e.expense_date)}"></td>
+        <td><select               name="account_id"     class="form-select form-select-sm">${buildAccountOptions(e.account_id)}</select></td>
         <td><select               name="category_id"    class="form-select form-select-sm">${buildCategoryOptions(e.category_id)}</select></td>
         <td>
-            <input type="text" name="description" class="form-control form-control-sm mb-1" maxlength="255" value="${escHtml(e.description ?? '')}">
+            <input type="text" name="description" class="form-control form-control-sm mb-1" maxlength="512" value="${escHtml(e.description ?? '')}">
             <input type="text" name="shared_with" class="form-control form-control-sm" maxlength="255" placeholder="Condiviso con..." value="${escHtml(e.shared_with ?? '')}">
         </td>
         <td><input type="text"   name="tags"           class="form-control form-control-sm" list="all-tags-datalist" placeholder="tag, separati" value="${escHtml(tagNames)}"></td>
@@ -178,7 +209,7 @@ function updateTotalFromTable() {
 
 async function loadList() {
     const tbody = document.getElementById('expenses-tbody');
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
         <span class="spinner-border spinner-border-sm me-2"></span>Carico…</td></tr>`;
 
     try {
@@ -191,7 +222,7 @@ async function loadList() {
 
         tbody.innerHTML = '';
         if (expenses.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-3 d-block mb-1"></i>Nessuna spesa trovata.</td></tr>`;
         } else {
             const frag = document.createDocumentFragment();
@@ -200,7 +231,7 @@ async function loadList() {
         }
         updateTotalFromTable();
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">
             <i class="bi bi-x-circle me-2"></i>${escHtml(err.message ?? 'Errore caricamento')}</td></tr>`;
     }
 }
@@ -388,7 +419,7 @@ function wireTableActions() {
                 updateTotalFromTable();
                 const tbody2 = document.getElementById('expenses-tbody');
                 if (!tbody2.children.length) {
-                    tbody2.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
+                    tbody2.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
                         <i class="bi bi-inbox fs-3 d-block mb-1"></i>Nessuna spesa.</td></tr>`;
                 }
                 toast.success('Spesa eliminata.');
@@ -605,12 +636,15 @@ const BANK_KINDS = [
     { value: 'transfer_pair', label: 'Ricarica (pair)' },
 ];
 
+const BANK_PAGE_SIZE = 15;
+
 let bankPreviewState = {
     accountId: 0,
     accountName: '',
     pair: 1,
     rows: [],
     categories: [],
+    page: 1,
 };
 
 function bankRenderCategoryOptions(selectedId) {
@@ -640,24 +674,22 @@ function bankRenderRow(r) {
     const dupBadge = r.is_duplicate
         ? `<span class="badge bg-warning text-dark ms-1" title="Gia' presente in DB">duplicato</span>`
         : '';
-    const suggHint = r.category_suggested
-        ? `<div class="form-text small mt-0">sugg.: ${escHtml(r.category_suggested)}</div>`
-        : '';
 
     let classCol;
     if (r.kind === 'income') {
         classCol = `<input type="text" class="form-control form-control-sm bank-cell" data-field="source"
-                          value="${escHtml(r.source ?? '')}" placeholder="Es. Bonifico da X">`;
+                          value="${escHtml(r.source ?? '')}" placeholder="Es. Bonifico da X" maxlength="64">`;
     } else {
         classCol = `<select class="form-select form-select-sm bank-cell" data-field="category_id">
                         ${bankRenderCategoryOptions(r.category_id)}
-                    </select>${suggHint}`;
+                    </select>`;
     }
 
-    const payCol = r.kind === 'income'
-        ? `<span class="text-muted small">—</span>`
-        : `<select class="form-select form-select-sm bank-cell" data-field="payment_method">
-              ${bankRenderPaymentOptions(r.payment_method ?? 'card')}
+    // Payment selector ora SEMPRE presente (anche income), cosi' l'utente
+    // puo' impostare il tipo di pagamento anche dove non c'e' autocompilazione.
+    const payDefault = r.payment_method ?? (r.kind === 'income' ? 'transfer' : 'card');
+    const payCol = `<select class="form-select form-select-sm bank-cell" data-field="payment_method">
+              ${bankRenderPaymentOptions(payDefault)}
            </select>`;
 
     return `<tr data-idx="${r.idx}" class="${r.skip ? 'table-secondary text-muted' : ''}">
@@ -665,7 +697,10 @@ function bankRenderRow(r) {
             <input type="checkbox" class="bank-cell" data-field="include" ${r.skip ? '' : 'checked'} title="Importa questa riga">
         </td>
         <td>
-            <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escHtml(r.op_date)}">
+            <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escHtml(r.op_date ?? '')}" title="Data operazione (applicazione)">
+        </td>
+        <td>
+            <input type="date" class="form-control form-control-sm bank-cell" data-field="value_date" value="${escHtml(r.value_date ?? '')}" title="Data valuta">
         </td>
         <td>
             <select class="form-select form-select-sm bank-cell" data-field="kind">
@@ -674,7 +709,7 @@ function bankRenderRow(r) {
         </td>
         <td>
             <input type="text" class="form-control form-control-sm bank-cell" data-field="description"
-                   value="${escHtml(r.description ?? '')}">
+                   value="${escHtml(r.description ?? '')}" maxlength="512">
             <div class="form-text small mt-0">
                 <span class="text-muted">${escHtml(r.tipologia ?? '')}</span> ${dupBadge}
             </div>
@@ -688,10 +723,63 @@ function bankRenderRow(r) {
     </tr>`;
 }
 
+function bankPageCount() {
+    return Math.max(1, Math.ceil((bankPreviewState.rows?.length ?? 0) / BANK_PAGE_SIZE));
+}
+
+function bankClampPage() {
+    const total = bankPageCount();
+    if (bankPreviewState.page < 1) bankPreviewState.page = 1;
+    if (bankPreviewState.page > total) bankPreviewState.page = total;
+}
+
+function bankPagedRows() {
+    bankClampPage();
+    const start = (bankPreviewState.page - 1) * BANK_PAGE_SIZE;
+    return bankPreviewState.rows.slice(start, start + BANK_PAGE_SIZE);
+}
+
+function bankRenderPager() {
+    const list = document.getElementById('bank-preview-pager-list');
+    const info = document.getElementById('bank-preview-pager-info');
+    if (!list || !info) return;
+    const total = bankPageCount();
+    const cur   = bankPreviewState.page;
+    const totRows = bankPreviewState.rows.length;
+    const start   = totRows === 0 ? 0 : (cur - 1) * BANK_PAGE_SIZE + 1;
+    const end     = Math.min(totRows, cur * BANK_PAGE_SIZE);
+    info.textContent = totRows === 0
+        ? 'Nessuna riga'
+        : `Righe ${start}–${end} di ${totRows} (pagina ${cur} di ${total})`;
+
+    const items = [];
+    items.push(`<li class="page-item ${cur === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${cur - 1}" aria-label="Precedente">&laquo;</a></li>`);
+
+    // Compatto: mostra max 7 numeri di pagina centrati su quella corrente.
+    const window = 3;
+    const from = Math.max(1, cur - window);
+    const to   = Math.min(total, cur + window);
+    if (from > 1) items.push(`<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`);
+    if (from > 2) items.push(`<li class="page-item disabled"><span class="page-link">…</span></li>`);
+    for (let p = from; p <= to; p++) {
+        items.push(`<li class="page-item ${p === cur ? 'active' : ''}">
+            <a class="page-link" href="#" data-page="${p}">${p}</a></li>`);
+    }
+    if (to < total - 1) items.push(`<li class="page-item disabled"><span class="page-link">…</span></li>`);
+    if (to < total) items.push(`<li class="page-item"><a class="page-link" href="#" data-page="${total}">${total}</a></li>`);
+
+    items.push(`<li class="page-item ${cur === total ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${cur + 1}" aria-label="Successiva">&raquo;</a></li>`);
+    list.innerHTML = items.join('');
+}
+
 function bankRenderRows() {
     const tbody = document.getElementById('bank-preview-tbody');
     if (!tbody) return;
-    tbody.innerHTML = bankPreviewState.rows.map(bankRenderRow).join('');
+    bankClampPage();
+    tbody.innerHTML = bankPagedRows().map(bankRenderRow).join('');
+    bankRenderPager();
 }
 
 function bankRenderSummary(d) {
@@ -730,31 +818,37 @@ function bankShowStep(n) {
     document.getElementById('bank-import-step2').classList.toggle('d-none', n !== 2);
 }
 
-function bankReadRowFromTr(tr) {
+// Sincronizza il record in bankPreviewState.rows[idx] dai valori dell'input
+// modificato. Necessario perche' con la paginazione il DOM contiene solo la
+// pagina corrente: lo state e' la fonte di verita' al momento del commit.
+function bankSyncRowFromTr(tr) {
     const idx = Number(tr.dataset.idx);
     const get = (f) => tr.querySelector(`[data-field="${f}"]`);
-    const original = bankPreviewState.rows.find(r => r.idx === idx) ?? {};
-    const include = get('include')?.checked ?? true;
-    const kindEl  = get('kind');
-    const kind    = kindEl ? kindEl.value : original.kind;
-    const out = {
-        idx,
-        kind,
-        op_date:     get('op_date')?.value || original.op_date,
-        value_date:  original.value_date,
-        description: get('description')?.value ?? original.description ?? '',
-        amount:      Number(get('amount')?.value ?? original.amount ?? 0),
-        skip:        !include,
-    };
-    if (kind === 'income') {
-        out.source = get('source')?.value ?? original.source ?? '';
+    const r = bankPreviewState.rows.find(x => x.idx === idx);
+    if (!r) return null;
+
+    const includeEl = get('include');
+    if (includeEl) r.skip = !includeEl.checked;
+
+    const kindEl = get('kind');
+    if (kindEl) r.kind = kindEl.value;
+
+    const opEl = get('op_date');     if (opEl)  r.op_date     = opEl.value || r.op_date;
+    const vdEl = get('value_date');  if (vdEl)  r.value_date  = vdEl.value || null;
+    const descEl = get('description'); if (descEl) r.description = descEl.value;
+    const amtEl = get('amount');     if (amtEl) r.amount      = Number(amtEl.value || 0);
+
+    if (r.kind === 'income') {
+        const srcEl = get('source');
+        if (srcEl) r.source = srcEl.value;
     } else {
         const catEl = get('category_id');
-        out.category_id = catEl && catEl.value !== '' ? Number(catEl.value) : null;
-        const payEl = get('payment_method');
-        out.payment_method = payEl ? payEl.value : (original.payment_method ?? 'card');
+        if (catEl) r.category_id = catEl.value !== '' ? Number(catEl.value) : null;
     }
-    return out;
+    const payEl = get('payment_method');
+    if (payEl) r.payment_method = payEl.value;
+
+    return r;
 }
 
 function wireBankImport() {
@@ -818,6 +912,7 @@ function wireBankImport() {
             const d = json.data ?? {};
             bankPreviewState.rows       = d.rows ?? [];
             bankPreviewState.categories = d.categories ?? [];
+            bankPreviewState.page       = 1;
             if (toggleAll) toggleAll.checked = bankPreviewState.rows.some(r => !r.skip);
 
             if (resultBox) resultBox.innerHTML = '';
@@ -839,16 +934,15 @@ function wireBankImport() {
     form.addEventListener('submit', runPreview);
     form.querySelector('#bank-preview-btn')?.addEventListener('click', runPreview);
 
+    // Toggle all: opera su TUTTE le righe in stato (non solo quelle visibili).
     toggleAll?.addEventListener('change', () => {
         const checked = toggleAll.checked;
-        tbody.querySelectorAll('input[data-field="include"]').forEach(cb => {
-            cb.checked = checked;
-            const tr = cb.closest('tr');
-            tr.classList.toggle('table-secondary', !checked);
-            tr.classList.toggle('text-muted', !checked);
-        });
+        for (const r of bankPreviewState.rows) r.skip = !checked;
+        bankRenderRows();
     });
 
+    // Ogni cambio cella sincronizza prima lo state, poi (se kind cambia)
+    // ridisegna la riga perche' colonna source/category cambia.
     tbody?.addEventListener('change', (ev) => {
         const cell = ev.target.closest('.bank-cell');
         if (!cell) return;
@@ -856,30 +950,29 @@ function wireBankImport() {
         if (!tr) return;
         const field = cell.dataset.field;
 
+        const r = bankSyncRowFromTr(tr);
+        if (!r) return;
+
         if (field === 'include') {
-            tr.classList.toggle('table-secondary', !cell.checked);
-            tr.classList.toggle('text-muted', !cell.checked);
+            tr.classList.toggle('table-secondary', r.skip);
+            tr.classList.toggle('text-muted', r.skip);
             return;
         }
         if (field === 'kind') {
-            const idx = Number(tr.dataset.idx);
-            const r = bankPreviewState.rows.find(x => x.idx === idx);
-            if (!r) return;
-            const merged = bankReadRowFromTr(tr);
-            r.kind = merged.kind;
-            r.description = merged.description;
-            r.amount = merged.amount;
-            r.op_date = merged.op_date;
-            r.skip = merged.skip;
-            if (merged.kind === 'income') {
-                r.source = r.source ?? '';
-                r.category_id = null;
-                r.payment_method = null;
-            } else {
-                r.payment_method = r.payment_method ?? 'card';
-            }
+            // Re-render solo la riga interessata mantenendo posizione in pagina.
             tr.outerHTML = bankRenderRow(r);
         }
+    });
+
+    // Pager: click su numeri di pagina o prev/next.
+    document.getElementById('bank-preview-pager-list')?.addEventListener('click', (ev) => {
+        const a = ev.target.closest('[data-page]');
+        if (!a) return;
+        ev.preventDefault();
+        const p = Number(a.dataset.page);
+        if (!Number.isFinite(p)) return;
+        bankPreviewState.page = p;
+        bankRenderRows();
     });
 
     backBtn?.addEventListener('click', () => bankShowStep(1));
@@ -889,6 +982,7 @@ function wireBankImport() {
         if (resultBox) resultBox.innerHTML = '';
         setStep1Status('');
         bankPreviewState.rows = [];
+        bankPreviewState.page = 1;
     });
 
     newCatBtn?.addEventListener('click', async () => {
@@ -922,7 +1016,10 @@ function wireBankImport() {
 
     commitBtn?.addEventListener('click', async () => {
         if (!tbody) return;
-        const rows = Array.from(tbody.querySelectorAll('tr')).map(bankReadRowFromTr);
+        // Sincronizza prima lo state con i valori delle righe ATTUALMENTE in DOM
+        // (la pagina visibile potrebbe avere edit non ancora propagati).
+        tbody.querySelectorAll('tr').forEach(bankSyncRowFromTr);
+        const rows = bankPreviewState.rows;
         const toImport = rows.filter(r => !r.skip).length;
         if (toImport === 0) { toast.warning('Nessuna riga selezionata.'); return; }
 

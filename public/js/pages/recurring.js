@@ -17,6 +17,13 @@ const moneyFmt = new Intl.NumberFormat('it-IT', {
 });
 const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
+const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso) + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
+}
+
 const FREQ_LABELS = { weekly: 'Settimanale', monthly: 'Mensile', yearly: 'Annuale' };
 
 const tbody      = document.getElementById('recurring-tbody');
@@ -31,8 +38,8 @@ function renderRow(it) {
         ? `<span class="badge" style="background:${escapeAttr(it.category_color)}">${escapeHtml(it.category_name)}</span>`
         : '<span class="text-muted">-</span>';
     const desc = it.description ? escapeHtml(it.description) : '<span class="text-muted">-</span>';
-    const lastGen = it.last_generated_date ? escapeHtml(it.last_generated_date) : '<span class="text-muted">mai</span>';
-    const endDate = it.end_date ? escapeHtml(it.end_date) : '<span class="text-muted">-</span>';
+    const lastGen = it.last_generated_date ? escapeHtml(fmtDate(it.last_generated_date)) : '<span class="text-muted">mai</span>';
+    const endDate = it.end_date ? escapeHtml(fmtDate(it.end_date)) : '<span class="text-muted">-</span>';
     const activeBadge = Number(it.active) === 1
         ? '<span class="badge bg-success">attiva</span>'
         : '<span class="badge bg-secondary">disattiva</span>';
@@ -42,7 +49,7 @@ function renderRow(it) {
             <td>${desc}</td>
             <td>${cat}</td>
             <td>${FREQ_LABELS[it.frequency] ?? escapeHtml(it.frequency)}</td>
-            <td>${escapeHtml(it.start_date)}</td>
+            <td>${escapeHtml(fmtDate(it.start_date))}</td>
             <td>${endDate}</td>
             <td>${lastGen}</td>
             <td class="text-end fw-semibold">${fmtMoney(it.amount)}</td>

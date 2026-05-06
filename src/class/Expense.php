@@ -382,8 +382,8 @@ final class Expense
         if ($description === '') {
             $description = null;
         }
-        if ($description !== null && mb_strlen($description) > 255) {
-            throw new InvalidArgumentException('Descrizione troppo lunga (max 255 caratteri).');
+        if ($description !== null && mb_strlen($description) > 512) {
+            throw new InvalidArgumentException('Descrizione troppo lunga (max 512 caratteri).');
         }
 
         if ($categoryId !== null) {

@@ -14,6 +14,13 @@ const moneyFmt = new Intl.NumberFormat('it-IT', {
     style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
 });
 const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
+
+const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso) + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
+}
 const MONTH_LABELS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
 const yearSel = document.getElementById('report-year');
@@ -22,7 +29,7 @@ let catChart   = null;
 
 function tweenMoneyR(el, to) {
     if (!el) return;
-    const from = parseFloat((el.dataset.value ?? '''').replace(/[^\d.-]/g, '''')) || 0;
+    const from = parseFloat((el.dataset.value ?? '').replace(/[^\d.-]/g, '')) || 0;
     el.classList.add('mx-num');
     tweenNumber(el, from, to, { format: fmtMoney });
     el.dataset.value = String(to);
@@ -144,7 +151,7 @@ function renderTopExpenses(items) {
     }
     tbody.innerHTML = items.map(e => `
         <tr>
-            <td>${escapeHtml(e.expense_date)}</td>
+            <td>${escapeHtml(fmtDate(e.expense_date))}</td>
             <td><span class="badge" style="background:${escapeHtml(e.category_color)}">${escapeHtml(e.category_name)}</span></td>
             <td>${e.description ? escapeHtml(e.description) : '<span class="text-muted">-</span>'}</td>
             <td class="text-end fw-semibold">${fmtMoney(e.amount)}</td>

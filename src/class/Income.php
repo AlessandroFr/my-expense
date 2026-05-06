@@ -79,6 +79,8 @@ final class Income
      * inserito oppure null se la riga e' un duplicato (unique constraint su
      * (user_id, import_hash) sollevata).
      */
+    public const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
+
     public static function createImported(
         int $userId,
         string $source,
@@ -87,23 +89,25 @@ final class Income
         string $incomeDate,
         ?int $accountId,
         ?string $valueDate,
-        string $importHash
+        string $importHash,
+        ?string $paymentMethod = 'transfer'
     ): ?int {
         $row = self::validate($source, $description, $amount, $incomeDate);
         $accountId = self::checkAccount($userId, $accountId);
         if ($valueDate !== null && !self::isValidDate($valueDate)) {
             throw new InvalidArgumentException('Data valuta non valida.');
         }
+        $payment = self::normalizePayment($paymentMethod);
 
         try {
             $stmt = Database::pdo()->prepare(
                 'INSERT INTO incomes (user_id, account_id, source, description, amount,
-                                      income_date, value_date, import_hash)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                                      payment_method, income_date, value_date, import_hash)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $userId, $accountId, $row['source'], $row['description'], $row['amount'],
-                $row['income_date'], $valueDate, $importHash,
+                $payment, $row['income_date'], $valueDate, $importHash,
             ]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000' && (int) ($e->errorInfo[1] ?? 0) === 1062) {
@@ -113,6 +117,13 @@ final class Income
         }
 
         return (int) Database::pdo()->lastInsertId();
+    }
+
+    private static function normalizePayment(?string $payment): string
+    {
+        if ($payment === null || $payment === '') return 'transfer';
+        $p = strtolower(trim($payment));
+        return in_array($p, self::PAYMENT_METHODS, true) ? $p : 'transfer';
     }
 
     public static function update(
@@ -263,8 +274,8 @@ final class Income
 
         $description = $description === null ? null : trim($description);
         if ($description === '') $description = null;
-        if ($description !== null && mb_strlen($description) > 255) {
-            throw new InvalidArgumentException('Descrizione troppo lunga (max 255 caratteri).');
+        if ($description !== null && mb_strlen($description) > 512) {
+            throw new InvalidArgumentException('Descrizione troppo lunga (max 512 caratteri).');
         }
 
         return [

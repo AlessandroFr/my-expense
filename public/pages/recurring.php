@@ -58,7 +58,7 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
             </div>
             <div class="col-md-10">
                 <label class="form-label small mb-1">Descrizione</label>
-                <input type="text" name="description" class="form-control" maxlength="255" placeholder="Es: Affitto, Netflix, Assicurazione auto">
+                <input type="text" name="description" class="form-control" maxlength="512" placeholder="Es: Affitto, Netflix, Assicurazione auto">
             </div>
             <div class="col-md-2 d-grid">
                 <button type="submit" class="btn btn-primary">
