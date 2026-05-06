@@ -87,4 +87,4 @@ $values = $old + $cat;
     </div>
 </div>
 
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/categories.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/categories.js') ?>"></script>

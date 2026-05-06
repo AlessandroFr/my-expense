@@ -134,6 +134,7 @@ $paymentLabels  = [
                     <p class="small text-muted mt-2 mb-0">
                         Dopo l'analisi del file potrai rivedere e modificare ogni riga prima di confermare l'import.
                     </p>
+                    <div id="bank-step1-status" class="small mt-2" role="status" aria-live="polite"></div>
                 </div>
                 <div class="modal-footer" id="bank-step1-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
@@ -362,4 +363,4 @@ $paymentLabels  = [
     </div>
 </div>
 
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/expenses.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/expenses.js') ?>"></script>

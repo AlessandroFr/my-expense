@@ -145,6 +145,6 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script type="module" src="<?= htmlspecialchars($base . '/js/theme.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/theme.js') ?>"></script>
 </body>
 </html>

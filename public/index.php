@@ -292,6 +292,19 @@ function renderPage(string $page, array $data = []): void
         'accounts'      => 'Conti',
         default         => 'Pagina non trovata',
     };
+
+    // Cache busting per asset statici (JS/CSS) sotto public/.
+    // Genera URL con ?v=<filemtime> cosi' ogni modifica del file invalida la cache.
+    $assetBase = rtrim(\App\Config::get('app')['base_url'] ?? '', '/');
+    $asset = function (string $relPath) use ($assetBase): string {
+        $full = dirname(__DIR__) . '/public/' . ltrim($relPath, '/');
+        $v    = is_file($full) ? (string) filemtime($full) : '0';
+        return htmlspecialchars($assetBase . '/' . ltrim($relPath, '/') . '?v=' . $v, ENT_QUOTES, 'UTF-8');
+    };
+    if (!isset($data['asset'])) {
+        $data['asset'] = $asset;
+    }
+
     extract($data, EXTR_SKIP);
     require $layoutFile;
 }

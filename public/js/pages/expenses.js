@@ -770,6 +770,20 @@ function wireBankImport() {
     const newCatBtn  = document.getElementById('bank-new-category-btn');
     const newCatName = document.getElementById('bank-new-category-name');
     const newCatCol  = document.getElementById('bank-new-category-color');
+    const step1Status = document.getElementById('bank-step1-status');
+
+    const setStep1Status = (msg, level = 'muted') => {
+        if (!step1Status) return;
+        if (!msg) { step1Status.innerHTML = ''; return; }
+        const cls = ({
+            error: 'text-danger',
+            warn:  'text-warning',
+            info:  'text-primary',
+            muted: 'text-muted',
+        })[level] ?? 'text-muted';
+        step1Status.innerHTML = `<span class="${cls}"></span>`;
+        step1Status.querySelector('span').textContent = msg;
+    };
 
     const runPreview = async (ev) => {
         if (ev) ev.preventDefault();
@@ -777,14 +791,17 @@ function wireBankImport() {
         const fileInput = form.querySelector('input[name="file"]');
         const accSelect = form.querySelector('select[name="account_id"]');
         if (accSelect && !accSelect.value) {
+            setStep1Status('Seleziona un conto.', 'warn');
             toast.warning('Seleziona un conto.');
             return;
         }
         if (fileInput && (!fileInput.files || fileInput.files.length === 0)) {
+            setStep1Status('Seleziona il file CSV dell\'estratto conto.', 'warn');
             toast.warning('Seleziona il file CSV dell\'estratto conto.');
             return;
         }
         if (submitBtn) submitBtn.disabled = true;
+        setStep1Status('Analisi anteprima in corso...', 'info');
         try {
             const fd = new FormData(form);
             bankPreviewState.accountId   = Number(fd.get('account_id') ?? 0);
@@ -804,10 +821,12 @@ function wireBankImport() {
             if (toggleAll) toggleAll.checked = bankPreviewState.rows.some(r => !r.skip);
 
             if (resultBox) resultBox.innerHTML = '';
+            setStep1Status('');
             bankRenderRows();
             bankRenderSummary(d);
             bankShowStep(2);
         } catch (err) {
+            setStep1Status('Errore: ' + (err.message ?? 'anteprima fallita.'), 'error');
             toast.error(err.message ?? 'Errore anteprima.');
         } finally {
             if (submitBtn) submitBtn.disabled = false;
@@ -868,6 +887,7 @@ function wireBankImport() {
     modal?.addEventListener('hidden.bs.modal', () => {
         bankShowStep(1);
         if (resultBox) resultBox.innerHTML = '';
+        setStep1Status('');
         bankPreviewState.rows = [];
     });
 

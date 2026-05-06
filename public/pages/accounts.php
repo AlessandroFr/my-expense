@@ -172,4 +172,4 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
     </form>
 </dialog>
 
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/accounts.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/accounts.js') ?>"></script>

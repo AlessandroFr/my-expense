@@ -106,4 +106,4 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
 
 <!-- Chart.js da CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/dashboard.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/dashboard.js') ?>"></script>

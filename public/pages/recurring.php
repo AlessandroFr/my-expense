@@ -94,4 +94,4 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
     </div>
 </div>
 
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/recurring.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/recurring.js') ?>"></script>

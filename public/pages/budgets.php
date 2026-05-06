@@ -47,4 +47,4 @@ $currentMonth = date('Y-m');
     </div>
 </div>
 
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/budgets.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/budgets.js') ?>"></script>

@@ -110,4 +110,4 @@ $thisYear = (int) date('Y');
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
-<script type="module" src="<?= htmlspecialchars($base . '/js/pages/reports.js', ENT_QUOTES, 'UTF-8') ?>"></script>
+<script type="module" src="<?= $asset('js/pages/reports.js') ?>"></script>
