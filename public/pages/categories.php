@@ -19,35 +19,38 @@ $categories = Category::allForUser($userId);
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="row g-3">
+<aside class="col-12 col-lg-5 col-xl-4">
+<div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h6 text-muted mb-3"><i class="bi bi-plus-circle me-1"></i>Nuova categoria</h2>
         <form id="category-create-form" class="row g-2 align-items-end" autocomplete="off">
             <?= Csrf::field() ?>
-            <div class="col-md-4">
+            <div class="col-12">
                 <label for="name" class="form-label small">Nome</label>
                 <input type="text" id="name" name="name" class="form-control"
                        required maxlength="64"
                        placeholder="es. Spesa, Trasporti, Bollette">
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label for="color" class="form-label small">Colore</label>
                 <input type="color" id="color" name="color" class="form-control form-control-color"
                        value="#6c757d"
                        title="Colore categoria">
             </div>
-            <div class="col-md-3">
-                <label for="icon" class="form-label small">Icona <span class="text-muted">(opz.)</span></label>
-                <input type="text" id="icon" name="icon" class="form-control"
-                       maxlength="32"
-                       placeholder="bi-cart, bi-fuel-pump, …">
-            </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label for="sort_order" class="form-label small">Ordine</label>
                 <input type="number" id="sort_order" name="sort_order" class="form-control" value="0">
             </div>
-            <div class="col-md-1 d-grid">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i></button>
+            <div class="col-12">
+                <label for="icon" class="form-label small">Icona <span class="text-muted">(opz.)</span></label>
+                <input type="text" id="icon" name="icon" class="form-control"
+                       maxlength="32"
+                       placeholder="Sfoglia con il bottone…"
+                       data-icon-picker>
+            </div>
+            <div class="col-12 d-grid">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi</button>
             </div>
         </form>
         <div class="form-text mt-2">
@@ -55,7 +58,9 @@ $categories = Category::allForUser($userId);
         </div>
     </div>
 </div>
+</aside>
 
+<section class="col-12 col-lg-7 col-xl-8">
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <table class="table table-hover mb-0 align-middle">
@@ -105,6 +110,8 @@ $categories = Category::allForUser($userId);
             </div>
         <?php endif; ?>
     </div>
+</div>
+</section>
 </div>
 
 <script type="module" src="<?= $asset('js/pages/categories.js') ?>"></script>

@@ -7,22 +7,24 @@ use App\Config;
 
 $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
 ?>
-<div class="row mb-3 align-items-center">
-    <div class="col-md-8">
+<div class="row mb-3">
+    <div class="col-12">
         <h1 class="h3 mb-0"><i class="bi bi-bank me-2"></i>Conti</h1>
         <div class="text-muted small">Carte, conti correnti, contanti, risparmi: tutti i tuoi salvadanai.</div>
     </div>
 </div>
 
-<div class="card shadow-sm mb-3">
+<div class="row g-3">
+<aside class="col-12 col-lg-5 col-xl-4">
+<div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>Nuovo conto</h2>
         <form id="account-create-form" class="row g-2 align-items-end">
-            <div class="col-md-3">
+            <div class="col-12">
                 <label class="form-label small mb-1">Nome</label>
                 <input type="text" name="name" class="form-control" required maxlength="64" placeholder="Es: Carta Hype, Cash">
             </div>
-            <div class="col-md-2">
+            <div class="col-12">
                 <label class="form-label small mb-1">Tipo</label>
                 <select name="type" class="form-select">
                     <option value="checking">Conto corrente</option>
@@ -33,22 +35,17 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                     <option value="other">Altro</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-12">
                 <label class="form-label small mb-1">Saldo iniziale (EUR)</label>
                 <input type="text" name="opening_balance" class="form-control" inputmode="decimal" value="0">
             </div>
-            <div class="col-md-1">
+            <div class="col-6">
                 <label class="form-label small mb-1">Colore</label>
                 <input type="color" name="color" class="form-control form-control-color" value="#0d6efd">
             </div>
-            <div class="col-md-2">
-                <label class="form-label small mb-1">Icona (Bootstrap)</label>
-                <input type="text" name="icon" class="form-control" placeholder="credit-card">
-            </div>
-            <div class="col-md-2 d-grid">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-check-circle me-1"></i>Aggiungi
-                </button>
+            <div class="col-6">
+                <label class="form-label small mb-1">Icona</label>
+                <input type="text" name="icon" class="form-control" placeholder="Sfoglia…" data-icon-picker>
             </div>
 
             <div class="col-12 mt-2">
@@ -57,41 +54,51 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                         <i class="bi bi-bank2 me-1"></i>Dettagli bancari (opzionale)
                     </summary>
                     <div class="row g-2 mt-2">
-                        <div class="col-md-4">
+                        <div class="col-12">
                             <label class="form-label small mb-1">IBAN</label>
                             <input type="text" name="iban" class="form-control" maxlength="40" placeholder="IT60 X054 2811 1010 0000 0123 456">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6">
                             <label class="form-label small mb-1">BIC / SWIFT</label>
                             <input type="text" name="bic" class="form-control" maxlength="11" placeholder="BPMOIT22XXX">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6">
                             <label class="form-label small mb-1">Banca / Broker</label>
                             <input type="text" name="bank_name" class="form-control" maxlength="128" placeholder="Banca Sella">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-12">
                             <label class="form-label small mb-1">Intestatario</label>
                             <input type="text" name="account_holder" class="form-control" maxlength="128" placeholder="Mario Rossi">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-12">
                             <label class="form-label small mb-1">N. conto / Dossier</label>
                             <input type="text" name="account_number" class="form-control" maxlength="64" placeholder="0000123456">
                         </div>
-                        <div class="col-md-9">
+                        <div class="col-12">
                             <label class="form-label small mb-1">Note</label>
                             <input type="text" name="notes" class="form-control" maxlength="255" placeholder="Conto deposito titoli, ISIN, strategia...">
                         </div>
                     </div>
                 </details>
             </div>
+
+            <div class="col-12 d-grid mt-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle me-1"></i>Aggiungi
+                </button>
+            </div>
         </form>
     </div>
 </div>
+</aside>
 
+<section class="col-12 col-lg-7 col-xl-8">
 <div id="accounts-list" class="row g-3">
     <div class="col-12 text-center text-muted py-4">
         <div class="spinner-border spinner-border-sm me-2"></div>Caricamento...
     </div>
+</div>
+</section>
 </div>
 
 <dialog id="account-edit-modal" class="border-0 rounded-3 shadow p-0" style="max-width: 720px; width: 95%">
@@ -106,11 +113,11 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                 <input type="hidden" name="archived" value="0">
                 <input type="hidden" name="sort_order" value="0">
                 <div class="row g-2">
-                    <div class="col-md-5">
+                    <div class="col-md-4">
                         <label class="form-label small mb-1">Nome</label>
                         <input type="text" name="name" class="form-control" required maxlength="64">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label small mb-1">Tipo</label>
                         <select name="type" class="form-select">
                             <option value="checking">Conto corrente</option>
@@ -129,9 +136,9 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                         <label class="form-label small mb-1">Col.</label>
                         <input type="color" name="color" class="form-control form-control-color">
                     </div>
-                    <div class="col-md-1">
+                    <div class="col-md-3">
                         <label class="form-label small mb-1">Icona</label>
-                        <input type="text" name="icon" class="form-control" maxlength="32" placeholder="bank">
+                        <input type="text" name="icon" class="form-control" maxlength="32" placeholder="Sfoglia…" data-icon-picker>
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>

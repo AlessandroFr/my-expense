@@ -60,14 +60,12 @@ $values = $old + $cat;
                                    value="<?= htmlspecialchars((string) $values['sort_order'], ENT_QUOTES, 'UTF-8') ?>">
                         </div>
                         <div class="col-12">
-                            <label for="icon" class="form-label">Icona <span class="text-muted small">(nome Bootstrap Icons, opzionale)</span></label>
+                            <label for="icon" class="form-label">Icona <span class="text-muted small">(opzionale)</span></label>
                             <input type="text" id="icon" name="icon" class="form-control"
                                    maxlength="32"
                                    value="<?= htmlspecialchars((string) ($values['icon'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
-                                   placeholder="bi-cart, bi-fuel-pump, bi-house, …">
-                            <div class="form-text">
-                                Sfoglia da <a href="https://icons.getbootstrap.com/" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
-                            </div>
+                                   placeholder="Sfoglia con il bottone…"
+                                   data-icon-picker>
                         </div>
                     </div>
 

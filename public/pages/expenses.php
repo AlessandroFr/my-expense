@@ -29,25 +29,6 @@ $paymentLabels  = [
         <h1 class="h3 mb-0"><i class="bi bi-receipt me-2"></i>Spese</h1>
     </div>
     <div class="col-md-6 text-md-end">
-        <div class="btn-group btn-group-sm me-1" role="group">
-            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Filtri salvati">
-                <i class="bi bi-bookmark me-1"></i>Filtri
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" id="saved-filters-menu">
-                <li><a class="dropdown-item small" href="#" data-saved-action="save"><i class="bi bi-floppy me-1"></i>Salva filtro corrente...</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><span class="dropdown-item-text small text-muted">Nessun filtro salvato.</span></li>
-            </ul>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
-            <i class="bi bi-download me-1"></i>Esporta
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal" title="Importa CSV semplice">
-            <i class="bi bi-upload me-1"></i>Importa
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="btn-import-bank" data-bs-toggle="modal" data-bs-target="#bank-import-modal" title="Importa estratto conto bancario">
-            <i class="bi bi-bank me-1"></i>Estratto conto
-        </button>
         <span class="text-muted small">Totale filtrato: </span>
         <span id="expenses-total" class="fw-semibold fs-5">EUR 0,00</span>
         <span class="text-muted small ms-2" id="expenses-count">(0 voci)</span>
@@ -202,19 +183,48 @@ $paymentLabels  = [
     </div>
 </div>
 
+<div class="row g-3">
+<aside class="col-12 col-lg-5 col-xl-4">
+
+<!-- ── Toolbar azioni rapide ────────────────────────────────────────────── -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2 d-flex flex-wrap gap-2">
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Filtri salvati">
+                <i class="bi bi-bookmark me-1"></i>Filtri
+            </button>
+            <ul class="dropdown-menu" id="saved-filters-menu">
+                <li><a class="dropdown-item small" href="#" data-saved-action="save"><i class="bi bi-floppy me-1"></i>Salva filtro corrente...</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><span class="dropdown-item-text small text-muted">Nessun filtro salvato.</span></li>
+            </ul>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
+            <i class="bi bi-download me-1"></i>Esporta
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal" title="Importa CSV semplice">
+            <i class="bi bi-upload me-1"></i>Importa
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-import-bank" data-bs-toggle="modal" data-bs-target="#bank-import-modal" title="Importa estratto conto bancario">
+            <i class="bi bi-bank me-1"></i>Estratto conto
+        </button>
+    </div>
+</div>
+
 <!-- ── Filtri ────────────────────────────────────────────────────────────── -->
 <div class="card shadow-sm mb-3">
     <div class="card-body">
+        <h2 class="h6 mb-3"><i class="bi bi-funnel me-1"></i>Filtri</h2>
         <form id="expenses-filters" class="row g-2 align-items-end">
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small">Da</label>
                 <input type="date" name="date_from" class="form-control form-control-sm">
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small">A</label>
                 <input type="date" name="date_to" class="form-control form-control-sm">
             </div>
-            <div class="col-md-2">
+            <div class="col-12">
                 <label class="form-label small">Categoria</label>
                 <select name="category_id" class="form-select form-select-sm">
                     <option value="">Tutte</option>
@@ -223,25 +233,7 @@ $paymentLabels  = [
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-1">
-                <label class="form-label small">Min €</label>
-                <input type="number" step="0.01" min="0" name="amount_min" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-1">
-                <label class="form-label small">Max €</label>
-                <input type="number" step="0.01" min="0" name="amount_max" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">Cerca</label>
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="descrizione…">
-            </div>
-            <div class="col-md-1">
-                <label class="form-label small">Tag</label>
-                <select name="tag" class="form-select form-select-sm" id="filter-tag">
-                    <option value="">Tutti</option>
-                </select>
-            </div>
-            <div class="col-md-2">
+            <div class="col-12">
                 <label class="form-label small">Conto</label>
                 <select name="account_id" class="form-select form-select-sm">
                     <option value="">Tutti</option>
@@ -250,9 +242,27 @@ $paymentLabels  = [
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-1 d-grid">
+            <div class="col-6">
+                <label class="form-label small">Min €</label>
+                <input type="number" step="0.01" min="0" name="amount_min" class="form-control form-control-sm">
+            </div>
+            <div class="col-6">
+                <label class="form-label small">Max €</label>
+                <input type="number" step="0.01" min="0" name="amount_max" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+                <label class="form-label small">Cerca</label>
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="descrizione…">
+            </div>
+            <div class="col-12">
+                <label class="form-label small">Tag</label>
+                <select name="tag" class="form-select form-select-sm" id="filter-tag">
+                    <option value="">Tutti</option>
+                </select>
+            </div>
+            <div class="col-12 d-grid">
                 <button type="button" id="filters-reset" class="btn btn-sm btn-outline-secondary" title="Resetta filtri">
-                    <i class="bi bi-x-lg"></i>
+                    <i class="bi bi-x-lg me-1"></i>Reset filtri
                 </button>
             </div>
         </form>
@@ -260,20 +270,20 @@ $paymentLabels  = [
 </div>
 
 <!-- ── Form CREATE inline ───────────────────────────────────────────────── -->
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h6 text-muted mb-3"><i class="bi bi-plus-circle me-1"></i>Nuova spesa</h2>
         <form id="expense-create-form" class="row g-2 align-items-end" autocomplete="off">
             <?= Csrf::field() ?>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small">Data</label>
                 <input type="date" name="expense_date" class="form-control" required value="<?= htmlspecialchars($today, ENT_QUOTES, 'UTF-8') ?>">
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small">Importo €</label>
                 <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required placeholder="0,00">
             </div>
-            <div class="col-md-2">
+            <div class="col-12">
                 <label class="form-label small">Categoria</label>
                 <select name="category_id" class="form-select">
                     <option value="">— Nessuna —</option>
@@ -282,7 +292,7 @@ $paymentLabels  = [
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small">Pagamento</label>
                 <select name="payment_method" class="form-select" required>
                     <?php foreach ($paymentMethods as $pm): ?>
@@ -292,7 +302,7 @@ $paymentLabels  = [
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>
                 <select name="account_id" class="form-select">
                     <option value="">— Nessuno —</option>
@@ -301,28 +311,28 @@ $paymentLabels  = [
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-12">
                 <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
                 <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
             </div>
-            <div class="col-md-6">
+            <div class="col-12">
                 <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
                 <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
                 <datalist id="all-tags-datalist"></datalist>
             </div>
-            <div class="col-md-3">
+            <div class="col-7">
                 <label class="form-label small">Condivisa con <span class="text-muted">(opz.)</span></label>
                 <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
             </div>
-            <div class="col-md-2">
-                <label class="form-label small">La tua quota EUR <span class="text-muted">(opz.)</span></label>
+            <div class="col-5">
+                <label class="form-label small">Tua quota €</label>
                 <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
             </div>
-            <div class="col-md-1 d-grid">
-                <button type="submit" class="btn btn-primary" title="Aggiungi"><i class="bi bi-check-lg"></i></button>
+            <div class="col-12 d-grid">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi spesa</button>
             </div>
             <div class="col-12">
-                <label class="btn btn-sm btn-outline-secondary mb-0">
+                <label class="btn btn-sm btn-outline-secondary mb-0 w-100">
                     <i class="bi bi-camera me-1"></i>Scansiona scontrino (OCR)
                     <input type="file" id="ocr-input" accept="image/*" capture="environment" hidden>
                 </label>
@@ -332,6 +342,9 @@ $paymentLabels  = [
     </div>
 </div>
 
+</aside>
+
+<section class="col-12 col-lg-7 col-xl-8">
 <!-- ── Tabella spese ─────────────────────────────────────────────────────── -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
@@ -358,6 +371,8 @@ $paymentLabels  = [
             </tbody>
         </table>
     </div>
+</div>
+</section>
 </div>
 
 <!-- ── Modal: allegati ────────────────────────────────────────────────────── -->

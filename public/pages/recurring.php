@@ -7,31 +7,28 @@ use App\Config;
 
 $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
 ?>
-<div class="row mb-3 align-items-center">
-    <div class="col-md-8">
+<div class="row mb-3">
+    <div class="col-12">
         <h1 class="h3 mb-0"><i class="bi bi-arrow-repeat me-2"></i>Spese ricorrenti</h1>
         <div class="text-muted small">Affitti, abbonamenti, bollette: vengono generate automaticamente.</div>
     </div>
-    <div class="col-md-4 text-md-end">
-        <button type="button" class="btn btn-outline-primary" id="btn-run-now">
-            <i class="bi bi-play-circle me-1"></i>Genera ora
-        </button>
-    </div>
 </div>
 
-<div class="card shadow-sm mb-3">
+<div class="row g-3">
+<aside class="col-12 col-lg-5 col-xl-4">
+<div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>Nuova ricorrenza</h2>
         <form id="recurring-create-form" class="row g-2 align-items-end">
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small mb-1">Inizio</label>
                 <input type="date" name="start_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small mb-1">Fine (opz)</label>
                 <input type="date" name="end_date" class="form-control">
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small mb-1">Frequenza</label>
                 <select name="frequency" class="form-select" required>
                     <option value="monthly">Mensile</option>
@@ -39,15 +36,15 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                     <option value="yearly">Annuale</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small mb-1">Categoria</label>
                 <select name="category_id" class="form-select"></select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small mb-1">Importo (EUR)</label>
                 <input type="text" name="amount" class="form-control" inputmode="decimal" required>
             </div>
-            <div class="col-md-2">
+            <div class="col-6">
                 <label class="form-label small mb-1">Pagamento</label>
                 <select name="payment_method" class="form-select">
                     <option value="card">Carta</option>
@@ -56,19 +53,26 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                     <option value="other">Altro</option>
                 </select>
             </div>
-            <div class="col-md-10">
+            <div class="col-12">
                 <label class="form-label small mb-1">Descrizione</label>
                 <input type="text" name="description" class="form-control" maxlength="512" placeholder="Es: Affitto, Netflix, Assicurazione auto">
             </div>
-            <div class="col-md-2 d-grid">
+            <div class="col-12 d-grid">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-check-circle me-1"></i>Aggiungi
+                </button>
+            </div>
+            <div class="col-12 d-grid">
+                <button type="button" class="btn btn-outline-primary" id="btn-run-now">
+                    <i class="bi bi-play-circle me-1"></i>Genera ora
                 </button>
             </div>
         </form>
     </div>
 </div>
+</aside>
 
+<section class="col-12 col-lg-7 col-xl-8">
 <div class="card shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
@@ -92,6 +96,8 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
             </tbody>
         </table>
     </div>
+</div>
+</section>
 </div>
 
 <script type="module" src="<?= $asset('js/pages/recurring.js') ?>"></script>
