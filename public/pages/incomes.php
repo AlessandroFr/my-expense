@@ -97,6 +97,7 @@ $accounts = Account::allForUser($userId, false);
 </div>
 
 <div class="card shadow-sm">
+    <nav id="income-pager" class="px-3 pt-2"></nav>
     <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">

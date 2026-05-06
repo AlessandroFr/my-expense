@@ -6,6 +6,7 @@ import { apiSend, apiGuard } from '../componentBase.js';
 import { toast }             from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
+import { renderPager }       from '../pager.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -26,6 +27,10 @@ const PAYMENT_OPTIONS = ['cash', 'card', 'transfer', 'other'];
 let categories  = [];
 let allTags     = [];   // tutti i tag dell'utente {id, name, color}
 let lastFilters = {};
+
+// Paginazione server-side: i filtri resettano page=1; il pager modifica solo offset.
+const PAGE_SIZE = 25;
+let pageOffset  = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -194,15 +199,16 @@ function replaceWithEditRow(tr) {
 
 // ── Total ──────────────────────────────────────────────────────────────────
 
-function updateTotalFromTable() {
+function updateTotalFromTable(serverTotal = null) {
     const rows = document.querySelectorAll('#expenses-tbody tr[data-expense]');
-    let total = 0;
+    let pageTotal = 0;
     rows.forEach(r => {
         const e = JSON.parse(r.dataset.expense || '{}');
-        total += Number(e.amount) || 0;
+        pageTotal += Number(e.amount) || 0;
     });
-    document.getElementById('expenses-total').textContent = fmtMoney(total);
-    document.getElementById('expenses-count').textContent = `(${rows.length} ${rows.length === 1 ? 'voce' : 'voci'})`;
+    document.getElementById('expenses-total').textContent = fmtMoney(pageTotal);
+    const cnt = serverTotal != null ? serverTotal : rows.length;
+    document.getElementById('expenses-count').textContent = `(${cnt} ${cnt === 1 ? 'voce' : 'voci'} totali, pagina di ${rows.length})`;
 }
 
 // ── Caricamento lista ───────────────────────────────────────────────────────
@@ -217,8 +223,12 @@ async function loadList() {
         for (const [k, v] of Object.entries(lastFilters)) {
             if (v !== '' && v !== null && v !== undefined) params.set(k, v);
         }
+        params.set('limit',  String(PAGE_SIZE));
+        params.set('offset', String(pageOffset));
+
         const r = await apiGuard(api.get(`${BASE}/expenses/list`, params));
         const expenses = r.data?.expenses ?? [];
+        const total    = Number(r.data?.total ?? expenses.length);
 
         tbody.innerHTML = '';
         if (expenses.length === 0) {
@@ -229,7 +239,12 @@ async function loadList() {
             for (const e of expenses) frag.appendChild(renderViewRow(e));
             tbody.appendChild(frag);
         }
-        updateTotalFromTable();
+        updateTotalFromTable(total);
+        renderPager(document.getElementById('expenses-pager'), {
+            total, limit: PAGE_SIZE, offset: pageOffset,
+            label: 'Spese',
+            onChange: (newOffset) => { pageOffset = newOffset; loadList(); },
+        });
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">
             <i class="bi bi-x-circle me-2"></i>${escHtml(err.message ?? 'Errore caricamento')}</td></tr>`;
@@ -296,6 +311,7 @@ function wireFilters() {
     const apply = () => {
         const fd = new FormData(form);
         lastFilters = Object.fromEntries(fd.entries());
+        pageOffset  = 0;   // ogni cambio di filtro torna a pagina 1
         loadList();
     };
     const debounced = () => { clearTimeout(timer); timer = setTimeout(apply, 300); };

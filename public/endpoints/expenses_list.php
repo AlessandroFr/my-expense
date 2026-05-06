@@ -27,9 +27,16 @@ $filters = [
 ];
 
 try {
-    $rows = Expense::listForUser((int) Auth::userId(), $filters);
+    $userId = (int) Auth::userId();
+    $rows   = Expense::listForUser($userId, $filters);
+    $total  = Expense::countForUser($userId, $filters);
 } catch (Throwable $e) {
     Json::serverError($e);
 }
 
-Json::ok(['expenses' => $rows]);
+Json::ok([
+    'expenses' => $rows,
+    'total'    => $total,
+    'limit'    => (int) $filters['limit'],
+    'offset'   => (int) $filters['offset'],
+]);

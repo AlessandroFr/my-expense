@@ -7,6 +7,7 @@ import { apiSend, apiGuard, escapeHtml, escapeAttr,
 import { toast }                                         from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
+import { renderPager }                                   from '../pager.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -45,6 +46,9 @@ const resetBtn    = document.getElementById('income-filters-reset');
 
 let editingId = null;
 let cache     = [];
+
+const PAGE_SIZE = 25;
+let pageOffset  = 0;
 
 function debounce(fn, ms) {
     let t;
@@ -101,7 +105,7 @@ function getFilters() {
     return Object.fromEntries(Array.from(fd.entries()).filter(([, v]) => v !== ''));
 }
 
-function renderTable(items) {
+function renderTable(items /* serverTotal currently unused for sum since sum is on visible page */) {
     cache = items;
     if (!items.length) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Nessuna entrata.</td></tr>`;
@@ -113,27 +117,46 @@ function renderTable(items) {
 }
 
 function renderSources(sources) {
-    const opts = sources.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+    // Preserva la selezione corrente: il dropdown viene riscritto a ogni
+    // loadList(), e senza re-applicare `selected` l'utente perde il filtro.
+    const cur = sourceSel.value;
+    const opts = sources.map(s => {
+        const sel = s === cur ? ' selected' : '';
+        return `<option value="${escapeAttr(s)}"${sel}>${escapeHtml(s)}</option>`;
+    }).join('');
     sourceSel.innerHTML  = '<option value="">Tutte</option>' + opts;
-    sourceList.innerHTML = opts;
+    sourceList.innerHTML = sources.map(s => `<option value="${escapeAttr(s)}"></option>`).join('');
 }
 
 async function loadList() {
     try {
-        const r = await apiGuard(api.get(`${BASE}/incomes/list`, getFilters()));
+        const params = { ...getFilters(), limit: PAGE_SIZE, offset: pageOffset };
+        const r = await apiGuard(api.get(`${BASE}/incomes/list`, params));
         const d = r.data ?? {};
-        renderTable(d.incomes ?? []);
+        const items = d.incomes ?? [];
+        const total = Number(d.total ?? items.length);
+        renderTable(items, total);
         renderSources(d.sources ?? []);
+        renderPager(document.getElementById('income-pager'), {
+            total, limit: PAGE_SIZE, offset: pageOffset,
+            label: 'Entrate',
+            onChange: (newOffset) => { pageOffset = newOffset; loadList(); },
+        });
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento entrate.');
     }
 }
 
-const debouncedReload = debounce(loadList, 300);
+// Cambio filtri → torna a pagina 1
+function applyFilters() {
+    pageOffset = 0;
+    loadList();
+}
+const debouncedApply = debounce(applyFilters, 300);
 
-filtersForm.addEventListener('input', debouncedReload);
-filtersForm.addEventListener('change', loadList);
-resetBtn.addEventListener('click', () => { filtersForm.reset(); loadList(); });
+filtersForm.addEventListener('input', debouncedApply);
+filtersForm.addEventListener('change', applyFilters);
+resetBtn.addEventListener('click', () => { filtersForm.reset(); applyFilters(); });
 
 createForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -162,7 +185,7 @@ createForm.addEventListener('submit', async (ev) => {
         toast.success('Entrata aggiunta.');
         createForm.reset();
         createForm.querySelector('input[name="income_date"]').value = new Date().toISOString().slice(0, 10);
-        loadList();
+        applyFilters(); // torna a pagina 1 cosi' la nuova entrata e' visibile in cima
     } catch { /* toast already shown */ }
 });
 

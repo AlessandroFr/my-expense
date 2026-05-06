@@ -335,6 +335,7 @@ $paymentLabels  = [
 <!-- ── Tabella spese ─────────────────────────────────────────────────────── -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
+        <nav id="expenses-pager" class="px-3 pt-2"></nav>
         <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>

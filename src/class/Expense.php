@@ -75,6 +75,22 @@ final class Expense
         return $rows;
     }
 
+    /**
+     * Conta le righe che matchano i filtri (per paginazione lato client).
+     * @param array<string,mixed> $filters
+     */
+    public static function countForUser(int $userId, array $filters = []): int
+    {
+        [$where, $params] = self::buildWhere($userId, $filters);
+        $sql = "SELECT COUNT(*) FROM expenses e
+                LEFT JOIN categories c ON c.id = e.category_id
+                LEFT JOIN accounts   a ON a.id = e.account_id
+                {$where}";
+        $stmt = Database::pdo()->prepare($sql);
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
     public static function findForUser(int $id, int $userId): ?array
     {
         $stmt = Database::pdo()->prepare(

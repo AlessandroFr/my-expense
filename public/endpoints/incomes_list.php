@@ -22,6 +22,7 @@ $filters = [
 
 try {
     $items   = Income::listForUser($userId, $filters);
+    $total   = Income::countForUser($userId, $filters);
     $sources = Income::distinctSources($userId);
 } catch (Throwable $e) {
     Json::serverError($e);
@@ -30,4 +31,7 @@ try {
 Json::ok([
     'incomes' => $items,
     'sources' => $sources,
+    'total'   => $total,
+    'limit'   => (int) $filters['limit'],
+    'offset'  => (int) $filters['offset'],
 ]);
