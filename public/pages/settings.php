@@ -121,6 +121,71 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
             </div>
         </div>
     </div>
+
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-warning">
+            <div class="card-header bg-warning text-dark">
+                <i class="bi bi-arrow-counterclockwise me-2"></i><strong>Ripristina backup</strong>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    Carica un backup ZIP (o file SQL) precedentemente scaricato per
+                    <strong>sovrascrivere</strong> i tuoi dati attuali. Le tue credenziali di
+                    login restano invariate.
+                </p>
+                <p class="text-muted small mb-3">
+                    Tutti i tuoi dati attuali (movimenti, categorie, conti, budget, ricorrenti,
+                    tag, filtri, allegati) verranno cancellati e sostituiti dal contenuto del
+                    backup.
+                </p>
+
+                <!-- Step 1: file -->
+                <div class="mb-3">
+                    <label for="restore-file" class="form-label fw-semibold mb-2">
+                        1. Scegli il file di backup
+                    </label>
+                    <input type="file"
+                           id="restore-file"
+                           class="form-control"
+                           accept=".zip,.sql">
+                    <div class="form-text">Accettati: .zip (con allegati) o .sql (solo dati). Max 64 MB.</div>
+                </div>
+
+                <!-- Step 2: phrase -->
+                <div class="mb-3">
+                    <label for="restore-phrase" class="form-label fw-semibold mb-2">
+                        2. Digita la frase di conferma
+                    </label>
+                    <input type="text"
+                           id="restore-phrase"
+                           class="form-control font-monospace"
+                           autocomplete="off"
+                           spellcheck="false"
+                           placeholder="RIPRISTINA BACKUP">
+                    <div class="form-text">Esattamente così, in maiuscolo, senza apici.</div>
+                </div>
+
+                <!-- Step 3: password -->
+                <div class="mb-3">
+                    <label for="restore-password" class="form-label fw-semibold mb-2">
+                        3. Reinserisci la password
+                    </label>
+                    <input type="password"
+                           id="restore-password"
+                           class="form-control"
+                           autocomplete="current-password">
+                </div>
+
+                <button id="btn-restore" type="button" class="btn btn-warning" disabled>
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Ripristina backup
+                </button>
+                <div id="restore-hint" class="form-text mt-2">
+                    Il bottone si abilita quando hai scelto un file, digitato la frase e
+                    inserito la password.
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script type="module" src="<?= $asset('js/pages/settings.js') ?>"></script>

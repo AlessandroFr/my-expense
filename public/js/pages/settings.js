@@ -89,3 +89,66 @@ btnReset.addEventListener('click', async () => {
         refreshButtonState();
     }
 });
+
+// ─── Restore backup ──────────────────────────────────────────────────────────
+// Carica un backup .zip o .sql, riautentica con frase + password, l'endpoint
+// fa wipe + re-INSERT in transazione. UX speculare a quella del reset.
+
+const RESTORE_PHRASE = 'RIPRISTINA BACKUP';
+
+const fileInput   = document.getElementById('restore-file');
+const phraseR     = document.getElementById('restore-phrase');
+const pwdR        = document.getElementById('restore-password');
+const btnRestore  = document.getElementById('btn-restore');
+
+function refreshRestoreState() {
+    const fileOk   = fileInput.files && fileInput.files.length === 1;
+    const phraseOk = phraseR.value.trim() === RESTORE_PHRASE;
+    const pwdOk    = pwdR.value.length > 0;
+    btnRestore.disabled = !(fileOk && phraseOk && pwdOk);
+}
+
+fileInput.addEventListener('change', refreshRestoreState);
+phraseR.addEventListener('input',   refreshRestoreState);
+pwdR.addEventListener('input',      refreshRestoreState);
+
+btnRestore.addEventListener('click', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    const ok = await confirmDialog(
+        `Tutti i tuoi dati attuali verranno cancellati e sostituiti dal contenuto di "${file.name}". Procedere?`,
+        { title: 'Conferma ripristino', confirmText: 'Sì, ripristina', confirmClass: 'btn-warning' }
+    );
+    if (!ok) return;
+
+    btnRestore.disabled = true;
+    const origLabel = btnRestore.innerHTML;
+    btnRestore.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Ripristino in corso...';
+
+    try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('confirm_phrase', phraseR.value.trim());
+        fd.append('password', pwdR.value);
+
+        const r = await api.postFormData(`${BASE}/backup/restore`, fd);
+        if (r && r.ok === false) {
+            throw new Error(r.error?.message ?? 'Errore durante il ripristino.');
+        }
+
+        const d = (r && r.data) || {};
+        const totalRows = Object.values(d.rows_per_table || {})
+            .reduce((acc, n) => acc + (Number(n) || 0), 0);
+        const filesN = Number(d.files_extracted) || 0;
+        toast.success(`Ripristino completato: ${totalRows} righe, ${filesN} allegati.`);
+
+        setTimeout(() => { window.location.href = `${BASE}/dashboard`; }, 900);
+    } catch (err) {
+        // postFormData lancia Error con .body (envelope JSON) sui non-2xx
+        const msg = err?.body?.error?.message ?? err?.message ?? 'Errore durante il ripristino.';
+        toast.error(msg);
+        btnRestore.innerHTML = origLabel;
+        refreshRestoreState();
+    }
+});

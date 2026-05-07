@@ -261,6 +261,9 @@ switch ($route) {
     case 'GET /backup/download':
         require __DIR__ . '/endpoints/backup_download.php';
         break;
+    case 'POST /backup/restore':
+        require __DIR__ . '/endpoints/backup_restore.php';
+        break;
 
     // ── Impostazioni / reset DB ──────────────────────────────────────────
     case 'GET /settings':
