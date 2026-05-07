@@ -108,11 +108,11 @@ final class Income
         ?string $paymentMethod = 'transfer'
     ): ?int {
         $row = self::validate($source, $description, $amount, $incomeDate);
-        $accountId = self::checkAccount($userId, $accountId);
+        $payment = self::normalizePayment($paymentMethod);
+        $accountId = self::checkAccount($userId, $accountId, $payment);
         if ($valueDate !== null && !self::isValidDate($valueDate)) {
             throw new InvalidArgumentException('Data valuta non valida.');
         }
-        $payment = self::normalizePayment($paymentMethod);
 
         try {
             $stmt = Database::pdo()->prepare(
@@ -164,15 +164,28 @@ final class Income
         ]);
     }
 
-    private static function checkAccount(int $userId, ?int $accountId): ?int
+    private static function checkAccount(int $userId, ?int $accountId, ?string $paymentMethod = null): ?int
     {
-        if ($accountId === null || $accountId <= 0) return null;
+        if ($accountId === null || $accountId <= 0) {
+            if ($paymentMethod === 'cash') {
+                throw new InvalidArgumentException(
+                    'Per le entrate in contanti devi selezionare un conto cassa.'
+                );
+            }
+            return null;
+        }
         $check = Database::pdo()->prepare(
-            'SELECT 1 FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
+            'SELECT type FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
         );
         $check->execute([$accountId, $userId]);
-        if ($check->fetchColumn() === false) {
+        $type = $check->fetchColumn();
+        if ($type === false) {
             throw new InvalidArgumentException('Conto non trovato.');
+        }
+        if ($paymentMethod === 'cash' && (string) $type !== 'cash') {
+            throw new InvalidArgumentException(
+                'Il conto selezionato non e\' un conto cassa: scegli "In tasca" o un altro conto Contanti.'
+            );
         }
         return $accountId;
     }

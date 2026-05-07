@@ -102,6 +102,7 @@ createForm.addEventListener('submit', async (ev) => {
         createForm.reset();
         createForm.querySelector('input[name="opening_balance"]').value = '0';
         createForm.querySelector('input[name="color"]').value = '#0d6efd';
+        syncCashOnly(createForm);
         loadList();
     } catch (err) {
         toast.error(err.message ?? 'Errore creazione conto.');
@@ -114,6 +115,25 @@ function detailsPayload(a) {
     return out;
 }
 
+function syncCashOnly(form) {
+    if (!form) return;
+    const isCash = form.elements['type']?.value === 'cash';
+    form.querySelectorAll('[data-cash-only]').forEach(node => {
+        node.style.display = isCash ? '' : 'none';
+    });
+    if (!isCash) {
+        const cb = form.elements['is_default_cash'];
+        if (cb) cb.checked = false;
+    }
+}
+
+function bindCashOnly(form) {
+    if (!form) return;
+    const typeSel = form.elements['type'];
+    if (typeSel) typeSel.addEventListener('change', () => syncCashOnly(form));
+    syncCashOnly(form);
+}
+
 function openEditModal(a) {
     if (!editModal || !editForm) return;
     editForm.elements['id'].value              = a.id;
@@ -124,12 +144,19 @@ function openEditModal(a) {
     editForm.elements['opening_balance'].value = a.opening_balance ?? '0';
     editForm.elements['sort_order'].value      = a.sort_order ?? 0;
     editForm.elements['archived'].value        = Number(a.archived) === 1 ? '1' : '0';
+    if (editForm.elements['is_default_cash']) {
+        editForm.elements['is_default_cash'].checked = Number(a.is_default_cash) === 1;
+    }
     for (const f of DETAIL_FIELDS) {
         if (editForm.elements[f]) editForm.elements[f].value = a[f] ?? '';
     }
+    syncCashOnly(editForm);
     if (typeof editModal.showModal === 'function') editModal.showModal();
     else editModal.setAttribute('open', '');
 }
+
+bindCashOnly(createForm);
+bindCashOnly(editForm);
 
 function closeEditModal() {
     if (!editModal) return;
@@ -163,6 +190,7 @@ list.addEventListener('click', async (ev) => {
                 id, name: a.name, type: a.type, color: a.color, icon: a.icon ?? '',
                 opening_balance: a.opening_balance, sort_order: a.sort_order,
                 archived: Number(a.archived) === 1 ? 0 : 1,
+                is_default_cash: Number(a.is_default_cash) === 1 ? 1 : 0,
                 ...detailsPayload(a),
             });
             toast.success(Number(a.archived) === 1 ? 'Conto ripristinato.' : 'Conto archiviato.');

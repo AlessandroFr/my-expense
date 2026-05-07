@@ -14,8 +14,9 @@ use App\Expense;
 $base       = rtrim(Config::get('app')['base_url'] ?? '', '/');
 $userId     = (int) Auth::userId();
 $categories = Category::allForUser($userId);
-$accounts   = Account::allForUser($userId, false);
-$today      = date('Y-m-d');
+$accounts    = Account::allForUser($userId, false);
+$defaultCash = Account::defaultCashFor($userId);
+$today       = date('Y-m-d');
 $paymentMethods = Expense::PAYMENT_METHODS;
 $paymentLabels  = [
     'cash'     => 'Contanti',
@@ -110,6 +111,13 @@ $paymentLabels  = [
                         <label class="form-check-label small" for="bank-pair-ricariche">
                             Partita doppia per ricariche carta prepagata
                             <span class="text-muted">(crea spesa sul conto + entrata su account "Carta Prepagata")</span>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="bank-pair-prelievi" name="auto_pair_prelievi" value="1" checked>
+                        <label class="form-check-label small" for="bank-pair-prelievi">
+                            Partita doppia per prelievi ATM
+                            <span class="text-muted">(crea spesa sul conto + entrata su "In tasca")</span>
                         </label>
                     </div>
                     <p class="small text-muted mt-2 mb-0">
@@ -273,7 +281,8 @@ $paymentLabels  = [
 <div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h6 text-muted mb-3"><i class="bi bi-plus-circle me-1"></i>Nuova spesa</h2>
-        <form id="expense-create-form" class="row g-2 align-items-end" autocomplete="off">
+        <form id="expense-create-form" class="row g-2 align-items-end" autocomplete="off"
+              data-default-cash-id="<?= $defaultCash !== null ? (int) $defaultCash['id'] : '' ?>">
             <?= Csrf::field() ?>
             <div class="col-6">
                 <label class="form-label small">Data</label>
@@ -307,7 +316,7 @@ $paymentLabels  = [
                 <select name="account_id" class="form-select">
                     <option value="">— Nessuno —</option>
                     <?php foreach ($accounts as $a): ?>
-                        <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="<?= (int) $a['id'] ?>" data-type="<?= htmlspecialchars((string) $a['type'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>

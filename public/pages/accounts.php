@@ -39,6 +39,15 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                 <label class="form-label small mb-1">Saldo iniziale (EUR)</label>
                 <input type="text" name="opening_balance" class="form-control" inputmode="decimal" value="0">
             </div>
+            <div class="col-12" data-cash-only style="display:none">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="is_default_cash" id="account-create-is-default-cash" value="1">
+                    <label class="form-check-label small" for="account-create-is-default-cash">
+                        <i class="bi bi-wallet2 me-1"></i>Conto cassa principale
+                        <span class="text-muted">(riceve i prelievi ATM e i pagamenti contanti)</span>
+                    </label>
+                </div>
+            </div>
             <div class="col-6">
                 <label class="form-label small mb-1">Colore</label>
                 <input type="color" name="color" class="form-control form-control-color" value="#0d6efd">
@@ -139,6 +148,16 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                     <div class="col-md-3">
                         <label class="form-label small mb-1">Icona</label>
                         <input type="text" name="icon" class="form-control" maxlength="32" placeholder="Sfoglia…" data-icon-picker>
+                    </div>
+
+                    <div class="col-12" data-cash-only style="display:none">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_default_cash" id="account-edit-is-default-cash" value="1">
+                            <label class="form-check-label small" for="account-edit-is-default-cash">
+                                <i class="bi bi-wallet2 me-1"></i>Conto cassa principale
+                                <span class="text-muted">(riceve i prelievi ATM e i pagamenti contanti)</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>

@@ -18,7 +18,7 @@ final class Account
     {
         $sql = 'SELECT id, name, type, color, icon, opening_balance,
                        iban, bic, bank_name, account_holder, account_number, notes,
-                       archived, sort_order, created_at, updated_at
+                       archived, is_default_cash, sort_order, created_at, updated_at
                 FROM accounts
                 WHERE user_id = ?'
              . ($includeArchived ? '' : ' AND archived = 0')
@@ -33,12 +33,67 @@ final class Account
         $stmt = Database::pdo()->prepare(
             'SELECT id, user_id, name, type, color, icon, opening_balance,
                     iban, bic, bank_name, account_holder, account_number, notes,
-                    archived, sort_order
+                    archived, is_default_cash, sort_order
              FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
         );
         $stmt->execute([$id, $userId]);
         $row = $stmt->fetch();
         return $row === false ? null : $row;
+    }
+
+    /**
+     * Conto cassa designato per i contanti dell'utente:
+     * type='cash' AND is_default_cash=1; fallback al primo cash per
+     * sort_order/id; null se l'utente non ha alcun conto cash.
+     */
+    public static function defaultCashFor(int $userId): ?array
+    {
+        $stmt = Database::pdo()->prepare(
+            'SELECT id, user_id, name, type, color, icon, opening_balance,
+                    archived, is_default_cash, sort_order
+             FROM accounts
+             WHERE user_id = ? AND type = \'cash\'
+             ORDER BY is_default_cash DESC, sort_order ASC, id ASC
+             LIMIT 1'
+        );
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+        return $row === false ? null : $row;
+    }
+
+    /**
+     * Garantisce l'esistenza di un conto cassa per l'utente. Se manca,
+     * crea "In tasca" (verde, icona wallet2) e lo marca default.
+     * Ritorna l'id del conto cassa (esistente o appena creato).
+     */
+    public static function ensureDefaultCash(int $userId): int
+    {
+        $existing = self::defaultCashFor($userId);
+        if ($existing !== null) {
+            return (int) $existing['id'];
+        }
+        return self::create(
+            $userId, 'In tasca', 'cash', '#20c997',
+            'wallet2', '0.00', 50, [], true
+        );
+    }
+
+    /**
+     * Lookup case-insensitive per nome; se non esiste lo crea con i
+     * parametri forniti. Sostituisce il vecchio resolvePrepaidAccount
+     * di BankStatementImporter rendendo il pattern riusabile.
+     */
+    public static function findOrCreateByName(
+        int $userId, string $name, string $type,
+        string $color, string $icon, int $sortOrder = 100
+    ): int {
+        $needle = mb_strtolower($name);
+        foreach (self::allForUser($userId, true) as $a) {
+            if (mb_strtolower((string) $a['name']) === $needle) {
+                return (int) $a['id'];
+            }
+        }
+        return self::create($userId, $name, $type, $color, $icon, '0.00', $sortOrder);
     }
 
     /** @return array<int, array<string,mixed>> */
@@ -90,30 +145,43 @@ final class Account
     public static function create(
         int $userId, string $name, string $type, string $color,
         ?string $icon, string|float $openingBalance, int $sortOrder = 0,
-        array $details = []
+        array $details = [], bool $isDefaultCash = false
     ): int {
-        $row     = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder);
+        $row     = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder, $isDefaultCash);
         $details = self::normalizeDetails($details);
+        $pdo     = Database::pdo();
+        $pdo->beginTransaction();
         try {
-            $stmt = Database::pdo()->prepare(
+            $stmt = $pdo->prepare(
                 'INSERT INTO accounts
                     (user_id, name, type, color, icon, opening_balance, sort_order,
-                     iban, bic, bank_name, account_holder, account_number, notes)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                     iban, bic, bank_name, account_holder, account_number, notes,
+                     is_default_cash)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $userId, $row['name'], $row['type'], $row['color'], $row['icon'],
                 $row['opening_balance'], $row['sort_order'],
                 $details['iban'], $details['bic'], $details['bank_name'],
                 $details['account_holder'], $details['account_number'], $details['notes'],
+                $isDefaultCash ? 1 : 0,
             ]);
+            $newId = (int) $pdo->lastInsertId();
+            if ($isDefaultCash) {
+                self::clearOtherDefaultCash($userId, $newId);
+            }
+            $pdo->commit();
+            return $newId;
         } catch (PDOException $e) {
+            $pdo->rollBack();
             if ($e->getCode() === '23000') {
                 throw new RuntimeException("Esiste gia' un conto '{$row['name']}'.");
             }
             throw $e;
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
         }
-        return (int) Database::pdo()->lastInsertId();
     }
 
     /**
@@ -122,17 +190,20 @@ final class Account
     public static function update(
         int $id, int $userId, string $name, string $type, string $color,
         ?string $icon, string|float $openingBalance, int $sortOrder = 0,
-        bool $archived = false, array $details = []
+        bool $archived = false, array $details = [], bool $isDefaultCash = false
     ): void {
-        $row     = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder);
+        $row     = self::validate($name, $type, $color, $icon, $openingBalance, $sortOrder, $isDefaultCash);
         $details = self::normalizeDetails($details);
+        $pdo     = Database::pdo();
+        $pdo->beginTransaction();
         try {
-            $stmt = Database::pdo()->prepare(
+            $stmt = $pdo->prepare(
                 'UPDATE accounts
                  SET name = ?, type = ?, color = ?, icon = ?,
                      opening_balance = ?, sort_order = ?, archived = ?,
                      iban = ?, bic = ?, bank_name = ?,
-                     account_holder = ?, account_number = ?, notes = ?
+                     account_holder = ?, account_number = ?, notes = ?,
+                     is_default_cash = ?
                  WHERE id = ? AND user_id = ?'
             );
             $stmt->execute([
@@ -140,14 +211,37 @@ final class Account
                 $row['opening_balance'], $row['sort_order'], $archived ? 1 : 0,
                 $details['iban'], $details['bic'], $details['bank_name'],
                 $details['account_holder'], $details['account_number'], $details['notes'],
+                $isDefaultCash ? 1 : 0,
                 $id, $userId,
             ]);
+            if ($isDefaultCash) {
+                self::clearOtherDefaultCash($userId, $id);
+            }
+            $pdo->commit();
         } catch (PDOException $e) {
+            $pdo->rollBack();
             if ($e->getCode() === '23000') {
                 throw new RuntimeException("Esiste gia' un conto '{$row['name']}'.");
             }
             throw $e;
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
         }
+    }
+
+    /**
+     * Toglie il flag is_default_cash da tutti i conti dell'utente
+     * tranne quello appena promosso. Garantisce l'unicita' del default
+     * (vincolo applicativo: MySQL non supporta UNIQUE parziali).
+     */
+    private static function clearOtherDefaultCash(int $userId, int $keepId): void
+    {
+        $stmt = Database::pdo()->prepare(
+            'UPDATE accounts SET is_default_cash = 0
+             WHERE user_id = ? AND id <> ? AND is_default_cash = 1'
+        );
+        $stmt->execute([$userId, $keepId]);
     }
 
     public static function delete(int $id, int $userId): void
@@ -161,7 +255,8 @@ final class Account
      */
     private static function validate(
         string $name, string $type, string $color, ?string $icon,
-        string|float $openingBalance, int $sortOrder
+        string|float $openingBalance, int $sortOrder,
+        bool $isDefaultCash = false
     ): array {
         $name = trim($name);
         if ($name === '' || mb_strlen($name) > 64) {
@@ -169,6 +264,11 @@ final class Account
         }
         if (!in_array($type, self::TYPES, true)) {
             throw new InvalidArgumentException('Tipo conto non valido.');
+        }
+        if ($isDefaultCash && $type !== 'cash') {
+            throw new InvalidArgumentException(
+                'Il flag "Conto cassa principale" e\' valido solo per conti di tipo Contanti.'
+            );
         }
         $color = trim($color);
         if ($color === '') $color = '#6c757d';

@@ -13,9 +13,10 @@ if (!Csrf::check()) {
     Json::error('Token CSRF non valido.', Json::ERR_CSRF, 403);
 }
 
-$userId    = (int) Auth::userId();
-$accountId = (int) ($_POST['account_id'] ?? 0);
-$pair      = (bool) (int) ($_POST['auto_pair_ricariche'] ?? 1);
+$userId        = (int) Auth::userId();
+$accountId     = (int) ($_POST['account_id'] ?? 0);
+$pairRicariche = (bool) (int) ($_POST['auto_pair_ricariche'] ?? 1);
+$pairPrelievi  = (bool) (int) ($_POST['auto_pair_prelievi']  ?? 1);
 
 if ($accountId <= 0) {
     Json::error('Seleziona il conto su cui importare i movimenti.', Json::ERR_VALIDATION, 400);
@@ -33,7 +34,7 @@ if (!preg_match('/\.csv$/i', $origName)) {
 }
 
 try {
-    $result = BankStatementImporter::preview($userId, $accountId, $tmpPath, $pair);
+    $result = BankStatementImporter::preview($userId, $accountId, $tmpPath, $pairRicariche, $pairPrelievi);
 } catch (InvalidArgumentException $e) {
     Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);
 } catch (Throwable $e) {

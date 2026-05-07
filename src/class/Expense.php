@@ -416,17 +416,32 @@ final class Expense
             }
         }
 
+        $accountType = null;
         if ($accountId !== null) {
             if ($accountId <= 0) {
                 $accountId = null;
             } else {
                 $check = Database::pdo()->prepare(
-                    'SELECT 1 FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
+                    'SELECT type FROM accounts WHERE id = ? AND user_id = ? LIMIT 1'
                 );
                 $check->execute([$accountId, $userId]);
-                if ($check->fetchColumn() === false) {
+                $accountType = $check->fetchColumn();
+                if ($accountType === false) {
                     throw new InvalidArgumentException('Conto non trovato.');
                 }
+            }
+        }
+
+        if ($paymentMethod === 'cash') {
+            if ($accountId === null) {
+                throw new InvalidArgumentException(
+                    'Per i pagamenti in contanti devi selezionare un conto cassa.'
+                );
+            }
+            if ($accountType !== 'cash') {
+                throw new InvalidArgumentException(
+                    'Il conto selezionato non e\' un conto cassa: scegli "In tasca" o un altro conto Contanti.'
+                );
             }
         }
 

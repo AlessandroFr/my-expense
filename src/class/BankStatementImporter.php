@@ -32,6 +32,7 @@ final class BankStatementImporter
     public const KIND_EXPENSE       = 'expense';
     public const KIND_INCOME        = 'income';
     public const KIND_TRANSFER_PAIR = 'transfer_pair';
+    public const KIND_ATM_PAIR      = 'atm_pair';
 
     /** @var array<int,string> MCC -> categoria suggerita */
     private const MCC_MAP = [
@@ -86,7 +87,8 @@ final class BankStatementImporter
         int $userId,
         int $accountId,
         string $tmpPath,
-        bool $autoPairRicariche = true
+        bool $autoPairRicariche = true,
+        bool $autoPairPrelievi = true
     ): array {
         if (!is_uploaded_file($tmpPath) && !is_file($tmpPath)) {
             throw new InvalidArgumentException('File non valido.');
@@ -185,9 +187,16 @@ final class BankStatementImporter
                     && stripos($tipologia, 'Ricariche') !== false
                     && stripos($descrizione, 'RICARICA/RIMBORSO') !== false;
 
-                $kind = $isPrepaidRecharge && $autoPairRicariche
-                    ? self::KIND_TRANSFER_PAIR
-                    : ($isExpense ? self::KIND_EXPENSE : self::KIND_INCOME);
+                $isAtmWithdrawal = $isExpense
+                    && stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false;
+
+                if ($isPrepaidRecharge && $autoPairRicariche) {
+                    $kind = self::KIND_TRANSFER_PAIR;
+                } elseif ($isAtmWithdrawal && $autoPairPrelievi) {
+                    $kind = self::KIND_ATM_PAIR;
+                } else {
+                    $kind = $isExpense ? self::KIND_EXPENSE : self::KIND_INCOME;
+                }
 
                 $signed = $isExpense ? -$amount : $amount;
                 $hash   = self::computeImportHash($accountId, $opDate, $signed, $descrizione);
@@ -209,16 +218,20 @@ final class BankStatementImporter
                     'payment_method'     => null,
                 ];
 
-                if ($kind === self::KIND_EXPENSE || $kind === self::KIND_TRANSFER_PAIR) {
+                if ($kind === self::KIND_EXPENSE || $kind === self::KIND_TRANSFER_PAIR || $kind === self::KIND_ATM_PAIR) {
                     if ($kind === self::KIND_TRANSFER_PAIR) {
                         $catName = 'Trasferimenti interni';
+                    } elseif ($kind === self::KIND_ATM_PAIR) {
+                        $catName = 'Prelievo contante';
                     } else {
                         $cls     = self::classifyExpense($tipologia, $descrizione);
                         $catName = $cls['category'];
                     }
                     $row['category_suggested'] = $catName;
                     $row['category_id']        = $ensureCategory($catName);
-                    $row['payment_method']     = self::guessPaymentMethod($tipologia, $descrizione);
+                    $row['payment_method']     = $kind === self::KIND_ATM_PAIR
+                        ? 'cash'
+                        : self::guessPaymentMethod($tipologia, $descrizione);
                 } else {
                     $row['source']         = self::classifyIncomeSource($tipologia, $descrizione);
                     $row['payment_method'] = self::guessIncomePaymentMethod($tipologia, $descrizione);
@@ -279,6 +292,7 @@ final class BankStatementImporter
         $errors      = [];
 
         $prepaidAccountId = null;
+        $cashAccountId    = null;
 
         foreach ($rows as $rowIn) {
             $idx = (int) ($rowIn['idx'] ?? -1);
@@ -293,7 +307,7 @@ final class BankStatementImporter
                 $description = trim((string) ($rowIn['description'] ?? ''));
                 $amount      = self::ensurePositiveAmount($rowIn['amount'] ?? 0);
 
-                if (!in_array($kind, [self::KIND_EXPENSE, self::KIND_INCOME, self::KIND_TRANSFER_PAIR], true)) {
+                if (!in_array($kind, [self::KIND_EXPENSE, self::KIND_INCOME, self::KIND_TRANSFER_PAIR, self::KIND_ATM_PAIR], true)) {
                     throw new InvalidArgumentException('Tipo riga non valido.');
                 }
 
@@ -324,6 +338,47 @@ final class BankStatementImporter
                         $userId, 'Trasferimento da conto',
                         'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
                         (string) $amount, $opDate, $prepaidAccountId, $valueDate, $incHash, 'transfer'
+                    );
+                    if ($expId === null && $incId === null) {
+                        $dupCnt++;
+                    } else {
+                        $pairedCnt++;
+                        $importedExp += ($expId !== null ? 1 : 0);
+                        $importedInc += ($incId !== null ? 1 : 0);
+                    }
+                    continue;
+                }
+
+                if ($kind === self::KIND_ATM_PAIR) {
+                    if ($cashAccountId === null) {
+                        $cashAccountId = Account::ensureDefaultCash($userId);
+                    }
+                    if ($cashAccountId === $accountId) {
+                        throw new InvalidArgumentException(
+                            'Il conto sorgente coincide con la cassa contanti: impossibile fare partita doppia.'
+                        );
+                    }
+                    $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
+                        ? (int) $rowIn['category_id']
+                        : null;
+
+                    $cashAccount = Account::findForUser($cashAccountId, $userId);
+                    $cashName    = (string) ($cashAccount['name'] ?? 'In tasca');
+
+                    $signed   = -$amount;
+                    $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
+                    $expHash  = $baseHash . ':exp-atm';
+                    $incHash  = $baseHash . ':inc-atm';
+
+                    $expId = Expense::createImported(
+                        $userId, $catId, (string) $amount,
+                        'Prelievo ATM → ' . $cashName,
+                        'transfer', $opDate, $accountId, $valueDate, $expHash
+                    );
+                    $incId = Income::createImported(
+                        $userId, 'Prelievo ATM',
+                        'Prelievo da ' . (string) ($sourceAccount['name'] ?? 'conto'),
+                        (string) $amount, $opDate, $cashAccountId, $valueDate, $incHash, 'cash'
                     );
                     if ($expId === null && $incId === null) {
                         $dupCnt++;
@@ -581,11 +636,6 @@ final class BankStatementImporter
 
     private static function resolvePrepaidAccount(int $userId, string $name): int
     {
-        foreach (Account::allForUser($userId, true) as $a) {
-            if (mb_strtolower((string) $a['name']) === mb_strtolower($name)) {
-                return (int) $a['id'];
-            }
-        }
-        return Account::create($userId, $name, 'card', '#9c27b0', 'credit-card', '0.00', 100);
+        return Account::findOrCreateByName($userId, $name, 'card', '#9c27b0', 'credit-card', 100);
     }
 }

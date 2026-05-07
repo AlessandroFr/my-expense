@@ -423,9 +423,30 @@ function wireFilters() {
     });
 }
 
+function setupCashPreselect(form) {
+    const paySel = form.elements['payment_method'];
+    const accSel = form.elements['account_id'];
+    if (!paySel || !accSel) return;
+    const defaultCashId = form.dataset.defaultCashId ?? '';
+    paySel.addEventListener('change', () => {
+        if (paySel.value !== 'cash') return;
+        const cur = accSel.options[accSel.selectedIndex];
+        const curIsCash = cur && cur.dataset.type === 'cash';
+        if (curIsCash) return;
+        if (defaultCashId !== '') {
+            accSel.value = defaultCashId;
+            return;
+        }
+        const firstCash = [...accSel.options].find(o => o.dataset.type === 'cash');
+        if (firstCash) accSel.value = firstCash.value;
+    });
+}
+
 function wireCreateForm() {
     const form = document.getElementById('expense-create-form');
     if (!form) return;
+
+    setupCashPreselect(form);
 
     form.addEventListener('submit', async (ev) => {
         ev.preventDefault();

@@ -32,6 +32,7 @@ try {
             'account_number' => (string) ($_POST['account_number'] ?? ''),
             'notes'          => (string) ($_POST['notes']          ?? ''),
         ],
+        !empty($_POST['is_default_cash']),
     );
 } catch (Throwable $e) {
     Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);

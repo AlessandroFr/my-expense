@@ -174,6 +174,10 @@ CREATE TABLE IF NOT EXISTS `expense_attachments` (
 -- ── Multi-conto ──────────────────────────────────────────────────────────────
 -- Migration: 008_accounts.sql (+ ALTER su expenses/incomes/recurring per account_id)
 -- Migration: 012_accounts_bank_details.sql (IBAN/BIC/banca/intestatario + tipo investment)
+-- Migration: 015_cash_account.sql (flag is_default_cash per il conto cassa
+--   "In tasca": riceve i pagamenti contanti e i prelievi bancomat in
+--   partita doppia. Vincoli applicativi nel codice PHP: max 1 default per
+--   user, valido solo se type='cash'.)
 CREATE TABLE IF NOT EXISTS `accounts` (
     `id`              INT UNSIGNED   NOT NULL AUTO_INCREMENT,
     `user_id`         INT UNSIGNED   NOT NULL,
@@ -189,6 +193,7 @@ CREATE TABLE IF NOT EXISTS `accounts` (
     `account_number`  VARCHAR(64)    NULL,
     `notes`           VARCHAR(255)   NULL,
     `archived`        TINYINT(1)     NOT NULL DEFAULT 0,
+    `is_default_cash` TINYINT(1)     NOT NULL DEFAULT 0,
     `sort_order`      INT            NOT NULL DEFAULT 0,
     `created_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
