@@ -36,6 +36,15 @@ function contrastText(hex) {
     return L > 0.55 ? '#1B1B2F' : '#FFFFFF';
 }
 
+// Estrae il testo "puro" da un valore description che ora puo' contenere HTML
+// (output TinyMCE). Usato per la cella compatta della tabella e per i title=.
+function htmlToPlain(html) {
+    if (!html) return '';
+    const d = document.createElement('div');
+    d.innerHTML = String(html);
+    return (d.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 function accountCell(it) {
     if (!it.account_id) return '<span class="text-muted">—</span>';
     const color = it.account_color || '#6c757d';
@@ -76,9 +85,9 @@ function debounce(fn, ms) {
 
 function renderRow(it) {
     const detailId = `income-detail-${it.id}`;
-    const descRaw = it.description ?? '';
-    const descCell = descRaw
-        ? `<div class="text-truncate" title="${escapeAttr(descRaw)}">${escapeHtml(descRaw)}</div>`
+    const descPlain = htmlToPlain(it.description ?? '');
+    const descCell = descPlain
+        ? `<div class="text-truncate" title="${escapeAttr(descPlain)}">${escapeHtml(descPlain)}</div>`
         : `<div class="text-truncate text-muted">—</div>`;
     return `
         <tr data-id="${it.id}">
@@ -116,7 +125,8 @@ function renderRow(it) {
 function renderDetailRow(it, detailId) {
     let parts = '';
     if (it.description) {
-        parts += `<dt>Descrizione</dt><dd>${escapeHtml(it.description)}</dd>`;
+        // description e' HTML (TinyMCE); rendering diretto.
+        parts += `<dt>Descrizione</dt><dd><div class="mx-rich-content">${it.description}</div></dd>`;
     } else {
         parts += `<dt>Descrizione</dt><dd><span class="text-muted">Nessuna descrizione</span></dd>`;
     }
@@ -161,7 +171,7 @@ function openEditModal(id) {
     form.elements['amount'].value      = it.amount ?? '';
     form.elements['source'].value      = it.source ?? '';
     form.elements['account_id'].value  = it.account_id != null ? String(it.account_id) : '';
-    form.elements['description'].value = it.description ?? '';
+    window.MxRichEditor?.setContent('income-edit-description', it.description ?? '');
     m.show();
 }
 
@@ -171,6 +181,7 @@ async function onEditFormSubmit(ev) {
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     try {
+        window.MxRichEditor?.flush();
         const fd = new FormData(form);
         const payload = {
             id:          fd.get('id'),
@@ -265,6 +276,7 @@ resetBtn.addEventListener('click', () => { filtersForm.reset(); applyFilters(); 
 
 createForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
+    window.MxRichEditor?.flush();
     const fd = new FormData(createForm);
     const optimisticIt = {
         id: 'pending-' + Date.now(),
@@ -289,6 +301,7 @@ createForm.addEventListener('submit', async (ev) => {
         });
         toast.success('Entrata aggiunta.');
         createForm.reset();
+        window.MxRichEditor?.setContent('income-create-description', '');
         createForm.querySelector('input[name="income_date"]').value = new Date().toISOString().slice(0, 10);
         applyFilters(); // torna a pagina 1 cosi' la nuova entrata e' visibile in cima
     } catch { /* toast already shown */ }

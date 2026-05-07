@@ -48,6 +48,16 @@ function escHtml(s) {
     return d.innerHTML;
 }
 
+// Estrae il testo "puro" da un valore description che ora puo' contenere HTML
+// (output TinyMCE). Usato per la cella compatta della tabella e per gli
+// attributi title=.
+function htmlToPlain(html) {
+    if (!html) return '';
+    const d = document.createElement('div');
+    d.innerHTML = String(html);
+    return (d.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 function getCsrfToken() {
     const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : '';
@@ -188,9 +198,9 @@ function renderViewRow(e) {
     tr.dataset.id = String(e.id);
     tr.dataset.expense = JSON.stringify(rowDataFromExpense(e));
     const detailId = detailIdFor(e);
-    const desc = e.description ?? '';
-    const descCell = desc
-        ? `<div class="text-truncate" title="${escHtml(desc)}">${escHtml(desc)}</div>`
+    const descPlain = htmlToPlain(e.description ?? '');
+    const descCell = descPlain
+        ? `<div class="text-truncate" title="${escHtml(descPlain)}">${escHtml(descPlain)}</div>`
         : `<div class="text-truncate text-muted">—</div>`;
     const tagCount = (e.tags ?? []).length;
     const tagBadge = tagCount > 0
@@ -236,8 +246,10 @@ function renderDetailRow(e) {
     tr.classList.add('mx-detail-row', 'd-none');
     tr.dataset.detailFor = String(e.id);
 
+    // description e' HTML (TinyMCE); rendering diretto. La whitelist
+    // valid_elements di TinyMCE filtra script/handler pericolosi lato editor.
     const desc = e.description
-        ? escHtml(e.description)
+        ? `<div class="mx-rich-content">${e.description}</div>`
         : '<span class="text-muted">Nessuna descrizione</span>';
     const tagsContent = (e.tags && e.tags.length)
         ? tagsCell(e.tags)
@@ -312,7 +324,7 @@ function openEditModal(tr) {
     form.elements['payment_method'].value = e.payment_method ?? 'card';
     form.elements['category_id'].value    = e.category_id != null ? String(e.category_id) : '';
     form.elements['account_id'].value     = e.account_id  != null ? String(e.account_id)  : '';
-    form.elements['description'].value    = e.description ?? '';
+    window.MxRichEditor?.setContent('expense-edit-description', e.description ?? '');
     form.elements['tags'].value           = (e.tags ?? []).map(t => t.name).join(', ');
     form.elements['shared_with'].value    = e.shared_with ?? '';
     form.elements['share_amount'].value   = e.share_amount ?? '';
@@ -325,6 +337,7 @@ async function onEditFormSubmit(ev) {
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     try {
+        window.MxRichEditor?.flush();
         const fd = new FormData(form);
         const id = String(fd.get('id') ?? editModalCurrentId ?? '');
         const tagsCsv = String(fd.get('tags') ?? '');
@@ -522,6 +535,7 @@ function wireCreateForm() {
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         try {
+            window.MxRichEditor?.flush();
             const params = new URLSearchParams(new FormData(form));
             params.set('_csrf', getCsrfToken());
 
@@ -571,6 +585,7 @@ function wireCreateForm() {
             updateTotalFromTable();
 
             form.reset();
+            window.MxRichEditor?.setContent('expense-create-description', '');
             const dateEl = form.querySelector('input[name="expense_date"]');
             if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
 

@@ -259,7 +259,7 @@ $paymentLabels  = [
                     </div>
                     <div class="col-12">
                         <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
-                        <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
+                        <textarea id="expense-create-description" name="description" class="form-control mx-rich-editor" rows="3" maxlength="2048" placeholder="es. Pranzo bar"></textarea>
                     </div>
                     <div class="col-12">
                         <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
@@ -456,7 +456,7 @@ $paymentLabels  = [
                         </div>
                         <div class="col-12">
                             <label class="form-label small">Descrizione</label>
-                            <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
+                            <textarea id="expense-edit-description" name="description" class="form-control mx-rich-editor" rows="4" maxlength="2048" placeholder="es. Pranzo bar"></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label small">Tag <span class="text-muted">(separati da virgola)</span></label>

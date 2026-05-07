@@ -726,6 +726,21 @@ main.container { padding-bottom: 4rem; }
     line-height: 1;
 }
 .mx-account-badge .bi { font-size: 0.85em; }
+
+/* ── Rich content rendering (descrizioni HTML da TinyMCE) ──────────────── */
+.mx-rich-content { font-size: 0.9rem; }
+.mx-rich-content p { margin: 0 0 0.4rem; }
+.mx-rich-content p:last-child { margin-bottom: 0; }
+.mx-rich-content ul, .mx-rich-content ol { margin: 0 0 0.4rem 1.25rem; padding: 0; }
+.mx-rich-content a { color: var(--bs-primary); }
+.mx-rich-content code, .mx-rich-content pre {
+    background: var(--bs-tertiary-bg, var(--mx-line-2));
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+/* z-index TinyMCE sopra modal Bootstrap (modal-backdrop=1050, modal=1055) */
+.tox-tinymce-aux { z-index: 1100 !important; }
 .mx-detail-row > td {
     background: var(--bs-tertiary-bg, var(--mx-line-2));
     padding: 0.75rem 1rem 1rem !important;

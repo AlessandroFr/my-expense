@@ -302,8 +302,8 @@ final class Income
 
         $description = $description === null ? null : trim($description);
         if ($description === '') $description = null;
-        if ($description !== null && mb_strlen($description) > 512) {
-            throw new InvalidArgumentException('Descrizione troppo lunga (max 512 caratteri).');
+        if ($description !== null && mb_strlen($description) > 8192) {
+            throw new InvalidArgumentException('Descrizione troppo lunga (max 8192 caratteri).');
         }
 
         return [

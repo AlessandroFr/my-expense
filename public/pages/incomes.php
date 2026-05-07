@@ -64,7 +64,7 @@ $accounts = Account::allForUser($userId, false);
                     </div>
                     <div class="col-12">
                         <label class="form-label small mb-1">Descrizione</label>
-                        <input type="text" name="description" class="form-control" maxlength="512" placeholder="Note opzionali">
+                        <textarea id="income-create-description" name="description" class="form-control mx-rich-editor" rows="3" maxlength="2048" placeholder="Note opzionali"></textarea>
                     </div>
                     <div class="col-12 d-grid">
                         <button type="submit" class="btn btn-success">
@@ -187,7 +187,7 @@ $accounts = Account::allForUser($userId, false);
                         </div>
                         <div class="col-12">
                             <label class="form-label small">Descrizione</label>
-                            <input type="text" name="description" class="form-control" maxlength="512" placeholder="Note opzionali">
+                            <textarea id="income-edit-description" name="description" class="form-control mx-rich-editor" rows="4" maxlength="2048" placeholder="Note opzionali"></textarea>
                         </div>
                     </div>
                 </div>
