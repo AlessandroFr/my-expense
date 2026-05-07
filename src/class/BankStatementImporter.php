@@ -702,8 +702,19 @@ final class BankStatementImporter
         if ($desc === '') return null;
 
         if ($kind === 'income') {
-            // "BONIFICO DA NOME COGNOME NOTE: ..." → "Nome Cognome"
-            if (preg_match('/\bDA\s+([A-Z][A-Z\s\.\']+?)(?:\s+NOTE:|\s+VAL\.|\s+DATA|\s+CRO|$)/u', $desc, $m)) {
+            // Pattern dei bonifici ricevuti — il nome del cliente / pagatore
+            // viene preceduto da uno di questi prefissi verbatim:
+            //   "DA"                 → BONIFICO DA NOME COGNOME …
+            //   "VS. FAVORE"         → DISPOSIZIONE VS. FAVORE NOME COGNOME …
+            //   "A FAVORE DI"        → BONIFICO A FAVORE DI NOME COGNOME …
+            //   "VOSTRA DISPOSIZIONE"→ VOSTRA DISPOSIZIONE NOME COGNOME …
+            // (il prefisso e' SOLO verbatim e non fa parte del nome estratto)
+            if (preg_match(
+                '/\b(?:VS\.?\s*FAVORE|A\s+FAVORE\s+DI|VOSTRA\s+DISPOSIZIONE|DA)\s+'
+                . '([A-Z][A-Z\s\.\']+?)'
+                . '(?:\s+VAL\.|\s+COD\.|\s+CRO|\s+NOTE:|\s+DATA|\s+IT\d{2}|$)/u',
+                $desc, $m
+            )) {
                 return self::cleanupCounterpartyName($m[1]);
             }
             return null;
