@@ -59,7 +59,15 @@ const resetBtn    = document.getElementById('income-filters-reset');
 let editingId = null;
 let cache     = [];
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
+const PAGE_SIZE_STORAGE_KEY = 'mx-incomes-page-size';
+function loadStoredPageSize() {
+    try {
+        const v = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY));
+        return PAGE_SIZE_OPTIONS.includes(v) ? v : 25;
+    } catch { return 25; }
+}
+let PAGE_SIZE   = loadStoredPageSize();
 let pageOffset  = 0;
 
 function debounce(fn, ms) {
@@ -90,9 +98,17 @@ function renderRow(it) {
             <td class="text-nowrap"><span class="badge bg-success-subtle text-success-emphasis">${escapeHtml(it.source)}</span></td>
             <td class="mx-cell-truncate">${descCell}</td>
             <td class="text-end fw-semibold text-success text-nowrap">${fmtMoney(it.amount)}</td>
-            <td class="text-end text-nowrap">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit"  data-id="${it.id}"><i class="bi bi-pencil"></i></button>
-                <button type="button" class="btn btn-sm btn-outline-danger"    data-action="delete" data-id="${it.id}"><i class="bi bi-trash"></i></button>
+            <td class="text-end mx-row-actions">
+                <div class="dropdown">
+                    <button type="button" class="btn btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Azioni">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><button type="button" class="dropdown-item" data-action="edit" data-id="${it.id}"><i class="bi bi-pencil me-2"></i>Modifica</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button type="button" class="dropdown-item text-danger" data-action="delete" data-id="${it.id}"><i class="bi bi-trash me-2"></i>Elimina</button></li>
+                    </ul>
+                </div>
             </td>
         </tr>
         ${renderDetailRow(it, detailId)}`;
@@ -193,7 +209,14 @@ async function loadList() {
         renderPager(document.getElementById('income-pager'), {
             total, limit: PAGE_SIZE, offset: pageOffset,
             label: 'Entrate',
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
             onChange: (newOffset) => { pageOffset = newOffset; loadList(); },
+            onLimitChange: (newLimit) => {
+                PAGE_SIZE  = newLimit;
+                pageOffset = 0;
+                try { localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(newLimit)); } catch {}
+                loadList();
+            },
         });
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento entrate.');

@@ -196,25 +196,23 @@ $paymentLabels  = [
 
 <!-- ── Aside con tabs ───────────────────────────────────────────────────── -->
 <div class="card shadow-sm">
-    <div class="card-header p-0 bg-transparent border-bottom-0">
-        <ul class="nav nav-tabs nav-fill mx-aside-tabs" id="expenses-aside-tabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="tab-new-tab" data-bs-toggle="tab" data-bs-target="#tab-new" type="button" role="tab" aria-controls="tab-new" aria-selected="true">
-                    <i class="bi bi-plus-circle me-1"></i>Nuova
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tab-filters-tab" data-bs-toggle="tab" data-bs-target="#tab-filters" type="button" role="tab" aria-controls="tab-filters" aria-selected="false">
-                    <i class="bi bi-funnel me-1"></i>Filtri
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tab-tools-tab" data-bs-toggle="tab" data-bs-target="#tab-tools" type="button" role="tab" aria-controls="tab-tools" aria-selected="false">
-                    <i class="bi bi-tools me-1"></i>Strumenti
-                </button>
-            </li>
-        </ul>
-    </div>
+    <ul class="nav nav-fill mx-aside-tabs" id="expenses-aside-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-new-tab" data-bs-toggle="tab" data-bs-target="#tab-new" type="button" role="tab" aria-controls="tab-new" aria-selected="true" title="Nuova spesa">
+                <i class="bi bi-plus-circle"></i><span class="mx-tab-label">Nuova</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-filters-tab" data-bs-toggle="tab" data-bs-target="#tab-filters" type="button" role="tab" aria-controls="tab-filters" aria-selected="false" title="Filtri">
+                <i class="bi bi-funnel"></i><span class="mx-tab-label">Filtri</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-tools-tab" data-bs-toggle="tab" data-bs-target="#tab-tools" type="button" role="tab" aria-controls="tab-tools" aria-selected="false" title="Strumenti">
+                <i class="bi bi-tools"></i><span class="mx-tab-label">Strumenti</span>
+            </button>
+        </li>
+    </ul>
     <div class="card-body">
         <div class="tab-content">
 

@@ -9,7 +9,8 @@
 /**
  * Renderizza il pager dentro `node` (con info "righe X-Y di Z" + bottoni numerici).
  * @param {HTMLElement} node container
- * @param {{total:number, limit:number, offset:number, onChange:(newOffset:number)=>void, label?:string}} opts
+ * @param {{total:number, limit:number, offset:number, onChange:(newOffset:number)=>void,
+ *          label?:string, pageSizeOptions?:number[], onLimitChange?:(newLimit:number)=>void}} opts
  */
 export function renderPager(node, opts) {
     if (!node) return;
@@ -17,6 +18,7 @@ export function renderPager(node, opts) {
     const limit  = Math.max(1, Number(opts.limit)  || 25);
     const offset = Math.max(0, Number(opts.offset) || 0);
     const label  = opts.label ?? 'righe';
+    const sizeOpts = Array.isArray(opts.pageSizeOptions) ? opts.pageSizeOptions : null;
 
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const curPage    = Math.min(totalPages, Math.floor(offset / limit) + 1);
@@ -24,14 +26,43 @@ export function renderPager(node, opts) {
     const end        = Math.min(total, offset + limit);
 
     if (!node.querySelector('.pager-info')) {
-        node.classList.add('d-flex', 'justify-content-between', 'align-items-center', 'small');
+        node.classList.add('d-flex', 'flex-wrap', 'justify-content-between', 'align-items-center', 'gap-2', 'small');
         node.innerHTML = `
             <div class="pager-info text-muted"></div>
-            <ul class="pagination pagination-sm mb-0 pager-list"></ul>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <label class="pager-size-wrap d-none align-items-center gap-1 text-muted small mb-0">
+                    <span>Mostra</span>
+                    <select class="form-select form-select-sm pager-size" style="width:auto"></select>
+                </label>
+                <ul class="pagination pagination-sm mb-0 pager-list"></ul>
+            </div>
         `;
     }
     const info = node.querySelector('.pager-info');
     const list = node.querySelector('.pager-list');
+    const sizeWrap = node.querySelector('.pager-size-wrap');
+    const sizeSel  = node.querySelector('.pager-size');
+
+    if (sizeOpts && sizeSel && sizeWrap) {
+        sizeWrap.classList.remove('d-none');
+        sizeWrap.classList.add('d-inline-flex');
+        const sig = sizeOpts.join(',') + '|' + limit;
+        if (sizeSel.dataset.sig !== sig) {
+            sizeSel.innerHTML = sizeOpts.map(n =>
+                `<option value="${n}"${n === limit ? ' selected' : ''}>${n}</option>`
+            ).join('');
+            sizeSel.dataset.sig = sig;
+        }
+        if (sizeSel.__pagerSizeHandler) sizeSel.removeEventListener('change', sizeSel.__pagerSizeHandler);
+        sizeSel.__pagerSizeHandler = () => {
+            const n = Number(sizeSel.value);
+            if (Number.isFinite(n) && n > 0) opts.onLimitChange?.(n);
+        };
+        sizeSel.addEventListener('change', sizeSel.__pagerSizeHandler);
+    } else if (sizeWrap) {
+        sizeWrap.classList.add('d-none');
+        sizeWrap.classList.remove('d-inline-flex');
+    }
 
     info.textContent = total === 0
         ? `Nessuna riga`

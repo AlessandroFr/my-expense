@@ -29,7 +29,15 @@ let allTags     = [];   // tutti i tag dell'utente {id, name, color}
 let lastFilters = {};
 
 // Paginazione server-side: i filtri resettano page=1; il pager modifica solo offset.
-const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
+const PAGE_SIZE_STORAGE_KEY = 'mx-expenses-page-size';
+function loadStoredPageSize() {
+    try {
+        const v = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY));
+        return PAGE_SIZE_OPTIONS.includes(v) ? v : 25;
+    } catch { return 25; }
+}
+let PAGE_SIZE   = loadStoredPageSize();
 let pageOffset  = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -206,10 +214,18 @@ function renderViewRow(e) {
         <td class="text-center">${tagBadge}</td>
         <td class="text-center"><i class="bi ${paymentIcon(e.payment_method)}" title="${escHtml(payLabel)}"></i></td>
         <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}</td>
-        <td class="text-end text-nowrap">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="attach" title="Allegati"><i class="bi bi-paperclip"></i></button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit"><i class="bi bi-pencil"></i></button>
-            <button type="button" class="btn btn-sm btn-outline-danger"    data-action="delete"><i class="bi bi-trash"></i></button>
+        <td class="text-end mx-row-actions">
+            <div class="dropdown">
+                <button type="button" class="btn btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Azioni">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                    <li><button type="button" class="dropdown-item" data-action="edit"><i class="bi bi-pencil me-2"></i>Modifica</button></li>
+                    <li><button type="button" class="dropdown-item" data-action="attach"><i class="bi bi-paperclip me-2"></i>Allegati</button></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button type="button" class="dropdown-item text-danger" data-action="delete"><i class="bi bi-trash me-2"></i>Elimina</button></li>
+                </ul>
+            </div>
         </td>`;
     return tr;
 }
@@ -294,9 +310,9 @@ function replaceWithEditRow(tr) {
             <input type="number" name="amount"       class="form-control form-control-sm text-end mb-1" step="0.01" min="0.01" required value="${escHtml(e.amount)}" title="Totale">
             <input type="number" name="share_amount" class="form-control form-control-sm text-end" step="0.01" min="0.01" placeholder="tua quota" value="${escHtml(e.share_amount ?? '')}" title="La tua quota">
         </td>
-        <td class="text-end text-nowrap">
-            <button type="button" class="btn btn-sm btn-success" data-action="save"><i class="bi bi-check-lg"></i></button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="cancel"><i class="bi bi-x-lg"></i></button>
+        <td class="text-end mx-row-actions">
+            <button type="button" class="btn btn-sm btn-success" data-action="save" title="Salva"><i class="bi bi-check-lg"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="cancel" title="Annulla"><i class="bi bi-x-lg"></i></button>
         </td>`;
     tr.replaceWith(edit);
 }
@@ -350,7 +366,14 @@ async function loadList() {
         renderPager(document.getElementById('expenses-pager'), {
             total, limit: PAGE_SIZE, offset: pageOffset,
             label: 'Spese',
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
             onChange: (newOffset) => { pageOffset = newOffset; loadList(); },
+            onLimitChange: (newLimit) => {
+                PAGE_SIZE  = newLimit;
+                pageOffset = 0;
+                try { localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(newLimit)); } catch {}
+                loadList();
+            },
         });
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">

@@ -22,20 +22,18 @@ $accounts = Account::allForUser($userId, false);
 <aside class="col-12 col-lg-5 col-xl-4">
 
 <div class="card shadow-sm">
-    <div class="card-header p-0 bg-transparent border-bottom-0">
-        <ul class="nav nav-tabs nav-fill mx-aside-tabs" id="incomes-aside-tabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="inc-tab-new-tab" data-bs-toggle="tab" data-bs-target="#inc-tab-new" type="button" role="tab" aria-controls="inc-tab-new" aria-selected="true">
-                    <i class="bi bi-plus-circle me-1"></i>Nuova
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="inc-tab-filters-tab" data-bs-toggle="tab" data-bs-target="#inc-tab-filters" type="button" role="tab" aria-controls="inc-tab-filters" aria-selected="false">
-                    <i class="bi bi-funnel me-1"></i>Filtri
-                </button>
-            </li>
-        </ul>
-    </div>
+    <ul class="nav nav-fill mx-aside-tabs" id="incomes-aside-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="inc-tab-new-tab" data-bs-toggle="tab" data-bs-target="#inc-tab-new" type="button" role="tab" aria-controls="inc-tab-new" aria-selected="true" title="Nuova entrata">
+                <i class="bi bi-plus-circle"></i><span class="mx-tab-label">Nuova</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="inc-tab-filters-tab" data-bs-toggle="tab" data-bs-target="#inc-tab-filters" type="button" role="tab" aria-controls="inc-tab-filters" aria-selected="false" title="Filtri">
+                <i class="bi bi-funnel"></i><span class="mx-tab-label">Filtri</span>
+            </button>
+        </li>
+    </ul>
     <div class="card-body">
         <div class="tab-content">
 

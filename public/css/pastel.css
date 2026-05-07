@@ -636,30 +636,80 @@ main.container { padding-bottom: 4rem; }
     min-width: 0;
 }
 
-/* ── Aside tabs (cards con tab in /expenses e /incomes) ────────────────── */
+/* ── Aside tabs: pill segmented control (in /expenses e /incomes) ─────── */
 .mx-aside-tabs {
+    --mx-tab-pad-y: 0.45rem;
+    --mx-tab-pad-x: 0.55rem;
     border-bottom: 0;
-    padding: 0.25rem 0.25rem 0;
-    gap: 0.15rem;
+    padding: 0.3rem;
+    margin: 0.5rem 0.5rem 0;
+    background: var(--bs-tertiary-bg, var(--mx-line-2));
+    border-radius: 999px;
+    gap: 0.2rem;
+    flex-wrap: nowrap;
+    overflow: hidden;
 }
+.mx-aside-tabs .nav-item { min-width: 0; }
 .mx-aside-tabs .nav-link {
-    border: 1px solid transparent;
-    border-radius: var(--bs-border-radius-sm) var(--bs-border-radius-sm) 0 0;
+    border: 0;
+    border-radius: 999px;
     color: var(--bs-secondary-color);
-    font-size: 0.85rem;
-    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1;
+    padding: var(--mx-tab-pad-y) var(--mx-tab-pad-x);
     background: transparent;
+    width: 100%;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    overflow: hidden;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.mx-aside-tabs .nav-link:hover {
+.mx-aside-tabs .nav-link .bi { font-size: 1rem; flex: 0 0 auto; }
+.mx-aside-tabs .nav-link .mx-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.mx-aside-tabs .nav-link:hover:not(.active) {
     color: var(--bs-body-color);
-    background: var(--bs-tertiary-bg);
-    border-color: transparent;
+    background: rgba(155, 124, 217, 0.08);
 }
 .mx-aside-tabs .nav-link.active {
     color: var(--bs-body-color);
     background: var(--bs-body-bg);
-    border-color: var(--bs-border-color) var(--bs-border-color) var(--bs-body-bg);
+    box-shadow: 0 1px 2px rgba(27, 27, 47, 0.06), 0 4px 10px -4px rgba(27, 27, 47, 0.10);
 }
+.mx-aside-tabs .nav-link:focus-visible {
+    outline: 2px solid var(--mx-lilac, #9B7CD9);
+    outline-offset: 2px;
+}
+/* Su colonna stretta nascondiamo la label e mostriamo solo l'icona;
+   il <button> ha sempre un title= per accessibilità/tooltip nativo. */
+@media (max-width: 1199.98px) {
+    .mx-aside-tabs .nav-link .mx-tab-label { display: none; }
+    .mx-aside-tabs .nav-link { gap: 0; padding: 0.5rem 0.4rem; }
+    .mx-aside-tabs .nav-link .bi { font-size: 1.05rem; }
+}
+
+/* ── Action kebab (riga tabella /expenses, /incomes) ──────────────────── */
+.mx-row-actions { white-space: nowrap; }
+.mx-row-actions .dropdown-toggle::after { display: none; }
+.mx-row-actions .btn {
+    --bs-btn-padding-y: 0.2rem;
+    --bs-btn-padding-x: 0.45rem;
+    border-color: transparent;
+    color: var(--bs-secondary-color);
+}
+.mx-row-actions .btn:hover {
+    background: var(--bs-tertiary-bg, var(--mx-line-2));
+    color: var(--bs-body-color);
+}
+.mx-row-actions .dropdown-item .bi { width: 1.1rem; display: inline-block; }
 
 /* ── Account badge (cella "Conto" su /expenses e /incomes) ─────────────── */
 .mx-account-badge {
