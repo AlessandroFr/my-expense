@@ -56,81 +56,98 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
 </head>
 <body data-base-url="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>">
 
-<?php if (Auth::check()): ?>
+<?php if (Auth::check()):
+    $uri = $_SERVER['REQUEST_URI'] ?? '/';
+    $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+    if ($base !== '' && strpos($path, $base) === 0) {
+        $path = substr($path, strlen($base)) ?: '/';
+    }
+    $currentPath = '/' . ltrim($path, '/');
+    $navMatches = static function (string $current, array $prefixes): bool {
+        foreach ($prefixes as $p) {
+            if ($current === $p || strpos($current, rtrim($p, '/') . '/') === 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+    $isDashboard = $navMatches($currentPath, ['/dashboard']);
+    $isMovements = $navMatches($currentPath, ['/expenses', '/incomes', '/recurring']);
+    $isPlan      = $navMatches($currentPath, ['/categories', '/budgets', '/accounts']);
+    $isReports   = $navMatches($currentPath, ['/reports']);
+
+    $username = Auth::username() ?? '';
+    $avatarInitial = $username !== '' ? mb_strtoupper(mb_substr($username, 0, 1, 'UTF-8'), 'UTF-8') : '?';
+?>
 <nav class="navbar navbar-expand bg-white border-bottom shadow-sm">
     <div class="container">
         <a class="navbar-brand fw-semibold" href="<?= htmlspecialchars($base . '/dashboard', ENT_QUOTES, 'UTF-8') ?>">
             <i class="bi bi-wallet2 me-1"></i><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>
         </a>
-        <ul class="navbar-nav flex-row gap-3 ms-3">
+        <ul class="navbar-nav flex-row gap-1 ms-3">
             <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/dashboard', ENT_QUOTES, 'UTF-8') ?>">
+                <a class="nav-link<?= $isDashboard ? ' active' : '' ?>" href="<?= htmlspecialchars($base . '/dashboard', ENT_QUOTES, 'UTF-8') ?>">
                     <i class="bi bi-speedometer2 me-1"></i>Dashboard
                 </a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/expenses', ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="bi bi-receipt me-1"></i>Spese
+            <li class="nav-item dropdown<?= $isMovements ? ' active' : '' ?>">
+                <a class="nav-link dropdown-toggle<?= $isMovements ? ' active' : '' ?>" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-arrow-left-right me-1"></i>Movimenti
                 </a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/expenses', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-receipt me-2"></i>Spese</a></li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/incomes', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-cash-stack me-2"></i>Entrate</a></li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/recurring', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-arrow-repeat me-2"></i>Ricorrenti</a></li>
+                </ul>
+            </li>
+            <li class="nav-item dropdown<?= $isPlan ? ' active' : '' ?>">
+                <a class="nav-link dropdown-toggle<?= $isPlan ? ' active' : '' ?>" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-sliders2 me-1"></i>Pianifica
+                </a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/categories', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-tags me-2"></i>Categorie</a></li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/budgets', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-bullseye me-2"></i>Budget</a></li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/accounts', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-bank me-2"></i>Conti</a></li>
+                </ul>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/incomes', ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="bi bi-cash-stack me-1"></i>Entrate
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/categories', ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="bi bi-tags me-1"></i>Categorie
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/budgets', ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="bi bi-bullseye me-1"></i>Budget
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/recurring', ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="bi bi-arrow-repeat me-1"></i>Ricorrenti
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/reports', ENT_QUOTES, 'UTF-8') ?>">
+                <a class="nav-link<?= $isReports ? ' active' : '' ?>" href="<?= htmlspecialchars($base . '/reports', ENT_QUOTES, 'UTF-8') ?>">
                     <i class="bi bi-bar-chart-steps me-1"></i>Report
                 </a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= htmlspecialchars($base . '/accounts', ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="bi bi-bank me-1"></i>Conti
-                </a>
-            </li>
         </ul>
-        <div class="ms-auto d-flex align-items-center gap-2">
+        <div class="ms-auto">
             <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Tema">
-                    <i id="theme-toggle-icon" class="bi bi-circle-half"></i>
+                <button type="button" class="mx-user-trigger" data-bs-toggle="dropdown" aria-expanded="false" title="Account">
+                    <span class="mx-avatar"><?= htmlspecialchars($avatarInitial, ENT_QUOTES, 'UTF-8') ?></span>
+                    <span class="mx-user-name d-none d-md-inline"><?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?></span>
+                    <i class="bi bi-chevron-down mx-user-caret"></i>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item small" href="#" data-theme-mode="light"><i class="bi bi-sun-fill me-1"></i>Chiaro</a></li>
-                    <li><a class="dropdown-item small" href="#" data-theme-mode="dark"><i class="bi bi-moon-stars-fill me-1"></i>Scuro</a></li>
-                    <li><a class="dropdown-item small" href="#" data-theme-mode="auto"><i class="bi bi-circle-half me-1"></i>Auto (sistema)</a></li>
+                <ul class="dropdown-menu dropdown-menu-end mx-user-menu">
+                    <li class="mx-user-header">
+                        <div class="mx-user-header-label">Loggato come</div>
+                        <div class="mx-user-header-name text-truncate"><?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?></div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="mx-theme-row">
+                        <span class="mx-theme-label">Tema</span>
+                        <div class="mx-theme-segments" role="group" aria-label="Tema">
+                            <button type="button" class="mx-theme-btn" data-theme-mode="light" title="Chiaro" aria-label="Tema chiaro"><i class="bi bi-sun-fill"></i></button>
+                            <button type="button" class="mx-theme-btn" data-theme-mode="dark" title="Scuro" aria-label="Tema scuro"><i class="bi bi-moon-stars-fill"></i></button>
+                            <button type="button" class="mx-theme-btn" data-theme-mode="auto" title="Auto" aria-label="Tema automatico"><i class="bi bi-circle-half"></i></button>
+                        </div>
+                    </li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/backup/download', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-cloud-download me-2"></i>Backup ZIP</a></li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/settings', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-gear me-2"></i>Impostazioni</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="post" action="<?= htmlspecialchars($base . '/logout', ENT_QUOTES, 'UTF-8') ?>" class="m-0">
+                            <?= Csrf::field() ?>
+                            <button type="submit" class="dropdown-item mx-logout-item"><i class="bi bi-box-arrow-right me-2"></i>Esci</button>
+                        </form>
+                    </li>
                 </ul>
             </div>
-            <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($base . '/backup/download', ENT_QUOTES, 'UTF-8') ?>" title="Backup completo (ZIP)">
-                <i class="bi bi-cloud-download"></i>
-            </a>
-            <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($base . '/settings', ENT_QUOTES, 'UTF-8') ?>" title="Impostazioni">
-                <i class="bi bi-gear"></i>
-            </a>
-            <span class="text-muted small">
-                <i class="bi bi-person-circle me-1"></i>
-                <?= htmlspecialchars(Auth::username() ?? '', ENT_QUOTES, 'UTF-8') ?>
-            </span>
-            <form method="post" action="<?= htmlspecialchars($base . '/logout', ENT_QUOTES, 'UTF-8') ?>" class="m-0">
-                <?= Csrf::field() ?>
-                <button type="submit" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-box-arrow-right"></i> Logout
-                </button>
-            </form>
         </div>
     </div>
 </nav>
