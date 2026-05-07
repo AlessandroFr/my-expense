@@ -258,6 +258,42 @@ final class BankStatementImporter
             }
         }
 
+        // Propagazione intra-import: se un nome viene risolto (match esistente
+        // o suggerimento nuovo) per una riga, cerca lo stesso nome nelle
+        // descrizioni delle ALTRE righe che non hanno ancora un contatto e
+        // applica lo stesso suggerimento. Cosi' es. 5 righe Esselunga di cui
+        // solo 1 catturata dal regex propagano il contatto a tutte e 5 prima
+        // del commit.
+        $resolvedNames = []; // [norm => ['name' => string, 'id_matched' => int|null]]
+        foreach ($rows as $r) {
+            if (!in_array($r['kind'], [self::KIND_EXPENSE, self::KIND_INCOME], true)) continue;
+            $sn = $r['contact_suggested_name'] ?? null;
+            if ($sn === null) continue;
+            $norm = Contact::normalize($sn);
+            if (mb_strlen($norm) < 4) continue; // soglia anti falsi positivi
+            if (isset($resolvedNames[$norm])) continue;
+            $resolvedNames[$norm] = [
+                'name'       => $sn,
+                'id_matched' => $r['contact_id_matched'] ?? null,
+            ];
+        }
+        if (!empty($resolvedNames)) {
+            foreach ($rows as &$r) {
+                if (!in_array($r['kind'], [self::KIND_EXPENSE, self::KIND_INCOME], true)) continue;
+                if (($r['contact_suggested_name'] ?? null) !== null) continue;
+                $descLow = mb_strtolower((string) ($r['description'] ?? ''));
+                if ($descLow === '') continue;
+                foreach ($resolvedNames as $norm => $info) {
+                    if (str_contains($descLow, $norm)) {
+                        $r['contact_suggested_name'] = $info['name'];
+                        $r['contact_id_matched']     = $info['id_matched'];
+                        break;
+                    }
+                }
+            }
+            unset($r);
+        }
+
         // Backfill preview: per ogni nome suggerito ma NON gia' presente in DB
         // conto quanti expenses/incomes/recurring verrebbero collegati al
         // commit. Cosi' l'utente vede in anteprima l'effetto del backfill.
