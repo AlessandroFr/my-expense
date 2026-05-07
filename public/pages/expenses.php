@@ -194,160 +194,182 @@ $paymentLabels  = [
 <div class="row g-3">
 <aside class="col-12 col-lg-5 col-xl-4">
 
-<!-- ── Toolbar azioni rapide ────────────────────────────────────────────── -->
-<div class="card shadow-sm mb-3">
-    <div class="card-body py-2 d-flex flex-wrap gap-2">
-        <div class="btn-group btn-group-sm" role="group">
-            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Filtri salvati">
-                <i class="bi bi-bookmark me-1"></i>Filtri
-            </button>
-            <ul class="dropdown-menu" id="saved-filters-menu">
-                <li><a class="dropdown-item small" href="#" data-saved-action="save"><i class="bi bi-floppy me-1"></i>Salva filtro corrente...</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><span class="dropdown-item-text small text-muted">Nessun filtro salvato.</span></li>
-            </ul>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
-            <i class="bi bi-download me-1"></i>Esporta
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal" title="Importa CSV semplice">
-            <i class="bi bi-upload me-1"></i>Importa
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-import-bank" data-bs-toggle="modal" data-bs-target="#bank-import-modal" title="Importa estratto conto bancario">
-            <i class="bi bi-bank me-1"></i>Estratto conto
-        </button>
-    </div>
-</div>
-
-<!-- ── Filtri ────────────────────────────────────────────────────────────── -->
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
-        <h2 class="h6 mb-3"><i class="bi bi-funnel me-1"></i>Filtri</h2>
-        <form id="expenses-filters" class="row g-2 align-items-end">
-            <div class="col-6">
-                <label class="form-label small">Da</label>
-                <input type="date" name="date_from" class="form-control form-control-sm">
-            </div>
-            <div class="col-6">
-                <label class="form-label small">A</label>
-                <input type="date" name="date_to" class="form-control form-control-sm">
-            </div>
-            <div class="col-12">
-                <label class="form-label small">Categoria</label>
-                <select name="category_id" class="form-select form-select-sm">
-                    <option value="">Tutte</option>
-                    <?php foreach ($categories as $c): ?>
-                        <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8') ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-12">
-                <label class="form-label small">Conto</label>
-                <select name="account_id" class="form-select form-select-sm">
-                    <option value="">Tutti</option>
-                    <?php foreach ($accounts as $a): ?>
-                        <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-6">
-                <label class="form-label small">Min €</label>
-                <input type="number" step="0.01" min="0" name="amount_min" class="form-control form-control-sm">
-            </div>
-            <div class="col-6">
-                <label class="form-label small">Max €</label>
-                <input type="number" step="0.01" min="0" name="amount_max" class="form-control form-control-sm">
-            </div>
-            <div class="col-12">
-                <label class="form-label small">Cerca</label>
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="descrizione…">
-            </div>
-            <div class="col-12">
-                <label class="form-label small">Tag</label>
-                <select name="tag" class="form-select form-select-sm" id="filter-tag">
-                    <option value="">Tutti</option>
-                </select>
-            </div>
-            <div class="col-12 d-grid">
-                <button type="button" id="filters-reset" class="btn btn-sm btn-outline-secondary" title="Resetta filtri">
-                    <i class="bi bi-x-lg me-1"></i>Reset filtri
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ── Form CREATE inline ───────────────────────────────────────────────── -->
+<!-- ── Aside con tabs ───────────────────────────────────────────────────── -->
 <div class="card shadow-sm">
+    <div class="card-header p-0 bg-transparent border-bottom-0">
+        <ul class="nav nav-tabs nav-fill mx-aside-tabs" id="expenses-aside-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-new-tab" data-bs-toggle="tab" data-bs-target="#tab-new" type="button" role="tab" aria-controls="tab-new" aria-selected="true">
+                    <i class="bi bi-plus-circle me-1"></i>Nuova
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-filters-tab" data-bs-toggle="tab" data-bs-target="#tab-filters" type="button" role="tab" aria-controls="tab-filters" aria-selected="false">
+                    <i class="bi bi-funnel me-1"></i>Filtri
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-tools-tab" data-bs-toggle="tab" data-bs-target="#tab-tools" type="button" role="tab" aria-controls="tab-tools" aria-selected="false">
+                    <i class="bi bi-tools me-1"></i>Strumenti
+                </button>
+            </li>
+        </ul>
+    </div>
     <div class="card-body">
-        <h2 class="h6 text-muted mb-3"><i class="bi bi-plus-circle me-1"></i>Nuova spesa</h2>
-        <form id="expense-create-form" class="row g-2 align-items-end" autocomplete="off"
-              data-default-cash-id="<?= $defaultCash !== null ? (int) $defaultCash['id'] : '' ?>">
-            <?= Csrf::field() ?>
-            <div class="col-6">
-                <label class="form-label small">Data</label>
-                <input type="date" name="expense_date" class="form-control" required value="<?= htmlspecialchars($today, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="tab-content">
+
+            <!-- ── Tab: Nuova spesa ─────────────────────────────────────── -->
+            <div class="tab-pane fade show active" id="tab-new" role="tabpanel" aria-labelledby="tab-new-tab">
+                <form id="expense-create-form" class="row g-2 align-items-end" autocomplete="off"
+                      data-default-cash-id="<?= $defaultCash !== null ? (int) $defaultCash['id'] : '' ?>">
+                    <?= Csrf::field() ?>
+                    <div class="col-6">
+                        <label class="form-label small">Data</label>
+                        <input type="date" name="expense_date" class="form-control" required value="<?= htmlspecialchars($today, ENT_QUOTES, 'UTF-8') ?>">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Importo €</label>
+                        <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required placeholder="0,00">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Categoria</label>
+                        <select name="category_id" class="form-select">
+                            <option value="">— Nessuna —</option>
+                            <?php foreach ($categories as $c): ?>
+                                <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Pagamento</label>
+                        <select name="payment_method" class="form-select" required>
+                            <?php foreach ($paymentMethods as $pm): ?>
+                                <option value="<?= htmlspecialchars($pm, ENT_QUOTES, 'UTF-8') ?>" <?= $pm === 'card' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($paymentLabels[$pm] ?? $pm, ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>
+                        <select name="account_id" class="form-select">
+                            <option value="">— Nessuno —</option>
+                            <?php foreach ($accounts as $a): ?>
+                                <option value="<?= (int) $a['id'] ?>" data-type="<?= htmlspecialchars((string) $a['type'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
+                        <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
+                        <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
+                        <datalist id="all-tags-datalist"></datalist>
+                    </div>
+                    <div class="col-7">
+                        <label class="form-label small">Condivisa con <span class="text-muted">(opz.)</span></label>
+                        <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label small">Tua quota €</label>
+                        <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi spesa</button>
+                    </div>
+                    <div class="col-12">
+                        <label class="btn btn-sm btn-outline-secondary mb-0 w-100">
+                            <i class="bi bi-camera me-1"></i>Scansiona scontrino (OCR)
+                            <input type="file" id="ocr-input" accept="image/*" capture="environment" hidden>
+                        </label>
+                        <span id="ocr-status" class="small text-muted ms-2"></span>
+                    </div>
+                </form>
             </div>
-            <div class="col-6">
-                <label class="form-label small">Importo €</label>
-                <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required placeholder="0,00">
+
+            <!-- ── Tab: Filtri ──────────────────────────────────────────── -->
+            <div class="tab-pane fade" id="tab-filters" role="tabpanel" aria-labelledby="tab-filters-tab">
+                <form id="expenses-filters" class="row g-2 align-items-end">
+                    <div class="col-6">
+                        <label class="form-label small">Da</label>
+                        <input type="date" name="date_from" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">A</label>
+                        <input type="date" name="date_to" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Categoria</label>
+                        <select name="category_id" class="form-select form-select-sm">
+                            <option value="">Tutte</option>
+                            <?php foreach ($categories as $c): ?>
+                                <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Conto</label>
+                        <select name="account_id" class="form-select form-select-sm">
+                            <option value="">Tutti</option>
+                            <?php foreach ($accounts as $a): ?>
+                                <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Min €</label>
+                        <input type="number" step="0.01" min="0" name="amount_min" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Max €</label>
+                        <input type="number" step="0.01" min="0" name="amount_max" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Cerca</label>
+                        <input type="text" name="search" class="form-control form-control-sm" placeholder="descrizione…">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Tag</label>
+                        <select name="tag" class="form-select form-select-sm" id="filter-tag">
+                            <option value="">Tutti</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button type="button" id="filters-reset" class="btn btn-sm btn-outline-secondary" title="Resetta filtri">
+                            <i class="bi bi-x-lg me-1"></i>Reset filtri
+                        </button>
+                    </div>
+                </form>
             </div>
-            <div class="col-12">
-                <label class="form-label small">Categoria</label>
-                <select name="category_id" class="form-select">
-                    <option value="">— Nessuna —</option>
-                    <?php foreach ($categories as $c): ?>
-                        <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8') ?></option>
-                    <?php endforeach; ?>
-                </select>
+
+            <!-- ── Tab: Strumenti ───────────────────────────────────────── -->
+            <div class="tab-pane fade" id="tab-tools" role="tabpanel" aria-labelledby="tab-tools-tab">
+                <div class="d-grid gap-2">
+                    <div class="dropdown">
+                        <button type="button" class="btn btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Filtri salvati">
+                            <i class="bi bi-bookmark me-1"></i>Filtri salvati
+                        </button>
+                        <ul class="dropdown-menu w-100" id="saved-filters-menu">
+                            <li><a class="dropdown-item small" href="#" data-saved-action="save"><i class="bi bi-floppy me-1"></i>Salva filtro corrente...</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><span class="dropdown-item-text small text-muted">Nessun filtro salvato.</span></li>
+                        </ul>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary" id="btn-export-csv" title="Scarica CSV con i filtri attivi">
+                        <i class="bi bi-download me-1"></i>Esporta CSV
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="btn-import-csv" data-bs-toggle="modal" data-bs-target="#csv-import-modal" title="Importa CSV semplice">
+                        <i class="bi bi-upload me-1"></i>Importa CSV
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="btn-import-bank" data-bs-toggle="modal" data-bs-target="#bank-import-modal" title="Importa estratto conto bancario">
+                        <i class="bi bi-bank me-1"></i>Estratto conto bancario
+                    </button>
+                </div>
             </div>
-            <div class="col-6">
-                <label class="form-label small">Pagamento</label>
-                <select name="payment_method" class="form-select" required>
-                    <?php foreach ($paymentMethods as $pm): ?>
-                        <option value="<?= htmlspecialchars($pm, ENT_QUOTES, 'UTF-8') ?>" <?= $pm === 'card' ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($paymentLabels[$pm] ?? $pm, ENT_QUOTES, 'UTF-8') ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-6">
-                <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>
-                <select name="account_id" class="form-select">
-                    <option value="">— Nessuno —</option>
-                    <?php foreach ($accounts as $a): ?>
-                        <option value="<?= (int) $a['id'] ?>" data-type="<?= htmlspecialchars((string) $a['type'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-12">
-                <label class="form-label small">Descrizione <span class="text-muted">(opz.)</span></label>
-                <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
-            </div>
-            <div class="col-12">
-                <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
-                <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
-                <datalist id="all-tags-datalist"></datalist>
-            </div>
-            <div class="col-7">
-                <label class="form-label small">Condivisa con <span class="text-muted">(opz.)</span></label>
-                <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
-            </div>
-            <div class="col-5">
-                <label class="form-label small">Tua quota €</label>
-                <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
-            </div>
-            <div class="col-12 d-grid">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi spesa</button>
-            </div>
-            <div class="col-12">
-                <label class="btn btn-sm btn-outline-secondary mb-0 w-100">
-                    <i class="bi bi-camera me-1"></i>Scansiona scontrino (OCR)
-                    <input type="file" id="ocr-input" accept="image/*" capture="environment" hidden>
-                </label>
-                <span id="ocr-status" class="small text-muted ms-2"></span>
-            </div>
-        </form>
+
+        </div>
     </div>
 </div>
 
@@ -358,28 +380,30 @@ $paymentLabels  = [
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <nav id="expenses-pager" class="px-3 pt-2"></nav>
-        <table class="table table-hover mb-0 align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th style="width:1%"></th>
-                    <th>Data</th>
-                    <th>Conto</th>
-                    <th>Categoria</th>
-                    <th>Descrizione</th>
-                    <th class="text-center" style="width:1%" title="Tag">#</th>
-                    <th class="text-center" style="width:1%" title="Pagamento"><i class="bi bi-credit-card"></i></th>
-                    <th class="text-end">Importo</th>
-                    <th class="text-end" style="width:1%">Azioni</th>
-                </tr>
-            </thead>
-            <tbody id="expenses-tbody">
-                <tr id="expenses-loading">
-                    <td colspan="9" class="text-center text-muted py-4">
-                        <span class="spinner-border spinner-border-sm me-2"></span>Carico…
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:1%"></th>
+                        <th class="text-nowrap">Data</th>
+                        <th>Conto</th>
+                        <th class="text-nowrap">Categoria</th>
+                        <th>Descrizione</th>
+                        <th class="text-center" style="width:1%" title="Tag">#</th>
+                        <th class="text-center" style="width:1%" title="Pagamento"><i class="bi bi-credit-card"></i></th>
+                        <th class="text-end text-nowrap">Importo</th>
+                        <th class="text-end" style="width:1%">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="expenses-tbody">
+                    <tr id="expenses-loading">
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <span class="spinner-border spinner-border-sm me-2"></span>Carico…
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 </section>

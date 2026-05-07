@@ -107,15 +107,27 @@ function categoryCell(e) {
     `;
 }
 
+// Calcola se il colore di sfondo richiede testo chiaro o scuro (W3C luminance).
+function contrastText(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return '#1B1B2F';
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    return L > 0.55 ? '#1B1B2F' : '#FFFFFF';
+}
+
 function accountCell(e) {
     if (!e.account_id) return '<span class="text-muted">—</span>';
     const color = e.account_color || '#6c757d';
-    const icon  = e.account_icon ? `<i class="bi bi-${escHtml(e.account_icon)} me-1"></i>` : '<i class="bi bi-bank me-1"></i>';
-    return `
-        <span class="d-inline-block rounded-circle me-1"
-              style="width:.7rem;height:.7rem;background-color:${escHtml(color)}"></span>
+    const fg    = contrastText(color);
+    const icon  = e.account_icon
+        ? `<i class="bi bi-${escHtml(e.account_icon)} me-1"></i>`
+        : '<i class="bi bi-bank me-1"></i>';
+    return `<span class="badge mx-account-badge" style="background-color:${escHtml(color)};color:${fg}" title="${escHtml(e.account_name ?? '')}">
         ${icon}${escHtml(e.account_name ?? '')}
-    `;
+    </span>`;
 }
 
 function buildAccountOptions(selected) {
