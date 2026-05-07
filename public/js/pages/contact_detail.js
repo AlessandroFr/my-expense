@@ -13,6 +13,13 @@ const fmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' 
 function fmtAmount(v) { return fmt.format(Number(v) || 0); }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
 
+const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso) + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
+}
+
 let breakdownChart = null;
 
 async function load(year) {
@@ -95,7 +102,7 @@ function renderMovements(rows) {
         const cat  = r.category_name ?? r.source ?? '—';
         const catColor = r.category_color ?? '#6c757d';
         tr.innerHTML = `
-            <td class="text-nowrap">${escHtml(r._date)}</td>
+            <td class="text-nowrap">${escHtml(fmtDate(r._date))}</td>
             <td><span class="badge ${isExpense ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}">${isExpense ? 'Spesa' : 'Entrata'}</span></td>
             <td>
                 <span class="d-inline-block rounded-circle me-1" style="width:.6rem;height:.6rem;background-color:${escHtml(catColor)}"></span>

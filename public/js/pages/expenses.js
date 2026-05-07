@@ -931,8 +931,8 @@ function bankRenderRow(r) {
                 ${kindBadge}
                 ${dupBadge}
                 <span class="text-muted small text-nowrap">
-                    <i class="bi bi-calendar3 me-1"></i>${escHtml(r.op_date ?? '')}
-                    ${r.value_date ? `<span class="ms-2"><i class="bi bi-calendar-check"></i> val. ${escHtml(r.value_date)}</span>` : ''}
+                    <i class="bi bi-calendar3 me-1"></i>${escHtml(fmtDate(r.op_date ?? ''))}
+                    ${r.value_date ? `<span class="ms-2"><i class="bi bi-calendar-check"></i> val. ${escHtml(fmtDate(r.value_date))}</span>` : ''}
                 </span>
                 <div class="ms-auto fw-semibold ${amountClass}" style="font-size:1.15rem;">
                     ${amountSign} € ${amountFmt}
