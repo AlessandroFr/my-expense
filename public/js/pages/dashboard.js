@@ -14,6 +14,7 @@ const moneyFmt = new Intl.NumberFormat('it-IT', {
 });
 const monthFmt      = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
 const monthShortFmt = new Intl.DateTimeFormat('it-IT', { month: 'short', year: '2-digit' });
+const dateFmt       = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 function fmtMoney(n) { return moneyFmt.format(Number(n) || 0); }
 
@@ -29,6 +30,82 @@ function fmtMonthShort(ym) {
     return monthShortFmt.format(new Date(y, (m || 1) - 1, 1));
 }
 
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? iso : dateFmt.format(d);
+}
+
+// ── Range presets ──────────────────────────────────────────────────────────
+
+function isoDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function computeRangeFromPreset(preset) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let from, to;
+    switch (preset) {
+        case 'last_month': {
+            from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            to   = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        }
+        case 'this_quarter': {
+            const q = Math.floor(today.getMonth() / 3);
+            from = new Date(today.getFullYear(), q * 3, 1);
+            to   = new Date(today.getFullYear(), q * 3 + 3, 0);
+            break;
+        }
+        case 'this_year':
+            from = new Date(today.getFullYear(), 0, 1);
+            to   = new Date(today.getFullYear(), 11, 31);
+            break;
+        case 'last_30':
+            to = new Date(today);
+            from = new Date(today); from.setDate(from.getDate() - 29);
+            break;
+        case 'last_90':
+            to = new Date(today);
+            from = new Date(today); from.setDate(from.getDate() - 89);
+            break;
+        case 'last_12m':
+            to = new Date(today);
+            from = new Date(today); from.setMonth(from.getMonth() - 11); from.setDate(1);
+            break;
+        case 'this_month':
+        default:
+            from = new Date(today.getFullYear(), today.getMonth(), 1);
+            to   = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+    }
+    return { from: isoDate(from), to: isoDate(to) };
+}
+
+function periodLabel(range) {
+    if (!range) return '';
+    const { from, to } = range;
+    const f = new Date(from + 'T00:00:00');
+    const t = new Date(to   + 'T00:00:00');
+    // Range = mese pieno → "Maggio 2026"
+    if (f.getDate() === 1
+        && f.getFullYear() === t.getFullYear()
+        && f.getMonth() === t.getMonth()
+        && t.getDate() === new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()
+    ) {
+        return monthFmt.format(f);
+    }
+    // Range = anno pieno → "Anno 2026"
+    if (f.getDate() === 1 && f.getMonth() === 0 && t.getMonth() === 11 && t.getDate() === 31) {
+        return `Anno ${f.getFullYear()}`;
+    }
+    return `${fmtDate(from)} → ${fmtDate(to)}`;
+}
+
 function tweenMoney(el, to) {
     if (!el) return;
     const from = parseFloat((el.dataset.value ?? '').replace(/[^\d.-]/g, '')) || 0;
@@ -40,7 +117,9 @@ function tweenMoney(el, to) {
 function renderKpi(d) {
     tweenMoney(document.getElementById('kpi-current'), Number(d.totals.current ?? 0));
     tweenMoney(document.getElementById('kpi-income'),  Number(d.totals.income_current ?? 0));
-    document.getElementById('kpi-current-month').textContent = fmtMonthLong(d.current_month);
+
+    const label = periodLabel(d.range);
+    document.querySelectorAll('[data-period-label]').forEach(el => el.textContent = label);
 
     const netEl  = document.getElementById('kpi-net');
     const netVal = Number(d.totals.net_current ?? 0);
@@ -93,9 +172,13 @@ function renderBudgetProgress(items) {
     }).join('');
 }
 
+let categoryChart = null;
+let monthChart    = null;
+
 function renderByCategory(data) {
     const canvas = document.getElementById('chart-by-category');
     const empty  = document.getElementById('by-category-empty');
+    if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
     if (!data.length) {
         canvas.classList.add('d-none');
         empty.classList.remove('d-none');
@@ -104,7 +187,7 @@ function renderByCategory(data) {
     canvas.classList.remove('d-none');
     empty.classList.add('d-none');
 
-    new Chart(canvas, {
+    categoryChart = new Chart(canvas, {
         type: 'doughnut',
         data: {
             labels: data.map(c => c.name),
@@ -131,6 +214,7 @@ function renderByCategory(data) {
 
 function renderByMonth(expenses, incomes) {
     const canvas = document.getElementById('chart-by-month');
+    if (monthChart) { monthChart.destroy(); monthChart = null; }
     // Unifica i mesi presenti in entrambi i dataset.
     const months = Array.from(new Set([
         ...expenses.map(m => m.month),
@@ -139,7 +223,7 @@ function renderByMonth(expenses, incomes) {
     const expMap = new Map(expenses.map(m => [m.month, Number(m.total)]));
     const incMap = new Map(incomes.map(m => [m.month, Number(m.total)]));
 
-    new Chart(canvas, {
+    monthChart = new Chart(canvas, {
         type: 'bar',
         data: {
             labels: months.map(fmtMonthShort),
@@ -179,9 +263,10 @@ function renderByMonth(expenses, incomes) {
     });
 }
 
-async function loadData() {
+async function loadData(range = null) {
     try {
-        const r = await apiGuard(api.get(`${BASE}/dashboard/data`));
+        const params = range ? { from: range.from, to: range.to } : {};
+        const r = await apiGuard(api.get(`${BASE}/dashboard/data`, params));
         const d = r.data ?? {};
         renderKpi(d);
         renderBudgetProgress(d.budget_progress ?? []);
@@ -192,7 +277,56 @@ async function loadData() {
     }
 }
 
+// ── Filtro periodo ─────────────────────────────────────────────────────────
+
+function getCurrentRange() {
+    const fromEl = document.getElementById('dash-from');
+    const toEl   = document.getElementById('dash-to');
+    if (fromEl?.value && toEl?.value && fromEl.value <= toEl.value) {
+        return { from: fromEl.value, to: toEl.value };
+    }
+    return computeRangeFromPreset('this_month');
+}
+
+function applyPresetToInputs(preset) {
+    const range = computeRangeFromPreset(preset);
+    const fromEl = document.getElementById('dash-from');
+    const toEl   = document.getElementById('dash-to');
+    if (fromEl) fromEl.value = range.from;
+    if (toEl)   toEl.value   = range.to;
+    return range;
+}
+
+function wireFilter() {
+    const presetEl = document.getElementById('dash-preset');
+    const fromEl   = document.getElementById('dash-from');
+    const toEl     = document.getElementById('dash-to');
+    const applyBtn = document.getElementById('dash-apply');
+    if (!presetEl || !applyBtn) return;
+
+    // Init: imposta range dal preset di default.
+    const initial = applyPresetToInputs(presetEl.value);
+
+    presetEl.addEventListener('change', () => {
+        if (presetEl.value === 'custom') return; // l'utente edita le date a mano
+        const range = applyPresetToInputs(presetEl.value);
+        loadData(range);
+    });
+
+    // Edit manuale delle date → preset diventa "custom".
+    [fromEl, toEl].forEach(el => el?.addEventListener('change', () => {
+        presetEl.value = 'custom';
+    }));
+
+    applyBtn.addEventListener('click', () => {
+        loadData(getCurrentRange());
+    });
+
+    return initial;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.row.g-3.mb-4').forEach(row => stagger(row));
-    loadData();
+    const initial = wireFilter();
+    loadData(initial);
 });

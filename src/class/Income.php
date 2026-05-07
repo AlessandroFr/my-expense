@@ -239,6 +239,19 @@ final class Income
     }
 
     /**
+     * Totale entrate in un range di date (inclusive).
+     */
+    public static function totalForRange(int $userId, string $from, string $to): float
+    {
+        $stmt = Database::pdo()->prepare(
+            'SELECT COALESCE(SUM(amount), 0) FROM incomes
+             WHERE user_id = ? AND income_date >= ? AND income_date <= ?'
+        );
+        $stmt->execute([$userId, $from, $to]);
+        return (float) $stmt->fetchColumn();
+    }
+
+    /**
      * @return array<int, array{month:string, total:float}>
      */
     public static function totalsByMonth(int $userId, int $monthsBack = 6): array

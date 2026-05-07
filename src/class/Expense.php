@@ -304,6 +304,51 @@ final class Expense
     }
 
     /**
+     * Totale spese in un range di date (inclusive).
+     */
+    public static function totalForRange(int $userId, string $from, string $to): float
+    {
+        $stmt = Database::pdo()->prepare(
+            'SELECT COALESCE(SUM(amount), 0)
+             FROM expenses
+             WHERE user_id = ? AND expense_date >= ? AND expense_date <= ?'
+        );
+        $stmt->execute([$userId, $from, $to]);
+        return (float) $stmt->fetchColumn();
+    }
+
+    /**
+     * Aggregato per categoria in un range di date (inclusive).
+     * @return array<int, array{category_id: ?int, name: string, color: string, icon: ?string, total: float}>
+     */
+    public static function totalsByCategoryForRange(int $userId, string $from, string $to): array
+    {
+        $stmt = Database::pdo()->prepare(
+            "SELECT
+                e.category_id,
+                COALESCE(c.name, 'Senza categoria') AS name,
+                COALESCE(c.color, '#6c757d')         AS color,
+                c.icon                                AS icon,
+                SUM(e.amount)                         AS total
+             FROM expenses e
+             LEFT JOIN categories c ON c.id = e.category_id
+             WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date <= ?
+             GROUP BY e.category_id, c.name, c.color, c.icon
+             ORDER BY total DESC"
+        );
+        $stmt->execute([$userId, $from, $to]);
+        return array_map(static function (array $r): array {
+            return [
+                'category_id' => $r['category_id'] === null ? null : (int) $r['category_id'],
+                'name'        => (string) $r['name'],
+                'color'       => (string) $r['color'],
+                'icon'        => $r['icon'],
+                'total'       => (float) $r['total'],
+            ];
+        }, $stmt->fetchAll());
+    }
+
+    /**
      * Totali per gli ultimi N mesi (default 6), ordinati cronologicamente.
      * @return array<int, array{month: string, total: float}>
      */
