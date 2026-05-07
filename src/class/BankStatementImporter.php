@@ -240,6 +240,7 @@ final class BankStatementImporter
                 // Anagrafica suggerita (saltata per partite doppie interne).
                 $row['contact_suggested_name'] = null;
                 $row['contact_id_matched']     = null;
+                $row['contact_propagated']     = false;
                 if ($kind === self::KIND_EXPENSE || $kind === self::KIND_INCOME) {
                     $contactKind = $kind === self::KIND_EXPENSE ? 'expense' : 'income';
                     $suggested = self::extractCounterparty($tipologia, $descrizione, $contactKind);
@@ -287,6 +288,7 @@ final class BankStatementImporter
                     if (str_contains($descLow, $norm)) {
                         $r['contact_suggested_name'] = $info['name'];
                         $r['contact_id_matched']     = $info['id_matched'];
+                        $r['contact_propagated']     = true;
                         break;
                     }
                 }

@@ -911,12 +911,15 @@ function bankRenderRow(r) {
         const contactBadge = r.contact_id_matched
             ? `<span class="badge bg-info-subtle text-info ms-1" title="Anagrafica esistente">esistente</span>`
             : (r.contact_suggested_name ? `<span class="badge bg-warning-subtle text-warning ms-1" title="Verra' creata">nuova</span>` : '');
+        const propagatedBadge = r.contact_propagated
+            ? `<span class="badge bg-secondary-subtle text-secondary ms-1" title="Propagata da un'altra riga del file (descrizione contiene il nome)">↗ propagata</span>`
+            : '';
         const backfillBadge = (Number(r.contact_backfill_count) > 0)
             ? `<span class="badge bg-success-subtle text-success ms-1" title="Al commit verranno collegati ${r.contact_backfill_count} movimenti gia' presenti che menzionano questo nome">+${r.contact_backfill_count} backfill</span>`
             : '';
         contactBlock = `
             <div class="col-12 col-md-4 col-lg-3">
-                <label class="form-label small mb-1">${isIncome ? 'Cliente' : 'Fornitore'}${contactBadge}${backfillBadge}</label>
+                <label class="form-label small mb-1">${isIncome ? 'Cliente' : 'Fornitore'}${contactBadge}${propagatedBadge}${backfillBadge}</label>
                 <input type="text" class="form-control form-control-sm bank-cell" data-field="contact_name"
                        value="${escHtml(r.contact_name ?? '')}" placeholder="—" maxlength="120" list="contacts-datalist">
             </div>`;
@@ -1039,6 +1042,36 @@ function bankRenderPager() {
     items.push(`<li class="page-item ${cur === total ? 'disabled' : ''}">
         <a class="page-link" href="#" data-page="${cur + 1}" aria-label="Successiva">&raquo;</a></li>`);
     list.innerHTML = items.join('');
+}
+
+/**
+ * Propaga il contact_name di una riga sorgente alle ALTRE righe del file
+ * la cui descrizione lo contiene (case-insensitive, min 4 char) e che NON
+ * hanno gia' un'anagrafica assegnata. Le righe toccate vengono marcate
+ * come `contact_propagated`. Ritorna il numero di righe aggiornate.
+ */
+function bankPropagateContactName(srcRow) {
+    const name = (srcRow.contact_name ?? '').trim();
+    if (name === '') return 0;
+    const normName = name.toLowerCase();
+    if (normName.length < 4) return 0;
+
+    let touched = 0;
+    for (const r of bankPreviewState.rows) {
+        if (r.idx === srcRow.idx) continue;
+        if (r.kind !== 'expense' && r.kind !== 'income') continue;
+        if ((r.contact_name ?? '').trim() !== '') continue; // non sovrascrivere
+        const descLow = (r.description ?? '').toLowerCase();
+        if (!descLow.includes(normName)) continue;
+
+        r.contact_name           = name;
+        r.contact_id             = srcRow.contact_id ?? null;
+        r.contact_id_matched     = srcRow.contact_id_matched ?? null;
+        r.contact_suggested_name = name;
+        r.contact_propagated     = true;
+        touched++;
+    }
+    return touched;
 }
 
 function bankRenderRows() {
@@ -1254,6 +1287,19 @@ function wireBankImport() {
             }
             // Re-render solo la riga interessata mantenendo posizione in pagina.
             tr.outerHTML = bankRenderRow(r);
+            return;
+        }
+        if (field === 'contact_name') {
+            // Propagazione live: il nome appena scritto vale anche per altre
+            // righe del file la cui descrizione lo contiene.
+            const touched = bankPropagateContactName(r);
+            if (touched > 0) {
+                bankRenderRows();
+                toast.success(`Anagrafica "${r.contact_name}" propagata a ${touched} altre riga${touched === 1 ? '' : 'e'} del file.`);
+            } else {
+                // Re-render solo della riga corrente per aggiornare i badge.
+                tr.outerHTML = bankRenderRow(r);
+            }
         }
     });
 
