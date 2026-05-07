@@ -262,6 +262,15 @@ switch ($route) {
         require __DIR__ . '/endpoints/backup_download.php';
         break;
 
+    // ── Impostazioni / reset DB ──────────────────────────────────────────
+    case 'GET /settings':
+        Auth::requireLogin();
+        renderPage('settings');
+        break;
+    case 'POST /db/reset':
+        require __DIR__ . '/endpoints/db_reset.php';
+        break;
+
     default:
         http_response_code(404);
         renderPage('404');
@@ -290,6 +299,7 @@ function renderPage(string $page, array $data = []): void
         'recurring'     => 'Spese ricorrenti',
         'reports'       => 'Report annuale',
         'accounts'      => 'Conti',
+        'settings'      => 'Impostazioni',
         default         => 'Pagina non trovata',
     };
 

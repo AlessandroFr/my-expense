@@ -118,6 +118,9 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
             <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($base . '/backup/download', ENT_QUOTES, 'UTF-8') ?>" title="Backup completo (ZIP)">
                 <i class="bi bi-cloud-download"></i>
             </a>
+            <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($base . '/settings', ENT_QUOTES, 'UTF-8') ?>" title="Impostazioni">
+                <i class="bi bi-gear"></i>
+            </a>
             <span class="text-muted small">
                 <i class="bi bi-person-circle me-1"></i>
                 <?= htmlspecialchars(Auth::username() ?? '', ENT_QUOTES, 'UTF-8') ?>

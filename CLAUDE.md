@@ -90,6 +90,16 @@ dark mode, PWA installable + offline cache, full ZIP backup, client-side OCR
   picker (con `capture=environment` su mobile per camera). Estrae importo
   più grande (regex `\d+[.,]\d{2}`) e data (DD/MM/YYYY o YYYY-MM-DD),
   pre-popola i campi.
+- **Reset DB** (`/settings` → "Zona pericolosa", `POST /db/reset`):
+  cancellazione scoped sull'utente loggato (`App\DatabaseReset`) in 3 ambiti:
+  `movements` (spese, entrate, expense_tags, expense_attachments + file su
+  disco), `movements_recurring` (come sopra + reset `last_generated_date`
+  sulle ricorrenti), `all` (tabula rasa di tutte le 10 tabelle user-scoped
+  tranne `users`). Protetto da: 1) backup ZIP scaricato in tab nuova
+  (gating client-side), 2) frase letterale `ELIMINA TUTTO`, 3)
+  re-inserimento password (`Auth::verifyPassword`). Tutte le DELETE in
+  un'unica transazione con `FOREIGN_KEY_CHECKS=0`; pulizia filesystem
+  best-effort dopo il commit.
 - **Import estratto conto bancario** (`POST /import/bank-statement`,
   modal "Estratto conto" su `/expenses`): parser per CSV Banca Sella /
   Patavina (`App\BankStatementImporter`). Encoding Windows-1252 auto-rilevato

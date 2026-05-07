@@ -65,6 +65,26 @@ final class Auth
         return Session::get('user_id') !== null;
     }
 
+    /**
+     * Verifica la password di un utente già loggato (re-auth per azioni distruttive).
+     * Diversamente da attempt(), non rigenera la sessione né aggiorna last_login_at.
+     */
+    public static function verifyPassword(int $userId, string $password): bool
+    {
+        if ($password === '') {
+            return false;
+        }
+        $stmt = Database::pdo()->prepare(
+            'SELECT password_hash FROM users WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return false;
+        }
+        return password_verify($password, (string) $row['password_hash']);
+    }
+
     public static function userId(): ?int
     {
         $id = Session::get('user_id');
