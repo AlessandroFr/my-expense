@@ -126,12 +126,12 @@ $accounts = Account::allForUser($userId, false);
             <thead class="table-light">
                 <tr>
                     <th style="width:1%"></th>
-                    <th style="width:100px">Data</th>
-                    <th style="width:140px">Conto</th>
-                    <th style="width:160px">Origine</th>
+                    <th class="text-nowrap">Data</th>
+                    <th>Conto</th>
+                    <th class="text-nowrap">Origine</th>
                     <th>Descrizione</th>
-                    <th class="text-end" style="width:120px">Importo</th>
-                    <th style="width:120px"></th>
+                    <th class="text-end text-nowrap">Importo</th>
+                    <th class="text-end" style="width:1%">Azioni</th>
                 </tr>
             </thead>
             <tbody id="income-tbody">
