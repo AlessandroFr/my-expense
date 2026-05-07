@@ -911,9 +911,12 @@ function bankRenderRow(r) {
         const contactBadge = r.contact_id_matched
             ? `<span class="badge bg-info-subtle text-info ms-1" title="Anagrafica esistente">esistente</span>`
             : (r.contact_suggested_name ? `<span class="badge bg-warning-subtle text-warning ms-1" title="Verra' creata">nuova</span>` : '');
+        const backfillBadge = (Number(r.contact_backfill_count) > 0)
+            ? `<span class="badge bg-success-subtle text-success ms-1" title="Al commit verranno collegati ${r.contact_backfill_count} movimenti gia' presenti che menzionano questo nome">+${r.contact_backfill_count} backfill</span>`
+            : '';
         contactBlock = `
             <div class="col-12 col-md-4 col-lg-3">
-                <label class="form-label small mb-1">${isIncome ? 'Cliente' : 'Fornitore'}${contactBadge}</label>
+                <label class="form-label small mb-1">${isIncome ? 'Cliente' : 'Fornitore'}${contactBadge}${backfillBadge}</label>
                 <input type="text" class="form-control form-control-sm bank-cell" data-field="contact_name"
                        value="${escHtml(r.contact_name ?? '')}" placeholder="—" maxlength="120" list="contacts-datalist">
             </div>`;

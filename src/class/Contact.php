@@ -325,6 +325,52 @@ final class Contact
     }
 
     /**
+     * Conta (senza scrivere) quanti expenses/incomes/recurring verrebbero
+     * collegati da applyBackfill se chiamato per il nome dato. Stessi
+     * predicati LIKE / soglia minima 4 char di applyBackfill — usato dalla
+     * preview dell'estratto conto per mostrare in anticipo l'effetto del
+     * backfill al commit.
+     *
+     * @return array{expenses:int, incomes:int, recurring:int}
+     */
+    public static function previewBackfillCount(int $userId, string $name): array
+    {
+        $name = trim($name);
+        if (mb_strlen($name) < 4) {
+            return ['expenses' => 0, 'incomes' => 0, 'recurring' => 0];
+        }
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $name);
+        $like    = '%' . $escaped . '%';
+
+        $pdo = Database::pdo();
+
+        $exp = $pdo->prepare(
+            'SELECT COUNT(*) FROM expenses
+             WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?'
+        );
+        $exp->execute([$userId, $like]);
+
+        $inc = $pdo->prepare(
+            'SELECT COUNT(*) FROM incomes
+             WHERE user_id = ? AND contact_id IS NULL
+               AND (description LIKE ? OR source LIKE ?)'
+        );
+        $inc->execute([$userId, $like, $like]);
+
+        $rec = $pdo->prepare(
+            'SELECT COUNT(*) FROM recurring_expenses
+             WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?'
+        );
+        $rec->execute([$userId, $like]);
+
+        return [
+            'expenses'  => (int) $exp->fetchColumn(),
+            'incomes'   => (int) $inc->fetchColumn(),
+            'recurring' => (int) $rec->fetchColumn(),
+        ];
+    }
+
+    /**
      * Esegui un backfill manuale: collega expenses/incomes/recurring esistenti
      * senza contact_id che menzionano il nome del contatto in descrizione/source.
      *

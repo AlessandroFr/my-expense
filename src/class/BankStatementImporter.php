@@ -258,6 +258,29 @@ final class BankStatementImporter
             }
         }
 
+        // Backfill preview: per ogni nome suggerito ma NON gia' presente in DB
+        // conto quanti expenses/incomes/recurring verrebbero collegati al
+        // commit. Cosi' l'utente vede in anteprima l'effetto del backfill.
+        // 1 COUNT per nome unico (LIKE non indicizzabile, ma le righe del
+        // singolo file sono al massimo qualche centinaio).
+        $countsByName = [];
+        foreach ($rows as $r) {
+            $sn = $r['contact_suggested_name'] ?? null;
+            if ($sn === null || $r['contact_id_matched'] !== null) continue;
+            if (isset($countsByName[$sn])) continue;
+            $countsByName[$sn] = Contact::previewBackfillCount($userId, $sn);
+        }
+        foreach ($rows as &$r) {
+            $sn = $r['contact_suggested_name'] ?? null;
+            if ($sn !== null && $r['contact_id_matched'] === null && isset($countsByName[$sn])) {
+                $c = $countsByName[$sn];
+                $r['contact_backfill_count'] = $c['expenses'] + $c['incomes'] + $c['recurring'];
+            } else {
+                $r['contact_backfill_count'] = 0;
+            }
+        }
+        unset($r);
+
         return [
             'account' => [
                 'id'   => (int) $sourceAccount['id'],
