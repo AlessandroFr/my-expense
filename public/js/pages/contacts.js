@@ -12,17 +12,6 @@ const send = apiSend(api);
 
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const TYPE_LABEL = {
-    supplier: 'Fornitore',
-    customer: 'Cliente',
-    both:     'Entrambi',
-};
-const TYPE_BADGE = {
-    supplier: 'bg-danger-subtle text-danger',
-    customer: 'bg-success-subtle text-success',
-    both:     'bg-secondary-subtle text-secondary',
-};
-
 let cache = { contacts: [], balances: new Map() };
 
 function escHtml(s) {
@@ -41,12 +30,8 @@ function fmtAmount(v) {
 // ── Render tabella ──────────────────────────────────────────────────────────
 
 function applyFilters(items) {
-    const t = document.getElementById('filter-type')?.value ?? '';
     const q = (document.getElementById('filter-search')?.value ?? '').trim().toLowerCase();
     return items.filter(c => {
-        if (t === 'supplier' && !['supplier', 'both'].includes(c.type)) return false;
-        if (t === 'customer' && !['customer', 'both'].includes(c.type)) return false;
-        if (t === 'both' && c.type !== 'both') return false;
         if (q !== '') {
             const haystack = [c.name, c.vat_number, c.iban, c.email].filter(Boolean).join(' ').toLowerCase();
             if (!haystack.includes(q)) return false;
@@ -76,7 +61,6 @@ function renderRow(c) {
             <a href="${detailUrl}" class="text-decoration-none">${escHtml(c.name)}</a>
             ${c.archived ? '<span class="badge bg-warning-subtle text-warning ms-1">archiviato</span>' : ''}
         </td>
-        <td><span class="badge rounded-pill ${TYPE_BADGE[c.type] || 'bg-secondary'}">${escHtml(TYPE_LABEL[c.type] || c.type)}</span></td>
         <td class="text-end">${exp ? fmtAmount(exp) : '<span class="text-muted">—</span>'}</td>
         <td class="text-end">${inc ? fmtAmount(inc) : '<span class="text-muted">—</span>'}</td>
         <td class="text-end ${netClass}">${bal ? fmtAmount(net) : '<span class="text-muted">—</span>'}</td>
@@ -152,7 +136,6 @@ function openModal(contact = null) {
         modeLabel.textContent = 'Modifica anagrafica';
         form.querySelector('input[name="id"]').value          = contact.id;
         form.querySelector('input[name="name"]').value        = contact.name ?? '';
-        form.querySelector('select[name="type"]').value       = contact.type ?? 'both';
         form.querySelector('input[name="vat_number"]').value  = contact.vat_number ?? '';
         form.querySelector('input[name="iban"]').value        = contact.iban ?? '';
         form.querySelector('input[name="email"]').value       = contact.email ?? '';
@@ -257,7 +240,6 @@ function wire() {
         }
     });
 
-    document.getElementById('filter-type')?.addEventListener('change', rerender);
     document.getElementById('filter-search')?.addEventListener('input', rerender);
     document.getElementById('filter-archived')?.addEventListener('change', loadAll);
 }

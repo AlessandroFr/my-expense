@@ -30,16 +30,7 @@ $contacts = Contact::allForUser($userId, false);
 <div class="card shadow-sm mb-3">
     <div class="card-body py-2">
         <div class="row g-2 align-items-end">
-            <div class="col-12 col-md-3">
-                <label class="form-label small mb-1">Tipo</label>
-                <select id="filter-type" class="form-select form-select-sm">
-                    <option value="">Tutte</option>
-                    <option value="supplier">Fornitori</option>
-                    <option value="customer">Clienti</option>
-                    <option value="both">Entrambi</option>
-                </select>
-            </div>
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-9">
                 <label class="form-label small mb-1">Cerca</label>
                 <input type="text" id="filter-search" class="form-control form-control-sm" placeholder="Nome / P.IVA / IBAN / email">
             </div>
@@ -61,7 +52,6 @@ $contacts = Contact::allForUser($userId, false);
                     <tr>
                         <th style="width:1%"></th>
                         <th>Nome</th>
-                        <th>Tipo</th>
                         <th class="text-end">Spese (anno)</th>
                         <th class="text-end">Entrate (anno)</th>
                         <th class="text-end">Saldo netto</th>
@@ -70,7 +60,7 @@ $contacts = Contact::allForUser($userId, false);
                     </tr>
                 </thead>
                 <tbody id="contacts-tbody">
-                    <tr><td colspan="8" class="text-center text-muted py-4">
+                    <tr><td colspan="7" class="text-center text-muted py-4">
                         <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…
                     </td></tr>
                 </tbody>
@@ -99,22 +89,15 @@ $contacts = Contact::allForUser($userId, false);
             </div>
             <div class="modal-body">
                 <div class="row g-2">
-                    <div class="col-md-7">
+                    <div class="col-md-9">
                         <label class="form-label small mb-1">Nome *</label>
                         <input type="text" name="name" class="form-control" required maxlength="120" placeholder="Es: Enel Energia, Mario Rossi">
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small mb-1">Tipo</label>
-                        <select name="type" class="form-select">
-                            <option value="both">Entrambi</option>
-                            <option value="supplier">Fornitore</option>
-                            <option value="customer">Cliente</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
                         <label class="form-label small mb-1">Colore</label>
                         <input type="color" name="color" class="form-control form-control-color" value="#6c757d">
                     </div>
+                    <input type="hidden" name="type" value="both">
 
                     <div class="col-md-6">
                         <label class="form-label small mb-1">P.IVA / CF</label>

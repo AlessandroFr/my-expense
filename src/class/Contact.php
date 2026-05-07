@@ -32,8 +32,10 @@ final class Contact
     }
 
     /**
-     * @param  ?string $type Filtro: 'supplier' | 'customer' | null (tutti).
-     *                       'supplier' include 'both'; 'customer' include 'both'.
+     * Cliente e fornitore coincidono: il parametro $type viene mantenuto per
+     * back-compat ma e' un no-op — l'UI adesso non distingue piu' i due ruoli.
+     *
+     * @param  ?string $type Ignorato (kept for API compat).
      * @return array<int, array<string,mixed>>
      */
     public static function allForUser(
@@ -48,11 +50,6 @@ final class Contact
         $params = [$userId];
         if (!$includeArchived) {
             $sql .= ' AND archived = 0';
-        }
-        if ($type === 'supplier') {
-            $sql .= " AND type IN ('supplier','both')";
-        } elseif ($type === 'customer') {
-            $sql .= " AND type IN ('customer','both')";
         }
         $sql .= ' ORDER BY name ASC';
         $stmt = Database::pdo()->prepare($sql);
@@ -85,9 +82,11 @@ final class Contact
     }
 
     /**
-     * Lookup case-insensitive per nome; se non esiste lo crea con il
-     * tipo richiesto. Se esiste ed era di tipo opposto, viene promosso a 'both'.
-     * Usato dai form ("crea al volo") e dall'import bancario.
+     * Lookup case-insensitive per nome; se non esiste lo crea (tipo 'both' —
+     * cliente e fornitore coincidono).
+     *
+     * Usato dai form ("crea al volo") e dall'import bancario. Il parametro
+     * $type e' mantenuto solo per back-compat, viene ignorato.
      */
     public static function findOrCreate(int $userId, string $name, string $type = 'both'): int
     {
@@ -98,8 +97,8 @@ final class Contact
         $norm = self::normalize($name);
         $existing = self::findByNormalizedName($userId, $norm);
         if ($existing !== null) {
-            $existingType = (string) $existing['type'];
-            if ($existingType !== 'both' && $existingType !== $type && $type !== 'both') {
+            // Promuovi sempre a 'both' (cliente e fornitore coincidono).
+            if ((string) ($existing['type'] ?? 'both') !== 'both') {
                 $stmt = Database::pdo()->prepare(
                     'UPDATE contacts SET type = \'both\' WHERE id = ? AND user_id = ?'
                 );
@@ -107,7 +106,7 @@ final class Contact
             }
             return (int) $existing['id'];
         }
-        return self::create($userId, $name, $type, []);
+        return self::create($userId, $name, 'both', []);
     }
 
     /**
@@ -115,7 +114,8 @@ final class Contact
      */
     public static function create(int $userId, string $name, string $type, array $details = []): int
     {
-        $row = self::validate($name, $type, $details);
+        // Cliente e fornitore coincidono: ignora il type passato dal caller.
+        $row = self::validate($name, 'both', $details);
         try {
             $stmt = Database::pdo()->prepare(
                 'INSERT INTO contacts
@@ -132,7 +132,14 @@ final class Contact
             }
             throw $e;
         }
-        return (int) Database::pdo()->lastInsertId();
+        $newId = (int) Database::pdo()->lastInsertId();
+
+        // Backfill: scansiona descrizioni esistenti senza contact_id e collega
+        // quelle che menzionano il nome del nuovo contatto. Best-effort: in caso
+        // di errore non impedisce la creazione del contatto.
+        try { self::applyBackfill($userId, $newId, $row['name']); } catch (\Throwable $e) { /* silent */ }
+
+        return $newId;
     }
 
     /**
@@ -315,6 +322,67 @@ final class Contact
             ];
         }
         return $out;
+    }
+
+    /**
+     * Esegui un backfill manuale: collega expenses/incomes/recurring esistenti
+     * senza contact_id che menzionano il nome del contatto in descrizione/source.
+     *
+     * @return array{expenses:int, incomes:int, recurring:int}
+     */
+    public static function backfillByDescription(int $userId, int $contactId): array
+    {
+        $contact = self::findForUser($contactId, $userId);
+        if ($contact === null) return ['expenses' => 0, 'incomes' => 0, 'recurring' => 0];
+        return self::applyBackfill($userId, $contactId, (string) $contact['name']);
+    }
+
+    /**
+     * UPDATE LIKE-based su expenses/incomes/recurring_expenses per collegare
+     * righe ancora orfane (`contact_id IS NULL`) la cui descrizione (o `source`
+     * per incomes) contiene il nome del contatto. Case-insensitive grazie alla
+     * collation utf8mb4_unicode_ci. Skippa nomi sotto i 4 char per limitare
+     * i falsi positivi (es. "BB", "Sky").
+     *
+     * @return array{expenses:int, incomes:int, recurring:int}
+     */
+    private static function applyBackfill(int $userId, int $contactId, string $name): array
+    {
+        $name = trim($name);
+        if (mb_strlen($name) < 4) {
+            return ['expenses' => 0, 'incomes' => 0, 'recurring' => 0];
+        }
+
+        // Escapa wildcard LIKE prima di inserire nel pattern '%name%'.
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $name);
+        $like    = '%' . $escaped . '%';
+
+        $pdo = Database::pdo();
+
+        $exp = $pdo->prepare(
+            'UPDATE expenses SET contact_id = ?
+             WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?'
+        );
+        $exp->execute([$contactId, $userId, $like]);
+
+        $inc = $pdo->prepare(
+            'UPDATE incomes SET contact_id = ?
+             WHERE user_id = ? AND contact_id IS NULL
+               AND (description LIKE ? OR source LIKE ?)'
+        );
+        $inc->execute([$contactId, $userId, $like, $like]);
+
+        $rec = $pdo->prepare(
+            'UPDATE recurring_expenses SET contact_id = ?
+             WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?'
+        );
+        $rec->execute([$contactId, $userId, $like]);
+
+        return [
+            'expenses'  => $exp->rowCount(),
+            'incomes'   => $inc->rowCount(),
+            'recurring' => $rec->rowCount(),
+        ];
     }
 
     /**

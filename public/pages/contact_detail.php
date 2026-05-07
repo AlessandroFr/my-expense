@@ -20,7 +20,6 @@ $contact = $id > 0 ? Contact::findForUser($id, $userId) : null;
     </div>
 <?php else: ?>
 <?php
-$typeLabel = ['supplier' => 'Fornitore', 'customer' => 'Cliente', 'both' => 'Entrambi'][$contact['type']] ?? $contact['type'];
 $year = (int) ($_GET['year'] ?? date('Y'));
 ?>
 <div class="row mb-3">
@@ -35,7 +34,6 @@ $year = (int) ($_GET['year'] ?? date('Y'));
                 <?= htmlspecialchars((string) $contact['name'], ENT_QUOTES, 'UTF-8') ?>
             </h1>
             <div class="text-muted small">
-                <span class="badge bg-secondary-subtle text-secondary me-1"><?= htmlspecialchars($typeLabel, ENT_QUOTES, 'UTF-8') ?></span>
                 <?php if (!empty($contact['vat_number'])): ?>
                     <code class="me-2">P.IVA <?= htmlspecialchars((string) $contact['vat_number'], ENT_QUOTES, 'UTF-8') ?></code>
                 <?php endif; ?>

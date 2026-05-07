@@ -106,14 +106,13 @@ $thisYear = (int) date('Y');
                         <thead class="table-light">
                             <tr>
                                 <th>Anagrafica</th>
-                                <th>Tipo</th>
                                 <th class="text-end">Spese</th>
                                 <th class="text-end">Entrate</th>
                                 <th class="text-end">Saldo netto</th>
                             </tr>
                         </thead>
                         <tbody id="contact-balance-tbody">
-                            <tr><td colspan="5" class="text-center text-muted py-3">
+                            <tr><td colspan="4" class="text-center text-muted py-3">
                                 <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…
                             </td></tr>
                         </tbody>

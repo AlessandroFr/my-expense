@@ -166,15 +166,9 @@ function renderContactBalance(rows) {
     if (!tbody) return;
     tbody.innerHTML = '';
     if (!rows || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nessuna anagrafica con movimenti nel periodo.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nessuna anagrafica con movimenti nel periodo.</td></tr>';
     } else {
         const top = rows.slice(0, 15);
-        const TYPE_LABEL = { supplier: 'Fornitore', customer: 'Cliente', both: 'Entrambi' };
-        const TYPE_BADGE = {
-            supplier: 'bg-danger-subtle text-danger',
-            customer: 'bg-success-subtle text-success',
-            both:     'bg-secondary-subtle text-secondary',
-        };
         const baseUrl = BASE;
         tbody.innerHTML = top.map(r => {
             const netClass = r.net > 0 ? 'text-success' : (r.net < 0 ? 'text-danger' : 'text-muted');
@@ -184,7 +178,6 @@ function renderContactBalance(rows) {
                         <span class="d-inline-block rounded-circle me-1" style="width:.6rem;height:.6rem;background:${escapeHtml(r.color)}"></span>
                         <a href="${baseUrl}/contacts/detail?id=${r.contact_id}&year=${yearSel.value}" class="text-decoration-none">${escapeHtml(r.name)}</a>
                     </td>
-                    <td><span class="badge rounded-pill ${TYPE_BADGE[r.type] || 'bg-secondary'}">${TYPE_LABEL[r.type] || r.type}</span></td>
                     <td class="text-end text-danger">${r.expenses_total ? fmtMoney(r.expenses_total) : '<span class="text-muted">—</span>'}</td>
                     <td class="text-end text-success">${r.incomes_total ? fmtMoney(r.incomes_total) : '<span class="text-muted">—</span>'}</td>
                     <td class="text-end ${netClass}">${fmtMoney(r.net)}</td>
