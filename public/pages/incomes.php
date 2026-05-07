@@ -152,4 +152,54 @@ $accounts = Account::allForUser($userId, false);
 </section>
 </div>
 
+<!-- ── Modal: edit entrata ───────────────────────────────────────────────── -->
+<div class="modal fade" id="income-edit-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="income-edit-form" autocomplete="off">
+                <input type="hidden" name="id" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i>Modifica entrata</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Data</label>
+                            <input type="date" name="income_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Importo (EUR)</label>
+                            <input type="text" name="amount" class="form-control" inputmode="decimal" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Origine</label>
+                            <input type="text" name="source" class="form-control" list="income-sources" required maxlength="64">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>
+                            <select name="account_id" class="form-select">
+                                <option value="">— Nessuno —</option>
+                                <?php foreach ($accounts as $a): ?>
+                                    <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">Descrizione</label>
+                            <input type="text" name="description" class="form-control" maxlength="512" placeholder="Note opzionali">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg me-1"></i>Salva modifiche
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script type="module" src="<?= $asset('js/pages/incomes.js') ?>"></script>

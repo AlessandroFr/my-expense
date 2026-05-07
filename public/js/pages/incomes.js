@@ -6,7 +6,7 @@ import { apiSend, apiGuard, escapeHtml, escapeAttr,
          confirmDialog, delegateTableClick }            from '../componentBase.js';
 import { toast }                                         from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
-import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
+import { optimisticCreate, optimisticDelete } from '../optimistic.js';
 import { renderPager }                                   from '../pager.js';
 
 const api  = FetchRequest.getInstance();
@@ -56,7 +56,6 @@ const sourceSel   = filtersForm.querySelector('select[name="source"]');
 const sourceList  = document.getElementById('income-sources');
 const resetBtn    = document.getElementById('income-filters-reset');
 
-let editingId = null;
 let cache     = [];
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
@@ -133,34 +132,64 @@ function renderDetailRow(it, detailId) {
         </tr>`;
 }
 
-function buildAccountOptions(selected) {
-    const sel = selected != null ? Number(selected) : null;
-    const accSel = document.querySelector('#income-create-form select[name="account_id"]');
-    const opts = ['<option value="">— Nessuno —</option>'];
-    if (accSel) {
-        for (const o of accSel.querySelectorAll('option[value]')) {
-            if (o.value === '') continue;
-            const s = Number(o.value) === sel ? ' selected' : '';
-            opts.push(`<option value="${o.value}"${s}>${escapeHtml(o.textContent.trim())}</option>`);
-        }
-    }
-    return opts.join('');
+// ── Edit modal ─────────────────────────────────────────────────────────────
+let editModalEl = null, editModalInstance = null;
+
+function getCsrfToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
 }
 
-function renderEditRow(it) {
-    return `
-        <tr data-id="${it.id}" class="table-warning">
-            <td></td>
-            <td><input type="date" class="form-control form-control-sm" name="income_date" value="${escapeAttr(it.income_date)}" required></td>
-            <td><select class="form-select form-select-sm" name="account_id">${buildAccountOptions(it.account_id)}</select></td>
-            <td><input type="text" class="form-control form-control-sm" name="source" value="${escapeAttr(it.source)}" maxlength="64" required></td>
-            <td><input type="text" class="form-control form-control-sm" name="description" value="${escapeAttr(it.description ?? '')}" maxlength="512"></td>
-            <td><input type="text" class="form-control form-control-sm text-end" name="amount" value="${escapeAttr(it.amount)}" inputmode="decimal" required></td>
-            <td class="text-end">
-                <button type="button" class="btn btn-sm btn-success" data-action="save"   data-id="${it.id}"><i class="bi bi-check-lg"></i></button>
-                <button type="button" class="btn btn-sm btn-secondary" data-action="cancel" data-id="${it.id}"><i class="bi bi-x-lg"></i></button>
-            </td>
-        </tr>`;
+function ensureEditModal() {
+    if (editModalInstance) return editModalInstance;
+    editModalEl = document.getElementById('income-edit-modal');
+    if (!editModalEl) return null;
+    editModalInstance = new bootstrap.Modal(editModalEl);
+    const form = document.getElementById('income-edit-form');
+    form.addEventListener('submit', onEditFormSubmit);
+    return editModalInstance;
+}
+
+function openEditModal(id) {
+    const it = cache.find(x => String(x.id) === String(id));
+    if (!it) return;
+    const m = ensureEditModal();
+    if (!m) return;
+    const form = document.getElementById('income-edit-form');
+    form.elements['id'].value          = it.id;
+    form.elements['income_date'].value = it.income_date ?? '';
+    form.elements['amount'].value      = it.amount ?? '';
+    form.elements['source'].value      = it.source ?? '';
+    form.elements['account_id'].value  = it.account_id != null ? String(it.account_id) : '';
+    form.elements['description'].value = it.description ?? '';
+    m.show();
+}
+
+async function onEditFormSubmit(ev) {
+    ev.preventDefault();
+    const form = ev.currentTarget;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+        const fd = new FormData(form);
+        const payload = {
+            id:          fd.get('id'),
+            income_date: fd.get('income_date'),
+            amount:      fd.get('amount'),
+            source:      fd.get('source'),
+            account_id:  fd.get('account_id') ?? '',
+            description: fd.get('description') ?? '',
+            _csrf:       getCsrfToken(),
+        };
+        await send(`${BASE}/incomes/update`, payload);
+        toast.success('Entrata aggiornata.');
+        editModalInstance?.hide();
+        loadList();
+    } catch (err) {
+        toast.error(err.message ?? 'Errore aggiornamento entrata.');
+    } finally {
+        submitBtn.disabled = false;
+    }
 }
 
 // Helper: rimuove il detail row che segue immediatamente la view row, se presente.
@@ -280,56 +309,7 @@ delegateTableClick(tbody, {
         }
     },
     edit: (id) => {
-        if (editingId !== null && editingId != id) {
-            const prev = cache.find(x => x.id == editingId);
-            if (prev) {
-                const prevTr = tbody.querySelector(`tr[data-id="${editingId}"]`);
-                if (prevTr) {
-                    // L'edit row precedente non ha detail sibling (rimosso al click edit),
-                    // quindi outerHTML può espandere a 2 trs senza orfani.
-                    prevTr.outerHTML = renderRow(prev);
-                }
-            }
-        }
-        editingId = id;
-        const it  = cache.find(x => x.id == id);
-        if (!it) return;
-        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
-        if (!tr) return;
-        // Rimuove il detail row sibling prima di sostituire la view row con l'edit row.
-        removeIncomeDetailSibling(tr);
-        tr.outerHTML = renderEditRow(it);
-    },
-    cancel: (id) => {
-        const it = cache.find(x => x.id == id);
-        if (!it) return;
-        editingId = null;
-        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
-        if (!tr) return;
-        // L'edit row non ha detail sibling: outerHTML inserisce view + detail in posizione.
-        tr.outerHTML = renderRow(it);
-    },
-    save: async (id) => {
-        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
-        const data = {
-            id,
-            source:      tr.querySelector('input[name="source"]').value,
-            description: tr.querySelector('input[name="description"]').value,
-            amount:      tr.querySelector('input[name="amount"]').value,
-            income_date: tr.querySelector('input[name="income_date"]').value,
-            account_id:  tr.querySelector('select[name="account_id"]')?.value ?? '',
-        };
-        try {
-            await optimisticUpdate({
-                row: tr,
-                applyValues: () => { /* values in inputs */ },
-                makeFinalRow: () => null,
-                call: () => send(`${BASE}/incomes/update`, data),
-            });
-            toast.success('Entrata aggiornata.');
-            editingId = null;
-            loadList();
-        } catch { /* toast shown */ }
+        openEditModal(id);
     },
     delete: async (id) => {
         const ok = await confirmDialog('Eliminare questa entrata?', { confirmText: 'Elimina', confirmClass: 'btn-danger' });

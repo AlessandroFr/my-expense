@@ -287,34 +287,68 @@ function removeDetailSibling(viewTr) {
     if (sibling && sibling.classList.contains('mx-detail-row')) sibling.remove();
 }
 
-function replaceWithEditRow(tr) {
-    // Rimuove eventuale detail row sibling per non lasciarlo orfano.
-    removeDetailSibling(tr);
+// Edit modal: popolato dai dataset della <tr> alla pressione di "Modifica".
+let editModalEl = null, editModalInstance = null, editModalCurrentId = null;
+
+function ensureEditModal() {
+    if (editModalInstance) return editModalInstance;
+    editModalEl = document.getElementById('expense-edit-modal');
+    if (!editModalEl) return null;
+    editModalInstance = new bootstrap.Modal(editModalEl);
+    const form = document.getElementById('expense-edit-form');
+    form.addEventListener('submit', onEditFormSubmit);
+    return editModalInstance;
+}
+
+function openEditModal(tr) {
+    const m = ensureEditModal();
+    if (!m) return;
     const e = JSON.parse(tr.dataset.expense || '{}');
-    const tagNames = (e.tags ?? []).map(t => t.name).join(', ');
-    const edit = document.createElement('tr');
-    edit.dataset.id = String(e.id);
-    edit.classList.add('table-warning');
-    edit.innerHTML = `
-        <td></td>
-        <td><input type="date"   name="expense_date"   class="form-control form-control-sm" required value="${escHtml(e.expense_date)}"></td>
-        <td><select               name="account_id"     class="form-select form-select-sm">${buildAccountOptions(e.account_id)}</select></td>
-        <td><select               name="category_id"    class="form-select form-select-sm">${buildCategoryOptions(e.category_id)}</select></td>
-        <td>
-            <input type="text" name="description" class="form-control form-control-sm mb-1" maxlength="512" value="${escHtml(e.description ?? '')}">
-            <input type="text" name="shared_with" class="form-control form-control-sm" maxlength="255" placeholder="Condiviso con..." value="${escHtml(e.shared_with ?? '')}">
-        </td>
-        <td><input type="text"   name="tags"           class="form-control form-control-sm" list="all-tags-datalist" placeholder="tag, separati" value="${escHtml(tagNames)}"></td>
-        <td><select               name="payment_method" class="form-select form-select-sm">${buildPaymentOptions(e.payment_method)}</select></td>
-        <td>
-            <input type="number" name="amount"       class="form-control form-control-sm text-end mb-1" step="0.01" min="0.01" required value="${escHtml(e.amount)}" title="Totale">
-            <input type="number" name="share_amount" class="form-control form-control-sm text-end" step="0.01" min="0.01" placeholder="tua quota" value="${escHtml(e.share_amount ?? '')}" title="La tua quota">
-        </td>
-        <td class="text-end mx-row-actions">
-            <button type="button" class="btn btn-sm btn-success" data-action="save" title="Salva"><i class="bi bi-check-lg"></i></button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="cancel" title="Annulla"><i class="bi bi-x-lg"></i></button>
-        </td>`;
-    tr.replaceWith(edit);
+    editModalCurrentId = String(e.id);
+    const form = document.getElementById('expense-edit-form');
+    form.elements['id'].value             = e.id;
+    form.elements['expense_date'].value   = e.expense_date ?? '';
+    form.elements['amount'].value         = e.amount ?? '';
+    form.elements['payment_method'].value = e.payment_method ?? 'card';
+    form.elements['category_id'].value    = e.category_id != null ? String(e.category_id) : '';
+    form.elements['account_id'].value     = e.account_id  != null ? String(e.account_id)  : '';
+    form.elements['description'].value    = e.description ?? '';
+    form.elements['tags'].value           = (e.tags ?? []).map(t => t.name).join(', ');
+    form.elements['shared_with'].value    = e.shared_with ?? '';
+    form.elements['share_amount'].value   = e.share_amount ?? '';
+    m.show();
+}
+
+async function onEditFormSubmit(ev) {
+    ev.preventDefault();
+    const form = ev.currentTarget;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+        const fd = new FormData(form);
+        const id = String(fd.get('id') ?? editModalCurrentId ?? '');
+        const tagsCsv = String(fd.get('tags') ?? '');
+        const params = new URLSearchParams();
+        for (const [k, v] of fd.entries()) {
+            if (k === 'tags') continue;
+            params.set(k, String(v));
+        }
+        params.set('_csrf', getCsrfToken());
+
+        const r = await send(`${BASE}/expenses/update`, params);
+
+        if (id) await assignTags(id, tagsCsv);
+        await loadTags();
+        await loadList();
+
+        toast.success('Spesa aggiornata.');
+        showBudgetWarning(r.data?.budget_warning);
+        editModalInstance?.hide();
+    } catch (err) {
+        toast.error(err.message ?? 'Errore aggiornamento spesa.');
+    } finally {
+        submitBtn.disabled = false;
+    }
 }
 
 // ── Total ──────────────────────────────────────────────────────────────────
@@ -572,17 +606,12 @@ function wireTableActions() {
         }
 
         if (action === 'edit') {
-            await withViewTransition(() => replaceWithEditRow(tr));
+            openEditModal(tr);
             return;
         }
 
         if (action === 'attach') {
             openAttachmentsModal(tr.dataset.id);
-            return;
-        }
-
-        if (action === 'cancel') {
-            await loadList();
             return;
         }
 
@@ -613,55 +642,6 @@ function wireTableActions() {
             return;
         }
 
-        if (action === 'save') {
-            const id = tr.dataset.id;
-            const inputs = tr.querySelectorAll('input, select');
-            const params = new URLSearchParams();
-            params.set('id', id);
-            params.set('_csrf', getCsrfToken());
-            const tagsCsv = tr.querySelector('input[name="tags"]')?.value ?? '';
-            inputs.forEach(i => {
-                if (i.name === 'tags') return;
-                params.set(i.name, i.value);
-            });
-
-            btn.disabled = true;
-            try {
-                const r = await optimisticUpdate({
-                    row: tr,
-                    applyValues: () => { /* values already shown in inputs */ },
-                    makeFinalRow: (resp) => {
-                        const exp = resp.data?.expense;
-                        return exp ? renderViewRow(exp) : null;
-                    },
-                    call: () => send(`${BASE}/expenses/update`, params),
-                });
-                const exp = r.data?.expense;
-                if (exp) {
-                    // optimisticUpdate ha sostituito solo la view row: aggancia il
-                    // detail row aggiornato (eventualmente già presente con dati
-                    // vecchi va rimpiazzato).
-                    const newRow = document.querySelector(`#expenses-tbody tr[data-id="${exp.id}"]`);
-                    if (newRow) {
-                        const sibling = newRow.nextElementSibling;
-                        if (sibling && sibling.classList.contains('mx-detail-row')) sibling.remove();
-                        newRow.after(renderDetailRow(exp));
-                    }
-                }
-                const tags = await assignTags(id, tagsCsv);
-                if (tags && exp) {
-                    const newRow = document.querySelector(`#expenses-tbody tr[data-id="${exp.id}"]`);
-                    if (newRow) replaceRowPair(newRow, { ...exp, tags });
-                }
-                await loadTags();
-                updateTotalFromTable();
-                toast.success('Spesa aggiornata.');
-                showBudgetWarning(r.data?.budget_warning);
-            } catch {
-                btn.disabled = false;
-            }
-            return;
-        }
     });
 }
 

@@ -407,6 +407,82 @@ $paymentLabels  = [
 </section>
 </div>
 
+<!-- ── Modal: edit spesa ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="expense-edit-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="expense-edit-form" autocomplete="off">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="id" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i>Modifica spesa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small">Data</label>
+                            <input type="date" name="expense_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Importo €</label>
+                            <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Pagamento</label>
+                            <select name="payment_method" class="form-select" required>
+                                <?php foreach ($paymentMethods as $pm): ?>
+                                    <option value="<?= htmlspecialchars($pm, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($paymentLabels[$pm] ?? $pm, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Categoria</label>
+                            <select name="category_id" class="form-select">
+                                <option value="">— Nessuna —</option>
+                                <?php foreach ($categories as $c): ?>
+                                    <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>
+                            <select name="account_id" class="form-select">
+                                <option value="">— Nessuno —</option>
+                                <?php foreach ($accounts as $a): ?>
+                                    <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">Descrizione</label>
+                            <input type="text" name="description" class="form-control" maxlength="512" placeholder="es. Pranzo bar">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">Tag <span class="text-muted">(separati da virgola)</span></label>
+                            <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label small">Condivisa con <span class="text-muted">(opz.)</span></label>
+                            <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small">Tua quota €</label>
+                            <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Salva modifiche
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal: allegati ────────────────────────────────────────────────────── -->
 <div class="modal fade" id="attachments-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
