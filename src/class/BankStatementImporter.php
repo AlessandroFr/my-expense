@@ -701,6 +701,16 @@ final class BankStatementImporter
         $desc = trim($descrizione);
         if ($desc === '') return null;
 
+        // Pattern kind-agnostic: bonifici col sandwich "FAV. NOME BONIFICO".
+        // Es: "VOSTRA DISPOSIZIONE A FAV. SILVIA POLATO BONIFICO DISPOSTO IN:
+        //      INTERNET COOR.BENEF.: IT25 F010 ... CRO: 000"
+        //                              → "Silvia Polato"
+        // Match indipendente dal kind (alcune banche lo usano per accrediti
+        // riflessi: il sandwich e' specifico abbastanza da non collidere).
+        if (preg_match('/\bFAV\.\s+([A-Z][A-Z\s\.\']+?)\s+BONIFICO\b/u', $desc, $m)) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+
         if ($kind === 'income') {
             // Pattern dei bonifici ricevuti — il nome del cliente / pagatore
             // viene preceduto da uno di questi prefissi verbatim:
@@ -732,6 +742,30 @@ final class BankStatementImporter
 
         // SDD: "ADDEBITO SDD ENEL ENERGIA VAL. ..." → "Enel Energia"
         if (preg_match('/^ADDEBITO\s+SDD\s+(.+?)(?:\s+VAL\.|\s+COD\.|\s+RIF\.|\s+MANDATO|$)/i', $desc, $m)) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+
+        // Carta di debito con notazione "C/O NOME …": il merchant viene
+        // sempre indicato dopo "C/O" e termina al primo terminatore tipico
+        // dell'estratto conto:
+        //  - keyword bancarie:  DEL VAL COD CRO NOTE DATA IL IN
+        //  - prefissi indirizzi: VIA VIALE PIAZZA CORSO LARGO VICOLO GALLERIA
+        //  - qualsiasi numero (date tipo 15/08/23, codici, importi)
+        //  - fine stringa
+        // Es:
+        //   "ADDEBITO CARTA N. 5266981 C/O BE PROUD S.R.L. DEL 15/08/23 A PADOVA"
+        //                                → "Be Proud S.r.l"
+        //   "C/O SCOUT VIA ROMA 23 PAGAMENTO NFC - SAMSUNG PAY COD. MCC 5691"
+        //                                → "Scout"
+        //   "C/O FOO BAR 12/03/26"       → "Foo Bar"
+        //   "C/O ACME SRL IN ROMA"       → "Acme Srl"
+        if (preg_match(
+            '/\bC\/O\s+([A-Z][A-Z0-9\s\.\']+?)'
+            . '(?:\s+(?:DEL|VAL|COD|CRO|NOTE|DATA|IL|IN'
+            . '|VIA|VIALE|PIAZZA|CORSO|LARGO|VICOLO|GALLERIA)\b'
+            . '|\s+\d|$)/u',
+            $desc, $m
+        )) {
             return self::cleanupCounterpartyName($m[1]);
         }
 
