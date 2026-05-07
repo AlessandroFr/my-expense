@@ -1046,43 +1046,32 @@ function bankRenderPager() {
 
 /**
  * Propaga il contact_name di una riga sorgente alle ALTRE righe del file.
- * Due criteri di match (case-insensitive, soglia 4 char):
- *  - RENAME: la riga aveva esattamente `oldContactName` → la rinomina al
- *    nuovo nome (non importa la descrizione, e' un'esplicita correzione).
- *  - SUBSTRING: la descrizione della riga contiene il NUOVO nome E la riga
- *    e' libera o gia' auto-propagata (non sovrascrive i nomi manuali/extracted).
+ * Regola unica e tassativa: la descrizione della riga target DEVE contenere
+ * il nuovo nome (case-insensitive, soglia minima 4 char). Se non lo contiene
+ * la riga resta com'e', anche se prima aveva lo stesso nome di srcRow.
  *
  * Le righe toccate vengono marcate `contact_propagated=true`.
  * Ritorna il numero di righe aggiornate.
  */
-function bankPropagateContactName(srcRow, oldContactName = '') {
+function bankPropagateContactName(srcRow) {
     const name = (srcRow.contact_name ?? '').trim();
     if (name === '') return 0;
     const normName = name.toLowerCase();
     if (normName.length < 4) return 0;
-
-    const oldNorm = (oldContactName ?? '').trim().toLowerCase();
-    const isRename = oldNorm.length >= 4 && oldNorm !== normName;
 
     let touched = 0;
     for (const r of bankPreviewState.rows) {
         if (r.idx === srcRow.idx) continue;
         if (r.kind !== 'expense' && r.kind !== 'income') continue;
 
-        const currentName = (r.contact_name ?? '').trim();
-        const currentNorm = currentName.toLowerCase();
+        const currentNorm = (r.contact_name ?? '').trim().toLowerCase();
         if (currentNorm === normName) continue; // gia' identica
 
-        // A) Rinomina: riga col vecchio nome → diventa il nuovo nome.
-        const matchesByOldName = isRename && currentNorm === oldNorm;
-
-        // B) Descrizione contiene il NUOVO nome — sempre, indipendentemente
-        //    da chi aveva impostato il nome corrente (vincolo voluto dall'utente:
-        //    rinominando, ogni riga la cui descrizione matcha deve aggiornarsi).
+        // Vincolo richiesto dall'utente: il nuovo nome deve essere
+        // letteralmente presente nella descrizione della riga, altrimenti
+        // la riga si lascia inalterata.
         const descLow = (r.description ?? '').toLowerCase();
-        const matchesByDesc = descLow.includes(normName);
-
-        if (!matchesByDesc && !matchesByOldName) continue;
+        if (!descLow.includes(normName)) continue;
 
         r.contact_name           = name;
         r.contact_id             = srcRow.contact_id ?? null;
@@ -1292,15 +1281,6 @@ function wireBankImport() {
         if (!tr) return;
         const field = cell.dataset.field;
 
-        // Catturo il vecchio nome anagrafica PRIMA del sync per il rename
-        // (bankSyncRowFromTr sovrascrive r.contact_name col valore nuovo).
-        let oldContactName = '';
-        if (field === 'contact_name') {
-            const idx = Number(tr.dataset.idx);
-            const stale = bankPreviewState.rows.find(x => x.idx === idx);
-            oldContactName = (stale?.contact_name ?? '').trim();
-        }
-
         const r = bankSyncRowFromTr(tr);
         if (!r) return;
 
@@ -1323,10 +1303,10 @@ function wireBankImport() {
             return;
         }
         if (field === 'contact_name') {
-            // Propagazione live: il nome appena scritto/modificato vale per
-            // altre righe (descrizione contiene il nome) E per le righe
-            // che avevano lo stesso vecchio nome (rinomina cascata).
-            const touched = bankPropagateContactName(r, oldContactName);
+            // Propagazione live: il nuovo nome viene applicato alle altre
+            // righe del file SOLO se appare letteralmente nella loro
+            // descrizione. Le altre restano invariate.
+            const touched = bankPropagateContactName(r);
             if (touched > 0) {
                 bankRenderRows();
                 toast.success(`Anagrafica "${r.contact_name}" propagata a ${touched} altre riga${touched === 1 ? '' : 'e'} del file.`);
