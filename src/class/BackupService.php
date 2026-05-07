@@ -11,8 +11,9 @@ use ZipArchive;
  * Genera un backup completo dei dati dell'utente: SQL dump (INSERT statements
  * scoped sul user_id) + tutti gli allegati come archivio ZIP scaricabile.
  *
- * Tabelle esportate: users, categories, accounts, tags, budgets, recurring_expenses,
- * incomes, expenses, expense_tags, expense_attachments, saved_filters.
+ * Tabelle esportate: users, categories, accounts, contacts, tags, budgets,
+ * recurring_expenses, incomes, expenses, expense_tags, expense_attachments,
+ * saved_filters.
  */
 final class BackupService
 {
@@ -20,6 +21,7 @@ final class BackupService
         'users'              => ['user_filter' => 'id'],
         'categories'         => ['user_filter' => 'user_id'],
         'accounts'           => ['user_filter' => 'user_id'],
+        'contacts'           => ['user_filter' => 'user_id'],
         'tags'               => ['user_filter' => 'user_id'],
         'budgets'            => ['user_filter' => 'user_id'],
         'recurring_expenses' => ['user_filter' => 'user_id'],

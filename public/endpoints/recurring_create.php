@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use App\Auth;
+use App\Contact;
 use App\Csrf;
 use App\Json;
 use App\RecurringExpense;
@@ -16,6 +17,15 @@ if (!Csrf::check()) {
 $userId = (int) Auth::userId();
 
 try {
+    $contactRaw  = $_POST['contact_id']   ?? '';
+    $contactName = trim((string) ($_POST['contact_name'] ?? ''));
+    $contactId   = null;
+    if ($contactRaw !== '' && $contactRaw !== '0') {
+        $contactId = (int) $contactRaw;
+    } elseif ($contactName !== '') {
+        $contactId = Contact::findOrCreate($userId, $contactName, 'supplier');
+    }
+
     $id = RecurringExpense::create(
         $userId,
         ($_POST['category_id'] ?? '') === '' ? null : (int) $_POST['category_id'],
@@ -25,6 +35,7 @@ try {
         (string) ($_POST['frequency']      ?? 'monthly'),
         (string) ($_POST['start_date']     ?? ''),
         ($_POST['end_date'] ?? '') === '' ? null : (string) $_POST['end_date'],
+        $contactId,
     );
 } catch (Throwable $e) {
     Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);

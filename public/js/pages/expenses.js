@@ -881,6 +881,14 @@ function bankRenderRow(r) {
               ${bankRenderPaymentOptions(payDefault)}
            </select>`;
 
+    const contactBadge = r.contact_id_matched
+        ? `<span class="badge bg-info-subtle text-info" title="Anagrafica esistente">esistente</span>`
+        : (r.contact_suggested_name ? `<span class="badge bg-warning-subtle text-warning" title="Verra' creata">nuova</span>` : '');
+    const contactCol = `
+        <input type="text" class="form-control form-control-sm bank-cell" data-field="contact_name"
+               value="${escHtml(r.contact_name ?? '')}" placeholder="—" maxlength="120">
+        <div class="form-text small mt-0">${contactBadge}</div>`;
+
     return `<tr data-idx="${r.idx}" class="${r.skip ? 'table-secondary text-muted' : ''}">
         <td class="text-center">
             <input type="checkbox" class="bank-cell" data-field="include" ${r.skip ? '' : 'checked'} title="Importa questa riga">
@@ -904,6 +912,7 @@ function bankRenderRow(r) {
             </div>
         </td>
         <td>${classCol}</td>
+        <td>${contactCol}</td>
         <td>${payCol}</td>
         <td>
             <input type="number" step="0.01" min="0.01" class="form-control form-control-sm text-end bank-cell"
@@ -1037,6 +1046,18 @@ function bankSyncRowFromTr(tr) {
     const payEl = get('payment_method');
     if (payEl) r.payment_method = payEl.value;
 
+    // Anagrafica editata: se l'utente ha cambiato il testo, scarta il match
+    // precedente (saranno creati al volo via Contact::findOrCreate).
+    const contactEl = get('contact_name');
+    if (contactEl) {
+        const newName = contactEl.value.trim();
+        if (newName !== (r.contact_name ?? '').trim()) {
+            r.contact_id = null;
+            r.contact_id_matched = null;
+        }
+        r.contact_name = newName;
+    }
+
     return r;
 }
 
@@ -1099,7 +1120,13 @@ function wireBankImport() {
             const json = await r.json();
             if (!json.ok) throw new Error(json.error?.message ?? 'Errore anteprima.');
             const d = json.data ?? {};
-            bankPreviewState.rows       = d.rows ?? [];
+            bankPreviewState.rows       = (d.rows ?? []).map(r => ({
+                ...r,
+                // Normalizza i suggerimenti anagrafica in campi che il commit
+                // backend consuma direttamente (resolveContactFromRow).
+                contact_id:   r.contact_id   ?? r.contact_id_matched ?? null,
+                contact_name: r.contact_name ?? r.contact_suggested_name ?? '',
+            }));
             bankPreviewState.categories = d.categories ?? [];
             bankPreviewState.page       = 1;
             if (toggleAll) toggleAll.checked = bankPreviewState.rows.some(r => !r.skip);

@@ -233,3 +233,30 @@ CREATE TABLE IF NOT EXISTS `saved_filters` (
     CONSTRAINT `fk_saved_filters_user`
         FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Anagrafiche fornitori/clienti ────────────────────────────────────────────
+-- Migration: 017_contacts.sql (+ ALTER su expenses/incomes/recurring per contact_id)
+-- name_norm e' il nome normalizzato (lower + trim + spazi collassati) usato
+-- per il matching case-insensitive in import bank statement.
+CREATE TABLE IF NOT EXISTS `contacts` (
+    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id`    INT UNSIGNED NOT NULL,
+    `name`       VARCHAR(120) NOT NULL,
+    `name_norm`  VARCHAR(120) NOT NULL,
+    `type`       ENUM('supplier','customer','both') NOT NULL DEFAULT 'both',
+    `vat_number` VARCHAR(32)  NULL,
+    `iban`       VARCHAR(34)  NULL,
+    `email`      VARCHAR(120) NULL,
+    `notes`      TEXT         NULL,
+    `color`      VARCHAR(7)   NOT NULL DEFAULT '#6c757d',
+    `archived`   TINYINT(1)   NOT NULL DEFAULT 0,
+    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_contacts_user_namenorm` (`user_id`, `name_norm`),
+    KEY `ix_contacts_user_archived` (`user_id`, `archived`),
+    CONSTRAINT `fk_contacts_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- NOTA: per gli ALTER TABLE che aggiungono `contact_id` a expenses/incomes/recurring_expenses
+--       vedere database/migrations/017_contacts.sql.

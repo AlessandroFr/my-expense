@@ -15,6 +15,7 @@ $filters = [
     'date_to'   => $_GET['date_to']   ?? null,
     'source'     => $_GET['source']     ?? null,
     'account_id' => isset($_GET['account_id']) && $_GET['account_id'] !== '' ? (int) $_GET['account_id'] : null,
+    'contact_id' => isset($_GET['contact_id']) && $_GET['contact_id'] !== '' ? (int) $_GET['contact_id'] : null,
     'search'     => $_GET['search']     ?? null,
     'limit'     => (int) ($_GET['limit']  ?? 200),
     'offset'    => (int) ($_GET['offset'] ?? 0),

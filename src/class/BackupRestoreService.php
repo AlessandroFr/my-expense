@@ -33,6 +33,7 @@ final class BackupRestoreService
     private const ALLOWED_TABLES = [
         'categories',
         'accounts',
+        'contacts',
         'tags',
         'budgets',
         'recurring_expenses',

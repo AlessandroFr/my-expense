@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 use App\Auth;
 use App\Budget;
+use App\Contact;
 use App\Csrf;
 use App\Expense;
 use App\Json;
@@ -39,8 +40,22 @@ $expenseDate   = (string) ($_POST['expense_date'] ?? date('Y-m-d'));
 $sharedWith    = ($_POST['shared_with']  ?? '') === '' ? null : (string) $_POST['shared_with'];
 $shareAmount   = ($_POST['share_amount'] ?? '') === '' ? null : (string) $_POST['share_amount'];
 
+$contactRaw  = $_POST['contact_id']   ?? '';
+$contactName = trim((string) ($_POST['contact_name'] ?? ''));
+$contactId   = null;
+// "0" o "" significano "rimuovi anagrafica"; presenza esplicita di id positivo o nome la imposta.
+if ($contactRaw !== '' && $contactRaw !== '0') {
+    $contactId = (int) $contactRaw;
+} elseif ($contactName !== '') {
+    try {
+        $contactId = Contact::findOrCreate($userId, $contactName, 'supplier');
+    } catch (Throwable $e) {
+        Json::error($e->getMessage(), Json::ERR_VALIDATION, 400);
+    }
+}
+
 try {
-    Expense::update($id, $userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount);
+    Expense::update($id, $userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount, $contactId);
     $row = Expense::findForUser($id, $userId);
     $ym  = substr($expenseDate, 0, 7);
     $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);

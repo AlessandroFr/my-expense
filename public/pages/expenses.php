@@ -8,6 +8,7 @@ use App\Account;
 use App\Auth;
 use App\Category;
 use App\Config;
+use App\Contact;
 use App\Csrf;
 use App\Expense;
 
@@ -16,6 +17,7 @@ $userId     = (int) Auth::userId();
 $categories = Category::allForUser($userId);
 $accounts    = Account::allForUser($userId, false);
 $defaultCash = Account::defaultCashFor($userId);
+$contacts    = Contact::allForUser($userId, false, 'supplier');
 $today       = date('Y-m-d');
 $paymentMethods = Expense::PAYMENT_METHODS;
 $paymentLabels  = [
@@ -161,6 +163,7 @@ $paymentLabels  = [
                                     <th style="width:120px">Tipo</th>
                                     <th>Descrizione</th>
                                     <th style="width:200px">Categoria / Origine</th>
+                                    <th style="width:180px">Anagrafica</th>
                                     <th style="width:120px">Pagamento</th>
                                     <th style="width:110px" class="text-end">Importo</th>
                                 </tr>
@@ -262,6 +265,15 @@ $paymentLabels  = [
                         <textarea id="expense-create-description" name="description" class="form-control mx-rich-editor" rows="3" maxlength="2048" placeholder="es. Pranzo bar"></textarea>
                     </div>
                     <div class="col-12">
+                        <label class="form-label small">Fornitore <span class="text-muted">(opz., crea al volo)</span></label>
+                        <input type="text" name="contact_name" class="form-control" list="contacts-datalist" maxlength="120" placeholder="es. Esselunga, Enel Energia">
+                        <datalist id="contacts-datalist">
+                            <?php foreach ($contacts as $cn): ?>
+                                <option value="<?= htmlspecialchars((string) $cn['name'], ENT_QUOTES, 'UTF-8') ?>"></option>
+                            <?php endforeach; ?>
+                        </datalist>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label small">Tag <span class="text-muted">(separati da virgola, opz.)</span></label>
                         <input type="text" name="tags" class="form-control" list="all-tags-datalist" placeholder="lavoro, ufficio, urgente">
                         <datalist id="all-tags-datalist"></datalist>
@@ -313,6 +325,15 @@ $paymentLabels  = [
                             <option value="">Tutti</option>
                             <?php foreach ($accounts as $a): ?>
                                 <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Fornitore</label>
+                        <select name="contact_id" class="form-select form-select-sm">
+                            <option value="">Tutti</option>
+                            <?php foreach ($contacts as $cn): ?>
+                                <option value="<?= (int) $cn['id'] ?>"><?= htmlspecialchars((string) $cn['name'], ENT_QUOTES, 'UTF-8') ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

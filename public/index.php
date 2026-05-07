@@ -228,6 +228,34 @@ switch ($route) {
         require __DIR__ . '/endpoints/attachments_download.php';
         break;
 
+    // ── Anagrafiche fornitori/clienti ────────────────────────────────────
+    case 'GET /contacts':
+        Auth::requireLogin();
+        renderPage('contacts');
+        break;
+    case 'GET /contacts/list':
+        require __DIR__ . '/endpoints/contacts_list.php';
+        break;
+    case 'POST /contacts/create':
+        require __DIR__ . '/endpoints/contacts_create.php';
+        break;
+    case 'POST /contacts/update':
+        require __DIR__ . '/endpoints/contacts_update.php';
+        break;
+    case 'POST /contacts/archive':
+        require __DIR__ . '/endpoints/contacts_archive.php';
+        break;
+    case 'POST /contacts/delete':
+        require __DIR__ . '/endpoints/contacts_delete.php';
+        break;
+    case 'GET /contacts/detail':
+        Auth::requireLogin();
+        renderPage('contact_detail', ['id' => (int) ($_GET['id'] ?? 0)]);
+        break;
+    case 'GET /contacts/balance':
+        require __DIR__ . '/endpoints/contacts_balance.php';
+        break;
+
     // ── Conti (multi-account) ────────────────────────────────────────────
     case 'GET /accounts':
         Auth::requireLogin();
@@ -302,6 +330,8 @@ function renderPage(string $page, array $data = []): void
         'recurring'     => 'Spese ricorrenti',
         'reports'       => 'Report annuale',
         'accounts'      => 'Conti',
+        'contacts'      => 'Anagrafiche',
+        'contact_detail'=> 'Dettaglio anagrafica',
         'settings'      => 'Impostazioni',
         default         => 'Pagina non trovata',
     };

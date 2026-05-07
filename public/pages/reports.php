@@ -90,6 +90,52 @@ $thisYear = (int) date('Y');
     </div>
 </div>
 
+<!-- ── Bilancio per anagrafica ──────────────────────────────────────────── -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 mb-3 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-person-rolodex me-1"></i>Bilancio per anagrafica</span>
+            <a href="<?= htmlspecialchars($base . '/contacts', ENT_QUOTES, 'UTF-8') ?>" class="small text-decoration-none">
+                Vedi tutte <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </h2>
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0" id="contact-balance-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Anagrafica</th>
+                                <th>Tipo</th>
+                                <th class="text-end">Spese</th>
+                                <th class="text-end">Entrate</th>
+                                <th class="text-end">Saldo netto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contact-balance-tbody">
+                            <tr><td colspan="5" class="text-center text-muted py-3">
+                                <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="small text-muted mb-1 text-center">Top fornitori</div>
+                        <div style="position:relative;height:200px"><canvas id="chart-top-suppliers"></canvas></div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted mb-1 text-center">Top clienti</div>
+                        <div style="position:relative;height:200px"><canvas id="chart-top-customers"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h6 mb-3"><i class="bi bi-trophy me-1"></i>Top 10 spese</h2>

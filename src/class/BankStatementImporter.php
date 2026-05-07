@@ -237,6 +237,21 @@ final class BankStatementImporter
                     $row['payment_method'] = self::guessIncomePaymentMethod($tipologia, $descrizione);
                 }
 
+                // Anagrafica suggerita (saltata per partite doppie interne).
+                $row['contact_suggested_name'] = null;
+                $row['contact_id_matched']     = null;
+                if ($kind === self::KIND_EXPENSE || $kind === self::KIND_INCOME) {
+                    $contactKind = $kind === self::KIND_EXPENSE ? 'expense' : 'income';
+                    $suggested = self::extractCounterparty($tipologia, $descrizione, $contactKind);
+                    if ($suggested !== null) {
+                        $row['contact_suggested_name'] = $suggested;
+                        $match = Contact::findByNormalizedName($userId, Contact::normalize($suggested));
+                        if ($match !== null) {
+                            $row['contact_id_matched'] = (int) $match['id'];
+                        }
+                    }
+                }
+
                 $rows[] = $row;
             } catch (\Throwable $e) {
                 $parseErrors[] = ['row' => $lineNum, 'message' => $e->getMessage()];
@@ -394,24 +409,26 @@ final class BankStatementImporter
                     $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
                         ? (int) $rowIn['category_id']
                         : null;
+                    $contactId = self::resolveContactFromRow($userId, $rowIn, 'supplier');
                     $payment = (string) ($rowIn['payment_method'] ?? 'card');
                     $signed  = -$amount;
                     $hash    = self::computeImportHash($accountId, $opDate, $signed, $description);
 
                     $id = Expense::createImported(
                         $userId, $catId, (string) $amount, $description,
-                        $payment, $opDate, $accountId, $valueDate, $hash
+                        $payment, $opDate, $accountId, $valueDate, $hash, $contactId
                     );
                     if ($id === null) $dupCnt++; else $importedExp++;
                 } else {
                     $source = trim((string) ($rowIn['source'] ?? ''));
                     if ($source === '') $source = 'Entrata';
+                    $contactId = self::resolveContactFromRow($userId, $rowIn, 'customer');
                     $payment = (string) ($rowIn['payment_method'] ?? 'transfer');
                     $hash = self::computeImportHash($accountId, $opDate, $amount, $description);
 
                     $id = Income::createImported(
                         $userId, $source, $description, (string) $amount,
-                        $opDate, $accountId, $valueDate, $hash, $payment
+                        $opDate, $accountId, $valueDate, $hash, $payment, $contactId
                     );
                     if ($id === null) $dupCnt++; else $importedInc++;
                 }
@@ -602,15 +619,124 @@ final class BankStatementImporter
         if (str_contains($tlow, 'stipendi'))     return 'Stipendio';
         if (str_contains($tlow, 'bancomat pay')) return 'P2P';
         if (str_contains($tlow, 'bonifici')) {
-            if (preg_match('/\bDA\s+([A-Z][A-Z\s\.\']+?)(?:\s+NOTE:|\s+VAL\.|\s+DATA|\s+CRO|$)/u', $descrizione, $m)) {
-                $name = trim($m[1]);
-                if ($name !== '' && mb_strlen($name) <= 60) {
-                    return 'Bonifico da ' . ucwords(mb_strtolower($name));
-                }
+            $name = self::extractCounterparty($tipologia, $descrizione, 'income');
+            if ($name !== null) {
+                return 'Bonifico da ' . $name;
             }
             return 'Bonifico';
         }
         return 'Entrata';
+    }
+
+    /**
+     * Estrae il nome della controparte (fornitore per uscite, cliente/pagatore
+     * per entrate) dalla descrizione bancaria. Ritorna il nome gia' formattato
+     * (Title Case) oppure null se non e' possibile estrarre nulla di sensato.
+     *
+     * @param string $kind 'expense' | 'income'
+     */
+    public static function extractCounterparty(string $tipologia, string $descrizione, string $kind): ?string
+    {
+        $desc = trim($descrizione);
+        if ($desc === '') return null;
+
+        if ($kind === 'income') {
+            // "BONIFICO DA NOME COGNOME NOTE: ..." → "Nome Cognome"
+            if (preg_match('/\bDA\s+([A-Z][A-Z\s\.\']+?)(?:\s+NOTE:|\s+VAL\.|\s+DATA|\s+CRO|$)/u', $desc, $m)) {
+                return self::cleanupCounterpartyName($m[1]);
+            }
+            return null;
+        }
+
+        // ── Expense ────────────────────────────────────────────────────────
+        $tlow = mb_strtolower($tipologia);
+
+        // Bonifici in uscita: "BONIFICO A NOME ..."
+        if (str_contains($tlow, 'bonifici')) {
+            if (preg_match('/\bA\s+([A-Z][A-Z\s\.\']+?)(?:\s+NOTE:|\s+VAL\.|\s+CRO|\s+DATA|$)/u', $desc, $m)) {
+                return self::cleanupCounterpartyName($m[1]);
+            }
+        }
+
+        // SDD: "ADDEBITO SDD ENEL ENERGIA VAL. ..." → "Enel Energia"
+        if (preg_match('/^ADDEBITO\s+SDD\s+(.+?)(?:\s+VAL\.|\s+COD\.|\s+RIF\.|\s+MANDATO|$)/i', $desc, $m)) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+
+        // Brand notabili (precede MCC perche' la descrizione Amazon ha MCC vario)
+        if (preg_match('/\bAMAZON(?:\.IT|\s+EU|\.COM|\*MARK\w*|\s+MARKET\w*)?\b/i', $desc)) {
+            return 'Amazon';
+        }
+
+        // POS con MCC: prendi la parte tra "POS" (o "PAGAMENTO") e "COD. MCC".
+        if (preg_match('/\bPAGAMENTO\s+POS\s+(.+?)\s+COD\.\s*MCC/i', $desc, $m)
+            || preg_match('/\bPOS\s+(.+?)\s+COD\.\s*MCC/i', $desc, $m)) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+
+        // Bollettini: "PAGAMENTO BOLLETTINO ENTE NOME ..." → "Ente Nome"
+        if (preg_match('/\bBOLLETTIN[OI]\s+(?:POSTALE\s+|BANCARIO\s+)?(.+?)(?:\s+CRO|\s+VAL\.|$)/i', $desc, $m)) {
+            $candidate = self::cleanupCounterpartyName($m[1]);
+            if ($candidate !== null) return $candidate;
+        }
+
+        // Ricariche/rimborsi prepagata e similari sono trasferimenti interni → no contact.
+        if (stripos($desc, 'RICARICA') !== false || stripos($desc, 'RIMBORSO CARTA') !== false) {
+            return null;
+        }
+        if (stripos($desc, 'PRELIEVO DI CONTANTE') !== false) {
+            return null;
+        }
+        if (stripos($desc, 'COMMISSIONE') !== false || stripos($desc, 'IMPOSTA DI BOLLO') !== false) {
+            return null;
+        }
+
+        // Fallback: prima parola "robusta" della descrizione (>=4 char alfa).
+        if (preg_match('/\b([A-Z][A-Z\.\']{3,}(?:\s+[A-Z][A-Z\.\']+){0,4})\b/u', $desc, $m)) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+        return null;
+    }
+
+    /**
+     * Pulizia comune del nome estratto: trim, collapse spaces, taglia a 120 char,
+     * Title Case. Ritorna null se dopo la pulizia il nome e' troppo corto / vuoto.
+     */
+    private static function cleanupCounterpartyName(string $raw): ?string
+    {
+        $s = preg_replace('/\s+/', ' ', trim($raw)) ?? $raw;
+        // Rimuove suffissi rumorosi tipici (numeri di transazione, codici).
+        $s = preg_replace('/\s+\d{6,}.*$/', '', $s) ?? $s;
+        $s = trim($s, " .,'");
+        if ($s === '' || mb_strlen($s) < 3) return null;
+        if (mb_strlen($s) > 120) $s = mb_substr($s, 0, 120);
+        return ucwords(mb_strtolower($s));
+    }
+
+    /**
+     * Risolve il contact_id da una riga in commit:
+     *  - se `contact_id` e' impostato a int>0 viene usato (verificato da
+     *    Expense/Income::createImported via FK).
+     *  - altrimenti se `contact_name` e' una stringa non vuota viene
+     *    chiamato Contact::findOrCreate con il tipo richiesto.
+     *  - in tutti gli altri casi torna null.
+     *
+     * @param array<string,mixed> $rowIn
+     * @param string $type 'supplier' | 'customer'
+     */
+    private static function resolveContactFromRow(int $userId, array $rowIn, string $type): ?int
+    {
+        if (isset($rowIn['contact_id']) && $rowIn['contact_id'] !== '' && $rowIn['contact_id'] !== null) {
+            $cid = (int) $rowIn['contact_id'];
+            if ($cid > 0) return $cid;
+        }
+        if (isset($rowIn['contact_name'])) {
+            $name = trim((string) $rowIn['contact_name']);
+            if ($name !== '') {
+                return Contact::findOrCreate($userId, $name, $type);
+            }
+        }
+        return null;
     }
 
     private static function guessPaymentMethod(string $tipologia, string $descrizione): string

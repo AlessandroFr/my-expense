@@ -24,11 +24,15 @@ final class Income
         $limit  = max(1, min(500, (int) ($filters['limit']  ?? 200)));
         $offset = max(0, (int) ($filters['offset'] ?? 0));
 
-        $sql = "SELECT i.id, i.user_id, i.account_id, i.source, i.description, i.amount, i.income_date,
+        $sql = "SELECT i.id, i.user_id, i.contact_id, i.account_id, i.source, i.description, i.amount, i.income_date,
                        i.created_at, i.updated_at,
-                       a.name AS account_name, a.color AS account_color, a.icon AS account_icon
+                       a.name AS account_name, a.color AS account_color, a.icon AS account_icon,
+                       co.name  AS contact_name,
+                       co.color AS contact_color,
+                       co.type  AS contact_type
                 FROM incomes i
-                LEFT JOIN accounts a ON a.id = i.account_id
+                LEFT JOIN accounts a  ON a.id  = i.account_id
+                LEFT JOIN contacts co ON co.id = i.contact_id
                 {$where}
                 ORDER BY i.income_date DESC, i.id DESC
                 LIMIT {$limit} OFFSET {$offset}";
@@ -46,7 +50,8 @@ final class Income
     {
         [$where, $params] = self::buildWhere($userId, $filters);
         $sql = "SELECT COUNT(*) FROM incomes i
-                LEFT JOIN accounts a ON a.id = i.account_id
+                LEFT JOIN accounts a  ON a.id  = i.account_id
+                LEFT JOIN contacts co ON co.id = i.contact_id
                 {$where}";
         $stmt = Database::pdo()->prepare($sql);
         $stmt->execute($params);
@@ -56,11 +61,15 @@ final class Income
     public static function findForUser(int $id, int $userId): ?array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT i.id, i.user_id, i.account_id, i.source, i.description, i.amount, i.income_date,
+            'SELECT i.id, i.user_id, i.contact_id, i.account_id, i.source, i.description, i.amount, i.income_date,
                     i.created_at, i.updated_at,
-                    a.name AS account_name, a.color AS account_color, a.icon AS account_icon
+                    a.name AS account_name, a.color AS account_color, a.icon AS account_icon,
+                    co.name  AS contact_name,
+                    co.color AS contact_color,
+                    co.type  AS contact_type
              FROM incomes i
-             LEFT JOIN accounts a ON a.id = i.account_id
+             LEFT JOIN accounts a  ON a.id  = i.account_id
+             LEFT JOIN contacts co ON co.id = i.contact_id
              WHERE i.id = ? AND i.user_id = ? LIMIT 1'
         );
         $stmt->execute([$id, $userId]);
@@ -74,17 +83,19 @@ final class Income
         ?string $description,
         string|float $amount,
         string $incomeDate,
-        ?int $accountId = null
+        ?int $accountId = null,
+        ?int $contactId = null
     ): int {
         $row = self::validate($source, $description, $amount, $incomeDate);
         $accountId = self::checkAccount($userId, $accountId);
+        $contactId = self::checkContact($userId, $contactId);
 
         $stmt = Database::pdo()->prepare(
-            'INSERT INTO incomes (user_id, account_id, source, description, amount, income_date)
-             VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO incomes (user_id, account_id, contact_id, source, description, amount, income_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
-            $userId, $accountId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
+            $userId, $accountId, $contactId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
         ]);
         return (int) Database::pdo()->lastInsertId();
     }
@@ -105,23 +116,25 @@ final class Income
         ?int $accountId,
         ?string $valueDate,
         string $importHash,
-        ?string $paymentMethod = 'transfer'
+        ?string $paymentMethod = 'transfer',
+        ?int $contactId = null
     ): ?int {
         $row = self::validate($source, $description, $amount, $incomeDate);
         $payment = self::normalizePayment($paymentMethod);
         $accountId = self::checkAccount($userId, $accountId, $payment);
+        $contactId = self::checkContact($userId, $contactId);
         if ($valueDate !== null && !self::isValidDate($valueDate)) {
             throw new InvalidArgumentException('Data valuta non valida.');
         }
 
         try {
             $stmt = Database::pdo()->prepare(
-                'INSERT INTO incomes (user_id, account_id, source, description, amount,
+                'INSERT INTO incomes (user_id, account_id, contact_id, source, description, amount,
                                       payment_method, income_date, value_date, import_hash)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
-                $userId, $accountId, $row['source'], $row['description'], $row['amount'],
+                $userId, $accountId, $contactId, $row['source'], $row['description'], $row['amount'],
                 $payment, $row['income_date'], $valueDate, $importHash,
             ]);
         } catch (PDOException $e) {
@@ -148,20 +161,35 @@ final class Income
         ?string $description,
         string|float $amount,
         string $incomeDate,
-        ?int $accountId = null
+        ?int $accountId = null,
+        ?int $contactId = null
     ): void {
         $row = self::validate($source, $description, $amount, $incomeDate);
         $accountId = self::checkAccount($userId, $accountId);
+        $contactId = self::checkContact($userId, $contactId);
 
         $stmt = Database::pdo()->prepare(
             'UPDATE incomes
-             SET account_id = ?, source = ?, description = ?, amount = ?, income_date = ?
+             SET account_id = ?, contact_id = ?, source = ?, description = ?, amount = ?, income_date = ?
              WHERE id = ? AND user_id = ?'
         );
         $stmt->execute([
-            $accountId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
+            $accountId, $contactId, $row['source'], $row['description'], $row['amount'], $row['income_date'],
             $id, $userId,
         ]);
+    }
+
+    private static function checkContact(int $userId, ?int $contactId): ?int
+    {
+        if ($contactId === null || $contactId <= 0) return null;
+        $check = Database::pdo()->prepare(
+            'SELECT 1 FROM contacts WHERE id = ? AND user_id = ? LIMIT 1'
+        );
+        $check->execute([$contactId, $userId]);
+        if ($check->fetchColumn() === false) {
+            throw new InvalidArgumentException('Anagrafica non trovata.');
+        }
+        return $contactId;
     }
 
     private static function checkAccount(int $userId, ?int $accountId, ?string $paymentMethod = null): ?int
@@ -264,6 +292,10 @@ final class Income
         if (!empty($filters['account_id'])) {
             $clauses[] = 'i.account_id = ?';
             $params[]  = (int) $filters['account_id'];
+        }
+        if (!empty($filters['contact_id'])) {
+            $clauses[] = 'i.contact_id = ?';
+            $params[]  = (int) $filters['contact_id'];
         }
         if (!empty($filters['search'])) {
             $clauses[] = '(i.description LIKE ? OR i.source LIKE ?)';

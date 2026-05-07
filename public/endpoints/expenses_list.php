@@ -18,6 +18,7 @@ $filters = [
     'date_to'     => $_GET['date_to']     ?? null,
     'category_id' => isset($_GET['category_id']) && $_GET['category_id'] !== '' ? (int) $_GET['category_id'] : null,
     'account_id'  => isset($_GET['account_id'])  && $_GET['account_id']  !== '' ? (int) $_GET['account_id']  : null,
+    'contact_id'  => isset($_GET['contact_id'])  && $_GET['contact_id']  !== '' ? (int) $_GET['contact_id']  : null,
     'amount_min'  => $_GET['amount_min']  ?? null,
     'amount_max'  => $_GET['amount_max']  ?? null,
     'search'      => $_GET['search']      ?? null,

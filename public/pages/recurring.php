@@ -3,9 +3,13 @@
  * Spese ricorrenti — template che generano spese reali a cadenza weekly/monthly/yearly.
  */
 
+use App\Auth;
 use App\Config;
+use App\Contact;
 
 $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
+$userId = (int) Auth::userId();
+$contacts = Contact::allForUser($userId, false, 'supplier');
 ?>
 <div class="row mb-3">
     <div class="col-12">
@@ -52,6 +56,15 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
                     <option value="transfer">Bonifico</option>
                     <option value="other">Altro</option>
                 </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label small mb-1">Fornitore <span class="text-muted">(opz., crea al volo)</span></label>
+                <input type="text" name="contact_name" class="form-control" list="contacts-datalist" maxlength="120" placeholder="es. Netflix, Vodafone">
+                <datalist id="contacts-datalist">
+                    <?php foreach ($contacts as $cn): ?>
+                        <option value="<?= htmlspecialchars((string) $cn['name'], ENT_QUOTES, 'UTF-8') ?>"></option>
+                    <?php endforeach; ?>
+                </datalist>
             </div>
             <div class="col-12">
                 <label class="form-label small mb-1">Descrizione</label>

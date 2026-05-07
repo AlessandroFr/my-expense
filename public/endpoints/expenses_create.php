@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 use App\Auth;
 use App\Budget;
+use App\Contact;
 use App\Csrf;
 use App\Expense;
 use App\Json;
@@ -30,8 +31,17 @@ $sharedWith    = ($_POST['shared_with']  ?? '') === '' ? null : (string) $_POST[
 $shareAmount   = ($_POST['share_amount'] ?? '') === '' ? null : (string) $_POST['share_amount'];
 $userId        = (int) Auth::userId();
 
+$contactRaw  = $_POST['contact_id']   ?? '';
+$contactName = trim((string) ($_POST['contact_name'] ?? ''));
+$contactId   = null;
+
 try {
-    $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount);
+    if ($contactRaw !== '' && $contactRaw !== '0') {
+        $contactId = (int) $contactRaw;
+    } elseif ($contactName !== '') {
+        $contactId = Contact::findOrCreate($userId, $contactName, 'supplier');
+    }
+    $id  = Expense::create($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, $sharedWith, $shareAmount, $contactId);
     $row = Expense::findForUser($id, $userId);
     $ym  = substr($expenseDate, 0, 7);
     $budgetWarning = Budget::checkForCategory($userId, $categoryId, $ym);

@@ -6,10 +6,12 @@
 use App\Account;
 use App\Auth;
 use App\Config;
+use App\Contact;
 
 $base     = rtrim(Config::get('app')['base_url'] ?? '', '/');
 $userId   = (int) Auth::userId();
 $accounts = Account::allForUser($userId, false);
+$contacts = Contact::allForUser($userId, false, 'customer');
 ?>
 <div class="row mb-3">
     <div class="col-12">
@@ -52,6 +54,15 @@ $accounts = Account::allForUser($userId, false);
                         <label class="form-label small mb-1">Origine</label>
                         <input type="text" name="source" class="form-control" list="income-sources" placeholder="Stipendio, Freelance..." required maxlength="64">
                         <datalist id="income-sources"></datalist>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small mb-1">Cliente / Pagatore <span class="text-muted">(opz., crea al volo)</span></label>
+                        <input type="text" name="contact_name" class="form-control" list="contacts-datalist" maxlength="120" placeholder="es. Acme Srl, Mario Rossi">
+                        <datalist id="contacts-datalist">
+                            <?php foreach ($contacts as $cn): ?>
+                                <option value="<?= htmlspecialchars((string) $cn['name'], ENT_QUOTES, 'UTF-8') ?>"></option>
+                            <?php endforeach; ?>
+                        </datalist>
                     </div>
                     <div class="col-12">
                         <label class="form-label small mb-1">Conto <span class="text-muted">(opz.)</span></label>
@@ -97,6 +108,15 @@ $accounts = Account::allForUser($userId, false);
                             <option value="">Tutti</option>
                             <?php foreach ($accounts as $a): ?>
                                 <option value="<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small mb-1">Cliente</label>
+                        <select name="contact_id" class="form-select form-select-sm">
+                            <option value="">Tutti</option>
+                            <?php foreach ($contacts as $cn): ?>
+                                <option value="<?= (int) $cn['id'] ?>"><?= htmlspecialchars((string) $cn['name'], ENT_QUOTES, 'UTF-8') ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -175,6 +195,10 @@ $accounts = Account::allForUser($userId, false);
                         <div class="col-md-6">
                             <label class="form-label small">Origine</label>
                             <input type="text" name="source" class="form-control" list="income-sources" required maxlength="64">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Cliente / Pagatore <span class="text-muted">(opz.)</span></label>
+                            <input type="text" name="contact_name" class="form-control" list="contacts-datalist" maxlength="120">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">Conto <span class="text-muted">(opz.)</span></label>

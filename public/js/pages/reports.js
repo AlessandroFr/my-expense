@@ -26,6 +26,8 @@ const MONTH_LABELS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott
 const yearSel = document.getElementById('report-year');
 let trendChart = null;
 let catChart   = null;
+let suppliersChart = null;
+let customersChart = null;
 
 function tweenMoneyR(el, to) {
     if (!el) return;
@@ -159,15 +161,83 @@ function renderTopExpenses(items) {
     `).join('');
 }
 
+function renderContactBalance(rows) {
+    const tbody = document.getElementById('contact-balance-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!rows || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nessuna anagrafica con movimenti nel periodo.</td></tr>';
+    } else {
+        const top = rows.slice(0, 15);
+        const TYPE_LABEL = { supplier: 'Fornitore', customer: 'Cliente', both: 'Entrambi' };
+        const TYPE_BADGE = {
+            supplier: 'bg-danger-subtle text-danger',
+            customer: 'bg-success-subtle text-success',
+            both:     'bg-secondary-subtle text-secondary',
+        };
+        const baseUrl = BASE;
+        tbody.innerHTML = top.map(r => {
+            const netClass = r.net > 0 ? 'text-success' : (r.net < 0 ? 'text-danger' : 'text-muted');
+            return `
+                <tr>
+                    <td>
+                        <span class="d-inline-block rounded-circle me-1" style="width:.6rem;height:.6rem;background:${escapeHtml(r.color)}"></span>
+                        <a href="${baseUrl}/contacts/detail?id=${r.contact_id}&year=${yearSel.value}" class="text-decoration-none">${escapeHtml(r.name)}</a>
+                    </td>
+                    <td><span class="badge rounded-pill ${TYPE_BADGE[r.type] || 'bg-secondary'}">${TYPE_LABEL[r.type] || r.type}</span></td>
+                    <td class="text-end text-danger">${r.expenses_total ? fmtMoney(r.expenses_total) : '<span class="text-muted">—</span>'}</td>
+                    <td class="text-end text-success">${r.incomes_total ? fmtMoney(r.incomes_total) : '<span class="text-muted">—</span>'}</td>
+                    <td class="text-end ${netClass}">${fmtMoney(r.net)}</td>
+                </tr>`;
+        }).join('');
+    }
+
+    // Top fornitori per spesa
+    const suppliers = (rows || []).filter(r => r.expenses_total > 0)
+        .sort((a, b) => b.expenses_total - a.expenses_total).slice(0, 10);
+    if (suppliersChart) suppliersChart.destroy();
+    const suppCtx = document.getElementById('chart-top-suppliers');
+    if (suppCtx) {
+        suppliersChart = new Chart(suppCtx, {
+            type: 'doughnut',
+            data: {
+                labels: suppliers.map(r => r.name),
+                datasets: [{ data: suppliers.map(r => r.expenses_total), backgroundColor: suppliers.map(r => r.color), borderWidth: 1 }],
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        });
+    }
+
+    // Top clienti per entrata
+    const customers = (rows || []).filter(r => r.incomes_total > 0)
+        .sort((a, b) => b.incomes_total - a.incomes_total).slice(0, 10);
+    if (customersChart) customersChart.destroy();
+    const custCtx = document.getElementById('chart-top-customers');
+    if (custCtx) {
+        customersChart = new Chart(custCtx, {
+            type: 'doughnut',
+            data: {
+                labels: customers.map(r => r.name),
+                datasets: [{ data: customers.map(r => r.incomes_total), backgroundColor: customers.map(r => r.color), borderWidth: 1 }],
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        });
+    }
+}
+
 async function load() {
     try {
-        const r = await apiGuard(api.get(`${BASE}/reports/year`, { year: yearSel.value }));
+        const [r, balResp] = await Promise.all([
+            apiGuard(api.get(`${BASE}/reports/year`, { year: yearSel.value })),
+            api.get(`${BASE}/contacts/balance?year=${yearSel.value}`).catch(() => ({ data: { summary: [] } })),
+        ]);
         const d = r.data ?? {};
         setKpi(d);
         renderTrend(d.by_month ?? []);
         renderCategories(d.by_category ?? []);
         renderHeatmap(d.heatmap ?? { matrix: [] });
         renderTopExpenses(d.top_expenses ?? []);
+        renderContactBalance(balResp?.data?.summary ?? []);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento report.');
     }

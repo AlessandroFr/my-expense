@@ -13,7 +13,7 @@ use Throwable;
  * Ambiti supportati:
  *  - 'movements'           → cancella expenses, incomes, expense_tags, expense_attachments + file su disco
  *  - 'movements_recurring' → come 'movements' + azzera last_generated_date sui template ricorrenti
- *  - 'all'                 → tabula rasa di tutte le 10 tabelle user-scoped (l'utente NON viene mai cancellato)
+ *  - 'all'                 → tabula rasa di tutte le 11 tabelle user-scoped (l'utente NON viene mai cancellato)
  *
  * Le delete passano per una transazione singola con FOREIGN_KEY_CHECKS=0
  * per essere indipendenti dall'ordine FK; la pulizia del filesystem
@@ -59,6 +59,7 @@ final class DatabaseReset
             'saved_filters_deleted'       => 0,
             'tags_deleted'                => 0,
             'accounts_deleted'            => 0,
+            'contacts_deleted'            => 0,
             'categories_deleted'          => 0,
             'attachment_files_deleted'    => 0,
         ];
@@ -97,6 +98,7 @@ final class DatabaseReset
                 $counters['recurring_deleted']     = self::deleteByUser($pdo, 'recurring_expenses', $userId);
                 $counters['tags_deleted']          = self::deleteByUser($pdo, 'tags',               $userId);
                 $counters['accounts_deleted']      = self::deleteByUser($pdo, 'accounts',           $userId);
+                $counters['contacts_deleted']      = self::deleteByUser($pdo, 'contacts',           $userId);
                 $counters['categories_deleted']    = self::deleteByUser($pdo, 'categories',         $userId);
             }
 

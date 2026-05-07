@@ -15,14 +15,18 @@ final class RecurringExpense
     public static function listForUser(int $userId): array
     {
         $stmt = Database::pdo()->prepare(
-            "SELECT r.id, r.user_id, r.category_id, r.amount, r.description,
+            "SELECT r.id, r.user_id, r.category_id, r.contact_id, r.amount, r.description,
                     r.payment_method, r.frequency, r.start_date, r.end_date,
                     r.last_generated_date, r.active, r.created_at, r.updated_at,
                     c.name  AS category_name,
                     c.color AS category_color,
-                    c.icon  AS category_icon
+                    c.icon  AS category_icon,
+                    co.name  AS contact_name,
+                    co.color AS contact_color,
+                    co.type  AS contact_type
              FROM recurring_expenses r
-             LEFT JOIN categories c ON c.id = r.category_id
+             LEFT JOIN categories c  ON c.id  = r.category_id
+             LEFT JOIN contacts   co ON co.id = r.contact_id
              WHERE r.user_id = ?
              ORDER BY r.active DESC, r.frequency, r.description"
         );
@@ -48,17 +52,18 @@ final class RecurringExpense
         string $paymentMethod,
         string $frequency,
         string $startDate,
-        ?string $endDate
+        ?string $endDate,
+        ?int $contactId = null
     ): int {
-        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $frequency, $startDate, $endDate);
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $frequency, $startDate, $endDate, $contactId);
         $stmt = Database::pdo()->prepare(
             'INSERT INTO recurring_expenses
-                (user_id, category_id, amount, description, payment_method,
+                (user_id, category_id, contact_id, amount, description, payment_method,
                  frequency, start_date, end_date, active)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)'
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)'
         );
         $stmt->execute([
-            $userId, $row['category_id'], $row['amount'], $row['description'],
+            $userId, $row['category_id'], $row['contact_id'], $row['amount'], $row['description'],
             $row['payment_method'], $row['frequency'], $row['start_date'], $row['end_date'],
         ]);
         return (int) Database::pdo()->lastInsertId();
@@ -73,17 +78,18 @@ final class RecurringExpense
         string $paymentMethod,
         string $frequency,
         string $startDate,
-        ?string $endDate
+        ?string $endDate,
+        ?int $contactId = null
     ): void {
-        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $frequency, $startDate, $endDate);
+        $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $frequency, $startDate, $endDate, $contactId);
         $stmt = Database::pdo()->prepare(
             'UPDATE recurring_expenses
-             SET category_id = ?, amount = ?, description = ?, payment_method = ?,
+             SET category_id = ?, contact_id = ?, amount = ?, description = ?, payment_method = ?,
                  frequency = ?, start_date = ?, end_date = ?
              WHERE id = ? AND user_id = ?'
         );
         $stmt->execute([
-            $row['category_id'], $row['amount'], $row['description'], $row['payment_method'],
+            $row['category_id'], $row['contact_id'], $row['amount'], $row['description'], $row['payment_method'],
             $row['frequency'], $row['start_date'], $row['end_date'], $id, $userId,
         ]);
     }
@@ -115,7 +121,7 @@ final class RecurringExpense
         $pdo   = Database::pdo();
 
         $stmt = $pdo->prepare(
-            'SELECT id, category_id, amount, description, payment_method, frequency,
+            'SELECT id, category_id, contact_id, amount, description, payment_method, frequency,
                     start_date, end_date, last_generated_date
              FROM recurring_expenses
              WHERE user_id = ? AND active = 1'
@@ -124,8 +130,8 @@ final class RecurringExpense
         $rows = $stmt->fetchAll();
 
         $insertExpense = $pdo->prepare(
-            'INSERT INTO expenses (user_id, category_id, amount, description, payment_method, expense_date)
-             VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO expenses (user_id, category_id, contact_id, amount, description, payment_method, expense_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $updateLast = $pdo->prepare(
             'UPDATE recurring_expenses SET last_generated_date = ? WHERE id = ? AND user_id = ?'
@@ -147,6 +153,7 @@ final class RecurringExpense
                 $insertExpense->execute([
                     $userId,
                     $r['category_id'],
+                    $r['contact_id'],
                     $r['amount'],
                     $r['description'],
                     $r['payment_method'],
@@ -186,7 +193,7 @@ final class RecurringExpense
 
     /**
      * @return array{
-     *   category_id:?int, amount:string, description:?string, payment_method:string,
+     *   category_id:?int, contact_id:?int, amount:string, description:?string, payment_method:string,
      *   frequency:string, start_date:string, end_date:?string
      * }
      */
@@ -198,7 +205,8 @@ final class RecurringExpense
         string $paymentMethod,
         string $frequency,
         string $startDate,
-        ?string $endDate
+        ?string $endDate,
+        ?int $contactId = null
     ): array {
         $amountF = is_string($amount) ? (float) str_replace(',', '.', $amount) : (float) $amount;
         if ($amountF < 0.01 || $amountF > 99999999.99) {
@@ -244,8 +252,23 @@ final class RecurringExpense
             }
         }
 
+        if ($contactId !== null) {
+            if ($contactId <= 0) {
+                $contactId = null;
+            } else {
+                $check = Database::pdo()->prepare(
+                    'SELECT 1 FROM contacts WHERE id = ? AND user_id = ? LIMIT 1'
+                );
+                $check->execute([$contactId, $userId]);
+                if ($check->fetchColumn() === false) {
+                    throw new InvalidArgumentException('Anagrafica non trovata.');
+                }
+            }
+        }
+
         return [
             'category_id'    => $categoryId,
+            'contact_id'     => $contactId,
             'amount'         => number_format($amountF, 2, '.', ''),
             'description'    => $description,
             'payment_method' => $paymentMethod,

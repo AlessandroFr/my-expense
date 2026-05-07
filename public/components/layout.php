@@ -73,7 +73,7 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
     };
     $isDashboard = $navMatches($currentPath, ['/dashboard']);
     $isMovements = $navMatches($currentPath, ['/expenses', '/incomes', '/recurring']);
-    $isPlan      = $navMatches($currentPath, ['/categories', '/budgets', '/accounts']);
+    $isPlan      = $navMatches($currentPath, ['/categories', '/budgets', '/accounts', '/contacts']);
     $isReports   = $navMatches($currentPath, ['/reports']);
 
     $username = Auth::username() ?? '';
@@ -108,6 +108,7 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
                     <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/categories', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-tags me-2"></i>Categorie</a></li>
                     <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/budgets', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-bullseye me-2"></i>Budget</a></li>
                     <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/accounts', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-bank me-2"></i>Conti</a></li>
+                    <li><a class="dropdown-item" href="<?= htmlspecialchars($base . '/contacts', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-person-rolodex me-2"></i>Anagrafiche</a></li>
                 </ul>
             </li>
             <li class="nav-item">
