@@ -19,6 +19,22 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
     </div>
 </div>
 
+<ul class="nav mx-tabs" id="settings-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-restore-tab" data-bs-toggle="tab" data-bs-target="#tab-restore" type="button" role="tab" aria-controls="tab-restore" aria-selected="true" title="Ripristina backup">
+            <i class="bi bi-arrow-counterclockwise"></i><span>Ripristina backup</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-reset-tab" data-bs-toggle="tab" data-bs-target="#tab-reset" type="button" role="tab" aria-controls="tab-reset" aria-selected="false" title="Reset database">
+            <i class="bi bi-trash3"></i><span>Reset database</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+<div class="tab-pane fade" id="tab-reset" role="tabpanel" aria-labelledby="tab-reset-tab">
 <div class="row g-3">
     <div class="col-12 col-lg-8">
         <div class="card shadow-sm border-danger">
@@ -121,7 +137,11 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
             </div>
         </div>
     </div>
+</div>
+</div>
 
+<div class="tab-pane fade show active" id="tab-restore" role="tabpanel" aria-labelledby="tab-restore-tab">
+<div class="row g-3">
     <div class="col-12 col-lg-8">
         <div class="card shadow-sm border-warning">
             <div class="card-header bg-warning text-dark">
@@ -187,5 +207,8 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
         </div>
     </div>
 </div>
+</div>
+
+</div><!-- /.tab-content -->
 
 <script type="module" src="<?= $asset('js/pages/settings.js') ?>"></script>

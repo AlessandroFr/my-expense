@@ -868,6 +868,56 @@ main.container { padding-bottom: 4rem; }
     .mx-aside-tabs .nav-link .bi { font-size: 1.05rem; }
 }
 
+/* ── Page tabs: pill segmented per pagine full-width (in /settings) ────── */
+.mx-tabs {
+    border-bottom: 0;
+    padding: 0.3rem;
+    background: var(--mx-line-2);
+    border-radius: 999px;
+    gap: 0.2rem;
+    display: inline-flex;
+    flex-wrap: nowrap;
+    margin-bottom: 1.25rem;
+}
+.mx-tabs .nav-item { min-width: 0; }
+.mx-tabs .nav-link {
+    border: 0;
+    border-radius: 999px;
+    color: var(--mx-ink-2);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.55rem 1.1rem;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.mx-tabs .nav-link .bi { font-size: 1rem; flex: 0 0 auto; }
+.mx-tabs .nav-link:hover:not(.active) {
+    color: var(--mx-ink);
+    background: rgba(155, 124, 217, 0.08);
+}
+.mx-tabs .nav-link.active {
+    color: var(--mx-ink);
+    background: var(--mx-paper);
+    box-shadow: 0 1px 2px rgba(27, 27, 47, 0.06), 0 4px 10px -4px rgba(27, 27, 47, 0.10);
+}
+.mx-tabs .nav-link:focus-visible {
+    outline: 2px solid var(--mx-lilac-deep);
+    outline-offset: 2px;
+}
+[data-bs-theme="dark"] .mx-tabs .nav-link.active {
+    background: rgba(155, 124, 217, 0.20);
+}
+@media (max-width: 575.98px) {
+    .mx-tabs { display: flex; width: 100%; }
+    .mx-tabs .nav-item { flex: 1 1 0; }
+    .mx-tabs .nav-link { width: 100%; padding: 0.55rem 0.6rem; }
+}
+
 /* ── Action kebab (riga tabella /expenses, /incomes) ──────────────────── */
 .mx-row-actions { white-space: nowrap; }
 .mx-row-actions .dropdown-toggle::after { display: none; }
