@@ -26,8 +26,8 @@ $appName = Config::get('app')['name'] ?? 'My Expense';
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="<?= htmlspecialchars($base . '/css/pastel.css', ENT_QUOTES, 'UTF-8') ?>">
-    <link rel="stylesheet" href="<?= htmlspecialchars($base . '/css/transitions.css', ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= $asset('css/pastel.css') ?>">
+    <link rel="stylesheet" href="<?= $asset('css/transitions.css') ?>">
 
     <!-- PWA -->
     <link rel="manifest" href="<?= htmlspecialchars($base . '/manifest.webmanifest', ENT_QUOTES, 'UTF-8') ?>">
