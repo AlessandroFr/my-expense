@@ -153,24 +153,14 @@ $paymentLabels  = [
                         </span>
                     </div>
 
-                    <div class="table-responsive" style="max-height: 60vh">
-                        <table class="table table-sm table-hover align-middle mb-0">
-                            <thead class="table-light sticky-top">
-                                <tr>
-                                    <th style="width:40px"><input type="checkbox" id="bank-toggle-all" checked title="Seleziona/deseleziona tutte"></th>
-                                    <th style="width:120px" title="Data operazione (data applicazione)">Data op.</th>
-                                    <th style="width:120px" title="Data valuta">Valuta</th>
-                                    <th style="width:120px">Tipo</th>
-                                    <th>Descrizione</th>
-                                    <th style="width:200px">Categoria / Origine</th>
-                                    <th style="width:180px">Anagrafica</th>
-                                    <th style="width:120px">Pagamento</th>
-                                    <th style="width:110px" class="text-end">Importo</th>
-                                </tr>
-                            </thead>
-                            <tbody id="bank-preview-tbody"></tbody>
-                        </table>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <label class="form-check-label small mb-0 d-flex align-items-center gap-1">
+                            <input type="checkbox" id="bank-toggle-all" class="form-check-input" checked>
+                            Seleziona / deseleziona tutte
+                        </label>
+                        <span class="text-muted small ms-auto">Modifica i campi inline; conferma in fondo.</span>
                     </div>
+                    <div id="bank-preview-list" class="d-flex flex-column gap-2 px-1" style="max-height:60vh; overflow-y:auto"></div>
 
                     <nav id="bank-preview-pager" class="d-flex justify-content-between align-items-center mt-2 small">
                         <div class="text-muted" id="bank-preview-pager-info"></div>

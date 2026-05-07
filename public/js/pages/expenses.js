@@ -822,8 +822,23 @@ function wireCsvButtons() {
 const BANK_KINDS = [
     { value: 'expense',       label: 'Spesa' },
     { value: 'income',        label: 'Entrata' },
-    { value: 'transfer_pair', label: 'Ricarica (pair)' },
+    { value: 'transfer_pair', label: 'Trasferimento (pair)' },
+    { value: 'atm_pair',      label: 'Prelievo ATM (pair)' },
 ];
+
+const BANK_KIND_BADGE = {
+    expense:       'bg-danger-subtle text-danger',
+    income:        'bg-success-subtle text-success',
+    transfer_pair: 'bg-info-subtle text-info',
+    atm_pair:      'bg-warning-subtle text-warning',
+};
+const BANK_KIND_LABEL = {
+    expense:       'Spesa',
+    income:        'Entrata',
+    transfer_pair: 'Trasferimento',
+    atm_pair:      'Prelievo ATM',
+};
+const BANK_PAIR_KINDS = new Set(['transfer_pair', 'atm_pair']);
 
 const BANK_PAGE_SIZE = 15;
 
@@ -860,65 +875,116 @@ function bankRenderKindOptions(selected) {
 }
 
 function bankRenderRow(r) {
-    const dupBadge = r.is_duplicate
-        ? `<span class="badge bg-warning text-dark ms-1" title="Gia' presente in DB">duplicato</span>`
-        : '';
+    const isPair   = BANK_PAIR_KINDS.has(r.kind);
+    const isIncome = r.kind === 'income';
 
-    let classCol;
-    if (r.kind === 'income') {
-        classCol = `<input type="text" class="form-control form-control-sm bank-cell" data-field="source"
-                          value="${escHtml(r.source ?? '')}" placeholder="Es. Bonifico da X" maxlength="64">`;
+    const dupBadge = r.is_duplicate
+        ? `<span class="badge bg-warning text-dark" title="Gia' presente in DB">duplicato</span>`
+        : '';
+    const kindBadge = `<span class="badge ${BANK_KIND_BADGE[r.kind] ?? 'bg-secondary'}">${escHtml(BANK_KIND_LABEL[r.kind] ?? r.kind)}</span>`;
+
+    // Importo grande, segnato e colorato in base al kind
+    const amountSign = isIncome ? '+' : '−';
+    const amountClass = isIncome ? 'text-success' : (isPair ? 'text-info' : 'text-danger');
+    const amountFmt = Number(r.amount ?? 0).toLocaleString('it-IT', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2,
+    });
+
+    // Categoria / Origine (terzo campo della grid editabile)
+    let middleField;
+    if (isIncome) {
+        middleField = `
+            <input type="text" class="form-control form-control-sm bank-cell" data-field="source"
+                   value="${escHtml(r.source ?? '')}" placeholder="Es. Bonifico da X" maxlength="64">`;
     } else {
-        classCol = `<select class="form-select form-select-sm bank-cell" data-field="category_id">
-                        ${bankRenderCategoryOptions(r.category_id)}
-                    </select>`;
+        middleField = `
+            <select class="form-select form-select-sm bank-cell" data-field="category_id">
+                ${bankRenderCategoryOptions(r.category_id)}
+            </select>`;
     }
 
-    // Payment selector ora SEMPRE presente (anche income), cosi' l'utente
-    // puo' impostare il tipo di pagamento anche dove non c'e' autocompilazione.
-    const payDefault = r.payment_method ?? (r.kind === 'income' ? 'transfer' : 'card');
-    const payCol = `<select class="form-select form-select-sm bank-cell" data-field="payment_method">
-              ${bankRenderPaymentOptions(payDefault)}
-           </select>`;
+    const payDefault = r.payment_method ?? (isIncome ? 'transfer' : 'card');
 
-    const contactBadge = r.contact_id_matched
-        ? `<span class="badge bg-info-subtle text-info" title="Anagrafica esistente">esistente</span>`
-        : (r.contact_suggested_name ? `<span class="badge bg-warning-subtle text-warning" title="Verra' creata">nuova</span>` : '');
-    const contactCol = `
-        <input type="text" class="form-control form-control-sm bank-cell" data-field="contact_name"
-               value="${escHtml(r.contact_name ?? '')}" placeholder="—" maxlength="120">
-        <div class="form-text small mt-0">${contactBadge}</div>`;
+    // Anagrafica: solo per spese/entrate (skipped per partite doppie interne)
+    let contactBlock = '';
+    if (!isPair) {
+        const contactBadge = r.contact_id_matched
+            ? `<span class="badge bg-info-subtle text-info ms-1" title="Anagrafica esistente">esistente</span>`
+            : (r.contact_suggested_name ? `<span class="badge bg-warning-subtle text-warning ms-1" title="Verra' creata">nuova</span>` : '');
+        contactBlock = `
+            <div class="col-12 col-md-4 col-lg-3">
+                <label class="form-label small mb-1">${isIncome ? 'Cliente' : 'Fornitore'}${contactBadge}</label>
+                <input type="text" class="form-control form-control-sm bank-cell" data-field="contact_name"
+                       value="${escHtml(r.contact_name ?? '')}" placeholder="—" maxlength="120" list="contacts-datalist">
+            </div>`;
+    }
 
-    return `<tr data-idx="${r.idx}" class="${r.skip ? 'table-secondary text-muted' : ''}">
-        <td class="text-center">
-            <input type="checkbox" class="bank-cell" data-field="include" ${r.skip ? '' : 'checked'} title="Importa questa riga">
-        </td>
-        <td>
-            <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escHtml(r.op_date ?? '')}" title="Data operazione (applicazione)">
-        </td>
-        <td>
-            <input type="date" class="form-control form-control-sm bank-cell" data-field="value_date" value="${escHtml(r.value_date ?? '')}" title="Data valuta">
-        </td>
-        <td>
-            <select class="form-select form-select-sm bank-cell" data-field="kind">
-                ${bankRenderKindOptions(r.kind)}
-            </select>
-        </td>
-        <td>
-            <input type="text" class="form-control form-control-sm bank-cell" data-field="description"
-                   value="${escHtml(r.description ?? '')}" maxlength="512">
-            <div class="form-text small mt-0">
-                <span class="text-muted">${escHtml(r.tipologia ?? '')}</span> ${dupBadge}
+    // Distribuzione colonne grid: con anagrafica visibile o nascosta
+    const cols = isPair
+        ? { kind: 3, mid: 4, pay: 3, amt: 2 }
+        : { kind: 2, mid: 3, pay: 2, amt: 2 };
+
+    return `<div data-idx="${r.idx}" class="card ${r.skip ? 'opacity-50 bg-body-tertiary' : 'shadow-sm'} bank-row-card">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                <input type="checkbox" class="form-check-input bank-cell mt-0" data-field="include" ${r.skip ? '' : 'checked'} title="Importa questa riga">
+                ${kindBadge}
+                ${dupBadge}
+                <span class="text-muted small text-nowrap">
+                    <i class="bi bi-calendar3 me-1"></i>${escHtml(r.op_date ?? '')}
+                    ${r.value_date ? `<span class="ms-2"><i class="bi bi-calendar-check"></i> val. ${escHtml(r.value_date)}</span>` : ''}
+                </span>
+                <div class="ms-auto fw-semibold ${amountClass}" style="font-size:1.15rem;">
+                    ${amountSign} € ${amountFmt}
+                </div>
             </div>
-        </td>
-        <td>${classCol}</td>
-        <td>${contactCol}</td>
-        <td>${payCol}</td>
-        <td>
-            <input type="number" step="0.01" min="0.01" class="form-control form-control-sm text-end bank-cell"
-                   data-field="amount" value="${Number(r.amount ?? 0).toFixed(2)}">
-        </td>
-    </tr>`;
+
+            <div class="mb-2">
+                <input type="text" class="form-control form-control-sm bank-cell" data-field="description"
+                       value="${escHtml(r.description ?? '')}" maxlength="512" placeholder="Descrizione">
+                ${r.tipologia ? `<div class="form-text small mt-0 fst-italic text-truncate" title="${escHtml(r.tipologia)}">${escHtml(r.tipologia)}</div>` : ''}
+            </div>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-${cols.kind}">
+                    <label class="form-label small mb-1">Tipo</label>
+                    <select class="form-select form-select-sm bank-cell" data-field="kind">
+                        ${bankRenderKindOptions(r.kind)}
+                    </select>
+                </div>
+                <div class="col-6 col-md-${cols.mid}">
+                    <label class="form-label small mb-1">${isIncome ? 'Origine' : 'Categoria'}</label>
+                    ${middleField}
+                </div>
+                ${contactBlock}
+                <div class="col-6 col-md-${cols.pay}">
+                    <label class="form-label small mb-1">Pagamento</label>
+                    <select class="form-select form-select-sm bank-cell" data-field="payment_method">
+                        ${bankRenderPaymentOptions(payDefault)}
+                    </select>
+                </div>
+                <div class="col-6 col-md-${cols.amt}">
+                    <label class="form-label small mb-1">Importo €</label>
+                    <input type="number" step="0.01" min="0.01" class="form-control form-control-sm text-end bank-cell"
+                           data-field="amount" value="${Number(r.amount ?? 0).toFixed(2)}">
+                </div>
+            </div>
+
+            <details class="small mt-2">
+                <summary class="text-muted">Modifica date</summary>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Data operazione</label>
+                        <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escHtml(r.op_date ?? '')}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Data valuta</label>
+                        <input type="date" class="form-control form-control-sm bank-cell" data-field="value_date" value="${escHtml(r.value_date ?? '')}">
+                    </div>
+                </div>
+            </details>
+        </div>
+    </div>`;
 }
 
 function bankPageCount() {
@@ -973,7 +1039,7 @@ function bankRenderPager() {
 }
 
 function bankRenderRows() {
-    const tbody = document.getElementById('bank-preview-tbody');
+    const tbody = document.getElementById('bank-preview-list');
     if (!tbody) return;
     bankClampPage();
     tbody.innerHTML = bankPagedRows().map(bankRenderRow).join('');
@@ -1067,7 +1133,7 @@ function wireBankImport() {
 
     const modal      = document.getElementById('bank-import-modal');
     const resultBox  = document.getElementById('bank-import-result');
-    const tbody      = document.getElementById('bank-preview-tbody');
+    const tbody      = document.getElementById('bank-preview-list');
     const toggleAll  = document.getElementById('bank-toggle-all');
     const backBtn    = document.getElementById('bank-back-btn');
     const commitBtn  = document.getElementById('bank-commit-btn');
@@ -1162,7 +1228,7 @@ function wireBankImport() {
     tbody?.addEventListener('change', (ev) => {
         const cell = ev.target.closest('.bank-cell');
         if (!cell) return;
-        const tr = cell.closest('tr');
+        const tr = cell.closest('[data-idx]');
         if (!tr) return;
         const field = cell.dataset.field;
 
@@ -1170,11 +1236,19 @@ function wireBankImport() {
         if (!r) return;
 
         if (field === 'include') {
-            tr.classList.toggle('table-secondary', r.skip);
-            tr.classList.toggle('text-muted', r.skip);
+            tr.classList.toggle('opacity-50', r.skip);
+            tr.classList.toggle('bg-body-tertiary', r.skip);
+            tr.classList.toggle('shadow-sm', !r.skip);
             return;
         }
         if (field === 'kind') {
+            // Pair kinds (transfer/atm) non hanno anagrafica → la pulisco
+            // perche' altrimenti il commit la propagherebbe per errore.
+            if (BANK_PAIR_KINDS.has(r.kind)) {
+                r.contact_id = null;
+                r.contact_id_matched = null;
+                r.contact_name = '';
+            }
             // Re-render solo la riga interessata mantenendo posizione in pagina.
             tr.outerHTML = bankRenderRow(r);
         }
@@ -1234,7 +1308,7 @@ function wireBankImport() {
         if (!tbody) return;
         // Sincronizza prima lo state con i valori delle righe ATTUALMENTE in DOM
         // (la pagina visibile potrebbe avere edit non ancora propagati).
-        tbody.querySelectorAll('tr').forEach(bankSyncRowFromTr);
+        tbody.querySelectorAll('[data-idx]').forEach(bankSyncRowFromTr);
         const rows = bankPreviewState.rows;
         const toImport = rows.filter(r => !r.skip).length;
         if (toImport === 0) { toast.warning('Nessuna riga selezionata.'); return; }
