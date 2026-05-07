@@ -1045,24 +1045,44 @@ function bankRenderPager() {
 }
 
 /**
- * Propaga il contact_name di una riga sorgente alle ALTRE righe del file
- * la cui descrizione lo contiene (case-insensitive, min 4 char) e che NON
- * hanno gia' un'anagrafica assegnata. Le righe toccate vengono marcate
- * come `contact_propagated`. Ritorna il numero di righe aggiornate.
+ * Propaga il contact_name di una riga sorgente alle ALTRE righe del file.
+ * Due criteri di match (case-insensitive, soglia 4 char):
+ *  - RENAME: la riga aveva esattamente `oldContactName` → la rinomina al
+ *    nuovo nome (non importa la descrizione, e' un'esplicita correzione).
+ *  - SUBSTRING: la descrizione della riga contiene il NUOVO nome E la riga
+ *    e' libera o gia' auto-propagata (non sovrascrive i nomi manuali/extracted).
+ *
+ * Le righe toccate vengono marcate `contact_propagated=true`.
+ * Ritorna il numero di righe aggiornate.
  */
-function bankPropagateContactName(srcRow) {
+function bankPropagateContactName(srcRow, oldContactName = '') {
     const name = (srcRow.contact_name ?? '').trim();
     if (name === '') return 0;
     const normName = name.toLowerCase();
     if (normName.length < 4) return 0;
 
+    const oldNorm = (oldContactName ?? '').trim().toLowerCase();
+    const isRename = oldNorm.length >= 4 && oldNorm !== normName;
+
     let touched = 0;
     for (const r of bankPreviewState.rows) {
         if (r.idx === srcRow.idx) continue;
         if (r.kind !== 'expense' && r.kind !== 'income') continue;
-        if ((r.contact_name ?? '').trim() !== '') continue; // non sovrascrivere
+
+        const currentName = (r.contact_name ?? '').trim();
+        const currentNorm = currentName.toLowerCase();
+        if (currentNorm === normName) continue; // gia' identica
+
+        // A) Rinomina: riga col vecchio nome → diventa il nuovo nome.
+        const matchesByOldName = isRename && currentNorm === oldNorm;
+
+        // B) Descrizione contiene il NUOVO nome — sempre, indipendentemente
+        //    da chi aveva impostato il nome corrente (vincolo voluto dall'utente:
+        //    rinominando, ogni riga la cui descrizione matcha deve aggiornarsi).
         const descLow = (r.description ?? '').toLowerCase();
-        if (!descLow.includes(normName)) continue;
+        const matchesByDesc = descLow.includes(normName);
+
+        if (!matchesByDesc && !matchesByOldName) continue;
 
         r.contact_name           = name;
         r.contact_id             = srcRow.contact_id ?? null;
@@ -1149,13 +1169,17 @@ function bankSyncRowFromTr(tr) {
     if (payEl) r.payment_method = payEl.value;
 
     // Anagrafica editata: se l'utente ha cambiato il testo, scarta il match
-    // precedente (saranno creati al volo via Contact::findOrCreate).
+    // precedente (saranno creati al volo via Contact::findOrCreate). L'edit
+    // manuale non e' piu' una propagazione → pulisco anche il flag e il
+    // count backfill (stale rispetto al nuovo nome).
     const contactEl = get('contact_name');
     if (contactEl) {
         const newName = contactEl.value.trim();
         if (newName !== (r.contact_name ?? '').trim()) {
             r.contact_id = null;
             r.contact_id_matched = null;
+            r.contact_propagated = false;
+            r.contact_backfill_count = 0;
         }
         r.contact_name = newName;
     }
@@ -1268,6 +1292,15 @@ function wireBankImport() {
         if (!tr) return;
         const field = cell.dataset.field;
 
+        // Catturo il vecchio nome anagrafica PRIMA del sync per il rename
+        // (bankSyncRowFromTr sovrascrive r.contact_name col valore nuovo).
+        let oldContactName = '';
+        if (field === 'contact_name') {
+            const idx = Number(tr.dataset.idx);
+            const stale = bankPreviewState.rows.find(x => x.idx === idx);
+            oldContactName = (stale?.contact_name ?? '').trim();
+        }
+
         const r = bankSyncRowFromTr(tr);
         if (!r) return;
 
@@ -1290,9 +1323,10 @@ function wireBankImport() {
             return;
         }
         if (field === 'contact_name') {
-            // Propagazione live: il nome appena scritto vale anche per altre
-            // righe del file la cui descrizione lo contiene.
-            const touched = bankPropagateContactName(r);
+            // Propagazione live: il nome appena scritto/modificato vale per
+            // altre righe (descrizione contiene il nome) E per le righe
+            // che avevano lo stesso vecchio nome (rinomina cascata).
+            const touched = bankPropagateContactName(r, oldContactName);
             if (touched > 0) {
                 bankRenderRows();
                 toast.success(`Anagrafica "${r.contact_name}" propagata a ${touched} altre riga${touched === 1 ? '' : 'e'} del file.`);
