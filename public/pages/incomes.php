@@ -107,6 +107,7 @@ $accounts = Account::allForUser($userId, false);
         <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
+                    <th style="width:1%"></th>
                     <th style="width:100px">Data</th>
                     <th style="width:140px">Conto</th>
                     <th style="width:160px">Origine</th>
@@ -116,13 +117,13 @@ $accounts = Account::allForUser($userId, false);
                 </tr>
             </thead>
             <tbody id="income-tbody">
-                <tr><td colspan="6" class="text-center text-muted py-4">
+                <tr><td colspan="7" class="text-center text-muted py-4">
                     <div class="spinner-border spinner-border-sm me-2"></div>Caricamento...
                 </td></tr>
             </tbody>
             <tfoot>
                 <tr class="table-light">
-                    <th colspan="4" class="text-end">Totale visibile</th>
+                    <th colspan="5" class="text-end">Totale visibile</th>
                     <th class="text-end" id="income-total">EUR -</th>
                     <th></th>
                 </tr>

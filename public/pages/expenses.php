@@ -352,19 +352,20 @@ $paymentLabels  = [
         <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
+                    <th style="width:1%"></th>
                     <th>Data</th>
                     <th>Conto</th>
                     <th>Categoria</th>
                     <th>Descrizione</th>
-                    <th>Tag</th>
-                    <th>Pagamento</th>
+                    <th class="text-center" style="width:1%" title="Tag">#</th>
+                    <th class="text-center" style="width:1%" title="Pagamento"><i class="bi bi-credit-card"></i></th>
                     <th class="text-end">Importo</th>
                     <th class="text-end" style="width:1%">Azioni</th>
                 </tr>
             </thead>
             <tbody id="expenses-tbody">
                 <tr id="expenses-loading">
-                    <td colspan="8" class="text-center text-muted py-4">
+                    <td colspan="9" class="text-center text-muted py-4">
                         <span class="spinner-border spinner-border-sm me-2"></span>Carico…
                     </td>
                 </tr>

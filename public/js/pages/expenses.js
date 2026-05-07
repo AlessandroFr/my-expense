@@ -150,18 +150,50 @@ function buildPaymentOptions(selected) {
 
 // ── Render rows ────────────────────────────────────────────────────────────
 
+const PAYMENT_ICONS = {
+    cash: 'bi-cash',
+    card: 'bi-credit-card-2-front',
+    transfer: 'bi-bank',
+    other: 'bi-three-dots',
+};
+
+function paymentIcon(method) {
+    return PAYMENT_ICONS[method] ?? 'bi-question-circle';
+}
+
+function detailIdFor(e) { return `expense-detail-${e.id}`; }
+
 function renderViewRow(e) {
     const tr = document.createElement('tr');
     tr.dataset.id = String(e.id);
     tr.dataset.expense = JSON.stringify(rowDataFromExpense(e));
+    const detailId = detailIdFor(e);
+    const desc = e.description ?? '';
+    const descCell = desc
+        ? `<div class="text-truncate" title="${escHtml(desc)}">${escHtml(desc)}</div>`
+        : `<div class="text-truncate text-muted">—</div>`;
+    const tagCount = (e.tags ?? []).length;
+    const tagBadge = tagCount > 0
+        ? `<span class="badge bg-secondary-subtle text-secondary-emphasis" title="${tagCount} tag"><i class="bi bi-tags me-1"></i>${tagCount}</span>`
+        : '';
+    const payLabel = PAYMENT_LABELS[e.payment_method] ?? (e.payment_method ?? '');
     tr.innerHTML = `
-        <td>${escHtml(fmtDate(e.expense_date))}</td>
-        <td>${accountCell(e)}</td>
-        <td>${categoryCell(e)}</td>
-        <td>${escHtml(e.description ?? '')}</td>
-        <td>${tagsCell(e.tags)}</td>
-        <td><span class="badge bg-light text-dark">${escHtml(PAYMENT_LABELS[e.payment_method] ?? e.payment_method)}</span></td>
-        <td class="text-end fw-semibold">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}</td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm mx-toggle-btn"
+                    data-action="toggle"
+                    aria-expanded="false"
+                    aria-controls="${detailId}"
+                    title="Mostra dettagli">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </td>
+        <td class="text-nowrap">${escHtml(fmtDate(e.expense_date))}</td>
+        <td class="text-nowrap">${accountCell(e)}</td>
+        <td class="text-nowrap">${categoryCell(e)}</td>
+        <td class="mx-cell-truncate">${descCell}</td>
+        <td class="text-center">${tagBadge}</td>
+        <td class="text-center"><i class="bi ${paymentIcon(e.payment_method)}" title="${escHtml(payLabel)}"></i></td>
+        <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}</td>
         <td class="text-end text-nowrap">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="attach" title="Allegati"><i class="bi bi-paperclip"></i></button>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit"><i class="bi bi-pencil"></i></button>
@@ -170,13 +202,73 @@ function renderViewRow(e) {
     return tr;
 }
 
+function renderDetailRow(e) {
+    const tr = document.createElement('tr');
+    tr.id = detailIdFor(e);
+    tr.classList.add('mx-detail-row', 'd-none');
+    tr.dataset.detailFor = String(e.id);
+
+    const desc = e.description
+        ? escHtml(e.description)
+        : '<span class="text-muted">Nessuna descrizione</span>';
+    const tagsContent = (e.tags && e.tags.length)
+        ? tagsCell(e.tags)
+        : '<span class="text-muted">—</span>';
+    const payLabel = PAYMENT_LABELS[e.payment_method] ?? (e.payment_method ?? '—');
+
+    let parts = `
+        <dt>Descrizione</dt><dd>${desc}</dd>
+        <dt>Pagamento</dt><dd><i class="bi ${paymentIcon(e.payment_method)} me-1"></i>${escHtml(payLabel)}</dd>
+        <dt>Tag</dt><dd>${tagsContent}</dd>
+    `;
+
+    if (e.share_amount || e.shared_with) {
+        const yours = e.share_amount ? fmtMoney(e.share_amount) : '';
+        const total = fmtMoney(e.amount);
+        const shared = e.shared_with ? ` · con ${escHtml(e.shared_with)}` : '';
+        parts += `<dt>Quota</dt><dd>${yours ? `${yours} di ${total}` : total}${shared}</dd>`;
+    }
+
+    if (e.value_date && e.value_date !== e.expense_date) {
+        parts += `<dt>Data valuta</dt><dd>${escHtml(fmtDate(e.value_date))}</dd>`;
+    }
+
+    if (e.import_hash) {
+        parts += `<dt>Origine</dt><dd><i class="bi bi-bank me-1"></i>Importato da estratto conto</dd>`;
+    }
+
+    tr.innerHTML = `<td colspan="9"><dl class="mx-detail-panel mb-0">${parts}</dl></td>`;
+    return tr;
+}
+
+// Sostituisce viewTr (e l'eventuale detail row sibling) con una nuova coppia
+// view+detail. Usato dopo update/save per ricaricare la riga senza fare un
+// re-render dell'intera tabella.
+function replaceRowPair(viewTr, e) {
+    const sibling = viewTr.nextElementSibling;
+    if (sibling && sibling.classList.contains('mx-detail-row')) sibling.remove();
+    const newView = renderViewRow(e);
+    const newDetail = renderDetailRow(e);
+    viewTr.replaceWith(newView);
+    newView.after(newDetail);
+}
+
+// Rimuove l'eventuale detail row che segue viewTr (utile prima di edit/delete).
+function removeDetailSibling(viewTr) {
+    const sibling = viewTr.nextElementSibling;
+    if (sibling && sibling.classList.contains('mx-detail-row')) sibling.remove();
+}
+
 function replaceWithEditRow(tr) {
+    // Rimuove eventuale detail row sibling per non lasciarlo orfano.
+    removeDetailSibling(tr);
     const e = JSON.parse(tr.dataset.expense || '{}');
     const tagNames = (e.tags ?? []).map(t => t.name).join(', ');
     const edit = document.createElement('tr');
     edit.dataset.id = String(e.id);
     edit.classList.add('table-warning');
     edit.innerHTML = `
+        <td></td>
         <td><input type="date"   name="expense_date"   class="form-control form-control-sm" required value="${escHtml(e.expense_date)}"></td>
         <td><select               name="account_id"     class="form-select form-select-sm">${buildAccountOptions(e.account_id)}</select></td>
         <td><select               name="category_id"    class="form-select form-select-sm">${buildCategoryOptions(e.category_id)}</select></td>
@@ -215,7 +307,7 @@ function updateTotalFromTable(serverTotal = null) {
 
 async function loadList() {
     const tbody = document.getElementById('expenses-tbody');
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">
         <span class="spinner-border spinner-border-sm me-2"></span>Carico…</td></tr>`;
 
     try {
@@ -232,11 +324,14 @@ async function loadList() {
 
         tbody.innerHTML = '';
         if (expenses.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-3 d-block mb-1"></i>Nessuna spesa trovata.</td></tr>`;
         } else {
             const frag = document.createDocumentFragment();
-            for (const e of expenses) frag.appendChild(renderViewRow(e));
+            for (const e of expenses) {
+                frag.appendChild(renderViewRow(e));
+                frag.appendChild(renderDetailRow(e));
+            }
             tbody.appendChild(frag);
         }
         updateTotalFromTable(total);
@@ -246,7 +341,7 @@ async function loadList() {
             onChange: (newOffset) => { pageOffset = newOffset; loadList(); },
         });
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">
             <i class="bi bi-x-circle me-2"></i>${escHtml(err.message ?? 'Errore caricamento')}</td></tr>`;
     }
 }
@@ -366,15 +461,20 @@ function wireCreateForm() {
             });
 
             const exp = r.data?.expense;
+            // optimisticCreate inserisce solo la view row; aggancio il detail row
+            // come sibling, partendo chiuso (d-none).
+            if (exp) {
+                const newRow = tbody.querySelector(`tr[data-id="${exp.id}"]`);
+                if (newRow && !(newRow.nextElementSibling?.classList.contains('mx-detail-row'))) {
+                    newRow.after(renderDetailRow(exp));
+                }
+            }
             const tagsCsv = form.querySelector('input[name="tags"]')?.value ?? '';
             if (tagsCsv.trim() !== '' && exp) {
                 const tags = await assignTags(exp.id, tagsCsv);
                 if (tags) {
                     const newRow = tbody.querySelector(`tr[data-id="${exp.id}"]`);
-                    if (newRow) {
-                        const updated = { ...exp, tags };
-                        newRow.replaceWith(renderViewRow(updated));
-                    }
+                    if (newRow) replaceRowPair(newRow, { ...exp, tags });
                 }
                 await loadTags();
             }
@@ -405,6 +505,16 @@ function wireTableActions() {
         if (!tr) return;
         const action = btn.dataset.action;
 
+        if (action === 'toggle') {
+            const detail = tr.nextElementSibling;
+            if (!detail || !detail.classList.contains('mx-detail-row')) return;
+            const willExpand = detail.classList.contains('d-none');
+            detail.classList.toggle('d-none', !willExpand);
+            btn.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
+            btn.title = willExpand ? 'Nascondi dettagli' : 'Mostra dettagli';
+            return;
+        }
+
         if (action === 'edit') {
             await withViewTransition(() => replaceWithEditRow(tr));
             return;
@@ -431,11 +541,12 @@ function wireTableActions() {
                 params.set('id', id);
                 params.set('_csrf', getCsrfToken());
                 await send(`${BASE}/expenses/delete`, params);
+                removeDetailSibling(tr);
                 tr.remove();
                 updateTotalFromTable();
                 const tbody2 = document.getElementById('expenses-tbody');
                 if (!tbody2.children.length) {
-                    tbody2.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+                    tbody2.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">
                         <i class="bi bi-inbox fs-3 d-block mb-1"></i>Nessuna spesa.</td></tr>`;
                 }
                 toast.success('Spesa eliminata.');
@@ -470,10 +581,21 @@ function wireTableActions() {
                     call: () => send(`${BASE}/expenses/update`, params),
                 });
                 const exp = r.data?.expense;
+                if (exp) {
+                    // optimisticUpdate ha sostituito solo la view row: aggancia il
+                    // detail row aggiornato (eventualmente già presente con dati
+                    // vecchi va rimpiazzato).
+                    const newRow = document.querySelector(`#expenses-tbody tr[data-id="${exp.id}"]`);
+                    if (newRow) {
+                        const sibling = newRow.nextElementSibling;
+                        if (sibling && sibling.classList.contains('mx-detail-row')) sibling.remove();
+                        newRow.after(renderDetailRow(exp));
+                    }
+                }
                 const tags = await assignTags(id, tagsCsv);
                 if (tags && exp) {
                     const newRow = document.querySelector(`#expenses-tbody tr[data-id="${exp.id}"]`);
-                    if (newRow) newRow.replaceWith(renderViewRow({ ...exp, tags }));
+                    if (newRow) replaceRowPair(newRow, { ...exp, tags });
                 }
                 await loadTags();
                 updateTotalFromTable();

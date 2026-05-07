@@ -56,18 +56,52 @@ function debounce(fn, ms) {
 }
 
 function renderRow(it) {
-    const desc = it.description ? escapeHtml(it.description) : '<span class="text-muted">-</span>';
+    const detailId = `income-detail-${it.id}`;
+    const descRaw = it.description ?? '';
+    const descCell = descRaw
+        ? `<div class="text-truncate" title="${escapeAttr(descRaw)}">${escapeHtml(descRaw)}</div>`
+        : `<div class="text-truncate text-muted">—</div>`;
     return `
         <tr data-id="${it.id}">
-            <td>${escapeHtml(fmtDate(it.income_date))}</td>
-            <td>${accountCell(it)}</td>
-            <td><span class="badge bg-success-subtle text-success-emphasis">${escapeHtml(it.source)}</span></td>
-            <td>${desc}</td>
-            <td class="text-end fw-semibold text-success">${fmtMoney(it.amount)}</td>
-            <td class="text-end">
+            <td class="text-center">
+                <button type="button" class="btn btn-sm mx-toggle-btn"
+                        data-action="toggle"
+                        data-id="${it.id}"
+                        aria-expanded="false"
+                        aria-controls="${detailId}"
+                        title="Mostra dettagli">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+            </td>
+            <td class="text-nowrap">${escapeHtml(fmtDate(it.income_date))}</td>
+            <td class="text-nowrap">${accountCell(it)}</td>
+            <td class="text-nowrap"><span class="badge bg-success-subtle text-success-emphasis">${escapeHtml(it.source)}</span></td>
+            <td class="mx-cell-truncate">${descCell}</td>
+            <td class="text-end fw-semibold text-success text-nowrap">${fmtMoney(it.amount)}</td>
+            <td class="text-end text-nowrap">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit"  data-id="${it.id}"><i class="bi bi-pencil"></i></button>
                 <button type="button" class="btn btn-sm btn-outline-danger"    data-action="delete" data-id="${it.id}"><i class="bi bi-trash"></i></button>
             </td>
+        </tr>
+        ${renderDetailRow(it, detailId)}`;
+}
+
+function renderDetailRow(it, detailId) {
+    let parts = '';
+    if (it.description) {
+        parts += `<dt>Descrizione</dt><dd>${escapeHtml(it.description)}</dd>`;
+    } else {
+        parts += `<dt>Descrizione</dt><dd><span class="text-muted">Nessuna descrizione</span></dd>`;
+    }
+    if (it.value_date && it.value_date !== it.income_date) {
+        parts += `<dt>Data valuta</dt><dd>${escapeHtml(fmtDate(it.value_date))}</dd>`;
+    }
+    if (it.import_hash) {
+        parts += `<dt>Origine</dt><dd><i class="bi bi-bank me-1"></i>Importato da estratto conto</dd>`;
+    }
+    return `
+        <tr id="${detailId}" class="mx-detail-row d-none" data-detail-for="${it.id}">
+            <td colspan="7"><dl class="mx-detail-panel mb-0">${parts}</dl></td>
         </tr>`;
 }
 
@@ -88,6 +122,7 @@ function buildAccountOptions(selected) {
 function renderEditRow(it) {
     return `
         <tr data-id="${it.id}" class="table-warning">
+            <td></td>
             <td><input type="date" class="form-control form-control-sm" name="income_date" value="${escapeAttr(it.income_date)}" required></td>
             <td><select class="form-select form-select-sm" name="account_id">${buildAccountOptions(it.account_id)}</select></td>
             <td><input type="text" class="form-control form-control-sm" name="source" value="${escapeAttr(it.source)}" maxlength="64" required></td>
@@ -100,6 +135,12 @@ function renderEditRow(it) {
         </tr>`;
 }
 
+// Helper: rimuove il detail row che segue immediatamente la view row, se presente.
+function removeIncomeDetailSibling(viewTr) {
+    const next = viewTr?.nextElementSibling;
+    if (next && next.classList.contains('mx-detail-row')) next.remove();
+}
+
 function getFilters() {
     const fd = new FormData(filtersForm);
     return Object.fromEntries(Array.from(fd.entries()).filter(([, v]) => v !== ''));
@@ -108,7 +149,7 @@ function getFilters() {
 function renderTable(items /* serverTotal currently unused for sum since sum is on visible page */) {
     cache = items;
     if (!items.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Nessuna entrata.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Nessuna entrata.</td></tr>`;
         totalEl.textContent = fmtMoney(0);
         return;
     }
@@ -190,22 +231,48 @@ createForm.addEventListener('submit', async (ev) => {
 });
 
 delegateTableClick(tbody, {
+    toggle: (id) => {
+        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
+        if (!tr) return;
+        const detail = tr.nextElementSibling;
+        if (!detail || !detail.classList.contains('mx-detail-row')) return;
+        const willExpand = detail.classList.contains('d-none');
+        detail.classList.toggle('d-none', !willExpand);
+        const btn = tr.querySelector('[data-action="toggle"]');
+        if (btn) {
+            btn.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
+            btn.title = willExpand ? 'Nascondi dettagli' : 'Mostra dettagli';
+        }
+    },
     edit: (id) => {
-        if (editingId !== null) {
+        if (editingId !== null && editingId != id) {
             const prev = cache.find(x => x.id == editingId);
-            if (prev) tbody.querySelector(`tr[data-id="${editingId}"]`).outerHTML = renderRow(prev);
+            if (prev) {
+                const prevTr = tbody.querySelector(`tr[data-id="${editingId}"]`);
+                if (prevTr) {
+                    // L'edit row precedente non ha detail sibling (rimosso al click edit),
+                    // quindi outerHTML può espandere a 2 trs senza orfani.
+                    prevTr.outerHTML = renderRow(prev);
+                }
+            }
         }
         editingId = id;
         const it  = cache.find(x => x.id == id);
         if (!it) return;
         const tr = tbody.querySelector(`tr[data-id="${id}"]`);
+        if (!tr) return;
+        // Rimuove il detail row sibling prima di sostituire la view row con l'edit row.
+        removeIncomeDetailSibling(tr);
         tr.outerHTML = renderEditRow(it);
     },
     cancel: (id) => {
         const it = cache.find(x => x.id == id);
         if (!it) return;
         editingId = null;
-        tbody.querySelector(`tr[data-id="${id}"]`).outerHTML = renderRow(it);
+        const tr = tbody.querySelector(`tr[data-id="${id}"]`);
+        if (!tr) return;
+        // L'edit row non ha detail sibling: outerHTML inserisce view + detail in posizione.
+        tr.outerHTML = renderRow(it);
     },
     save: async (id) => {
         const tr = tbody.querySelector(`tr[data-id="${id}"]`);
@@ -234,6 +301,8 @@ delegateTableClick(tbody, {
         if (!ok) return;
         const tr = tbody.querySelector(`tr[data-id="${id}"]`);
         if (!tr) return;
+        // Rimuove subito il detail sibling, poi optimisticDelete sfuma la view row.
+        removeIncomeDetailSibling(tr);
         try {
             await optimisticDelete({
                 row: tr,

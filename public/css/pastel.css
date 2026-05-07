@@ -621,3 +621,47 @@ main.container { padding-bottom: 4rem; }
     min-width: 3rem;
     justify-content: center;
 }
+
+/* ── Compact rows + expandable detail (expenses.js / incomes.js) ──────── */
+.mx-cell-truncate {
+    max-width: 1px; /* trick CSS table-layout: forza il wrapper interno a usare ellipsis */
+}
+.mx-cell-truncate > .text-truncate {
+    display: block;
+    max-width: 100%;
+}
+.mx-detail-row > td {
+    background: var(--bs-tertiary-bg, var(--mx-line-2));
+    padding: 0.75rem 1rem 1rem !important;
+    border-top: none !important;
+}
+.mx-detail-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem 1.25rem;
+    font-size: 0.9rem;
+}
+.mx-detail-panel dt {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary-color, #6c757d);
+    margin: 0 0 0.15rem;
+    font-weight: 600;
+}
+.mx-detail-panel dd { margin: 0; }
+.mx-toggle-btn {
+    border: 0;
+    background: transparent;
+    color: var(--bs-secondary-color, #6c757d);
+    padding: 0.15rem 0.4rem;
+    line-height: 1;
+}
+.mx-toggle-btn:hover { color: var(--bs-body-color); }
+.mx-toggle-btn .bi-chevron-down {
+    transition: transform var(--mx-dur-base, 200ms) var(--mx-ease-out, ease-out);
+    display: inline-block;
+}
+.mx-toggle-btn[aria-expanded="true"] .bi-chevron-down {
+    transform: rotate(180deg);
+}
