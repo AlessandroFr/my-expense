@@ -6,7 +6,17 @@ declare(strict_types=1);
  *
  * Formato tuple: [method, path, [Controller::class, 'action'], middleware[]]
  *
- * Vuoto in C2 -- popolato incrementalmente per dominio da C6 in poi.
+ * Popolato per dominio da C6 in poi (Expenses pilota).
  */
 
-return [];
+use App\Controllers\ExpenseController;
+
+return [
+    // Expenses
+    ['GET',  '/expenses/list',           [ExpenseController::class, 'list'],   ['auth']],
+    ['POST', '/expenses/create',         [ExpenseController::class, 'create'], ['auth', 'csrf']],
+    ['POST', '/expenses/update',         [ExpenseController::class, 'update'], ['auth', 'csrf']],
+    ['POST', '/expenses/delete',         [ExpenseController::class, 'delete'], ['auth', 'csrf']],
+    ['GET',  '/expenses/export',         [ExpenseController::class, 'export'], ['auth']],
+    ['POST', '/expenses/import',         [ExpenseController::class, 'import'], ['auth', 'csrf']],
+];
