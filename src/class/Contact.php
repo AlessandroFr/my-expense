@@ -35,26 +35,93 @@ final class Contact
      * Cliente e fornitore coincidono: il parametro $type viene mantenuto per
      * back-compat ma e' un no-op — l'UI adesso non distingue piu' i due ruoli.
      *
-     * @param  ?string $type Ignorato (kept for API compat).
+     * Opts (tutte opzionali, default = back-compat con i caller esistenti):
+     *   - search (?string): filtro LIKE %term% su name/vat_number/iban/email
+     *   - limit  (?int)   : se valorizzato applica LIMIT/OFFSET
+     *   - offset (int)    : default 0
+     *
+     * @param  ?string             $type Ignorato (kept for API compat).
+     * @param  array<string,mixed> $opts
      * @return array<int, array<string,mixed>>
      */
     public static function allForUser(
         int $userId,
         bool $includeArchived = false,
-        ?string $type = null
+        ?string $type = null,
+        array $opts = []
     ): array {
+        [$where, $params] = self::buildListWhereClause($userId, $includeArchived, $opts);
         $sql = 'SELECT id, name, name_norm, type, vat_number, iban, email, notes,
                        color, archived, created_at, updated_at
-                FROM contacts
-                WHERE user_id = ?';
+                FROM contacts'
+              . $where
+              . ' ORDER BY name ASC';
+
+        $limit  = isset($opts['limit'])  ? (int) $opts['limit']  : null;
+        $offset = isset($opts['offset']) ? max(0, (int) $opts['offset']) : 0;
+
+        $stmt = Database::pdo()->prepare(
+            $limit !== null ? $sql . ' LIMIT ? OFFSET ?' : $sql
+        );
+        $i = 1;
+        foreach ($params as $p) {
+            $stmt->bindValue($i++, $p, is_int($p) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        }
+        if ($limit !== null) {
+            $stmt->bindValue($i++, $limit,  \PDO::PARAM_INT);
+            $stmt->bindValue($i,   $offset, \PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Conta i contatti che soddisfano gli stessi predicati di allForUser
+     * (escluso LIMIT/OFFSET). Usato dalla paginazione di /contacts.
+     *
+     * @param array<string,mixed> $opts
+     */
+    public static function countForUser(
+        int $userId,
+        bool $includeArchived = false,
+        array $opts = []
+    ): int {
+        [$where, $params] = self::buildListWhereClause($userId, $includeArchived, $opts);
+        $sql = 'SELECT COUNT(*) FROM contacts' . $where;
+        $stmt = Database::pdo()->prepare($sql);
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Costruisce la WHERE clause condivisa fra allForUser e countForUser.
+     * Ritorna [SQL, params] dove SQL inizia con " WHERE …".
+     *
+     * @param array<string,mixed> $opts
+     * @return array{0:string, 1:array<int,mixed>}
+     */
+    private static function buildListWhereClause(
+        int $userId,
+        bool $includeArchived,
+        array $opts
+    ): array {
+        $sql    = ' WHERE user_id = ?';
         $params = [$userId];
+
         if (!$includeArchived) {
             $sql .= ' AND archived = 0';
         }
-        $sql .= ' ORDER BY name ASC';
-        $stmt = Database::pdo()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+
+        $search = isset($opts['search']) ? trim((string) $opts['search']) : '';
+        if ($search !== '') {
+            // Escapa wildcard LIKE — stesso pattern di previewBackfillCount.
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+            $like    = '%' . $escaped . '%';
+            $sql    .= ' AND (name LIKE ? OR vat_number LIKE ? OR iban LIKE ? OR email LIKE ?)';
+            array_push($params, $like, $like, $like, $like);
+        }
+
+        return [$sql, $params];
     }
 
     public static function findForUser(int $id, int $userId): ?array

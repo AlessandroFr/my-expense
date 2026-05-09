@@ -5,12 +5,10 @@
 
 use App\Auth;
 use App\Config;
-use App\Contact;
 use App\Csrf;
 
 $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
 $userId = (int) Auth::userId();
-$contacts = Contact::allForUser($userId, false);
 ?>
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -19,7 +17,7 @@ $contacts = Contact::allForUser($userId, false);
             <div class="text-muted small">Fornitori e clienti — chi paga, chi ricevi.</div>
         </div>
         <div class="d-flex gap-2 align-items-center">
-            <span id="contacts-count" class="badge bg-secondary"><?= count($contacts) ?> attivi</span>
+            <span id="contacts-count" class="badge bg-secondary">—</span>
             <button type="button" class="btn btn-primary btn-sm" data-action="new">
                 <i class="bi bi-plus-circle me-1"></i>Nuova anagrafica
             </button>
@@ -71,6 +69,7 @@ $contacts = Contact::allForUser($userId, false);
             Nessuna anagrafica. Aggiungi la prima qui sopra, oppure verra' creata
             automaticamente la prima volta che importi un estratto conto.
         </div>
+        <nav id="contacts-pager" class="px-3 py-2 border-top"></nav>
     </div>
 </div>
 
