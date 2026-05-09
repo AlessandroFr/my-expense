@@ -14,6 +14,7 @@ use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
 use App\Controllers\IncomeController;
+use App\Controllers\RecurringController;
 
 return [
     ['GET', '/expenses',         [ExpenseController::class,  'index'], ['auth']],
@@ -22,4 +23,5 @@ return [
     ['GET', '/budgets',          [BudgetController::class,   'index'], ['auth']],
     ['GET', '/incomes',          [IncomeController::class,   'index'], ['auth']],
     ['GET', '/accounts',         [AccountController::class,  'index'], ['auth']],
+    ['GET', '/recurring',        [RecurringController::class,'index'], ['auth']],
 ];

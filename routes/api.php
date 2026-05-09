@@ -15,6 +15,7 @@ use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
 use App\Controllers\FilterController;
 use App\Controllers\IncomeController;
+use App\Controllers\RecurringController;
 use App\Controllers\TagController;
 
 return [
@@ -60,4 +61,12 @@ return [
     ['POST', '/accounts/reconcile',             [AccountController::class, 'reconcile'],            ['auth', 'csrf']],
     ['GET',  '/accounts/reconciliations',       [AccountController::class, 'reconciliations'],      ['auth']],
     ['POST', '/accounts/reconciliation/delete', [AccountController::class, 'reconciliationDelete'], ['auth', 'csrf']],
+
+    // Recurring expenses
+    ['GET',  '/recurring/list',          [RecurringController::class, 'list'],   ['auth']],
+    ['POST', '/recurring/create',        [RecurringController::class, 'create'], ['auth', 'csrf']],
+    ['POST', '/recurring/update',        [RecurringController::class, 'update'], ['auth', 'csrf']],
+    ['POST', '/recurring/toggle',        [RecurringController::class, 'toggle'], ['auth', 'csrf']],
+    ['POST', '/recurring/delete',        [RecurringController::class, 'delete'], ['auth', 'csrf']],
+    ['POST', '/recurring/run',           [RecurringController::class, 'run'],    ['auth', 'csrf']],
 ];
