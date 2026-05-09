@@ -711,6 +711,20 @@ final class BankStatementImporter
             return self::cleanupCounterpartyName($m[1]);
         }
 
+        // Bonifici SEPA istantanei/ordinari (Banca Sella):
+        //   "BONIFICO - SEPA ISTANTANEO GALLO MATTIA VAL. ACCREDITO: ..."
+        //                                → "Gallo Mattia"
+        //   "BONIFICO - SEPA ORDINARIO MARIO ROSSI VAL. DISP: ..."
+        //                                → "Mario Rossi"
+        // Kind-agnostic: la struttura "SEPA <flavor> NAME VAL." e' specifica
+        // abbastanza da non collidere ne' con accrediti ne' con disposizioni.
+        if (preg_match(
+            '/\bSEPA\s+(?:ISTANTANEO|ORDINARIO)\s+([A-Z][A-Z\s\.\']+?)\s+VAL\./u',
+            $desc, $m
+        )) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+
         if ($kind === 'income') {
             // Pattern dei bonifici ricevuti — il nome del cliente / pagatore
             // viene preceduto da uno di questi prefissi verbatim:

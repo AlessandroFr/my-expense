@@ -59,6 +59,48 @@ final class BankStatementImporterParseTest extends TestCase
         self::assertNotSame($a, $b);
     }
 
+    public function testExtractCounterpartySepaIstantaneoIncoming(): void
+    {
+        $desc = 'BONIFICO - SEPA ISTANTANEO GALLO MATTIA VAL. ACCREDITO: 12/12/25 '
+              . 'COD.ID.ORD: IT24 M030 6234 2100 0000 2662 775 '
+              . 'CRO: 249829FA0B4B42198DFEACBD6501AC96 '
+              . 'GALLO MATTIA A 30035 MIRANO B '
+              . 'GLLMTT04T31F241H20251212249829FA0B4B4219';
+        self::assertSame(
+            'Gallo Mattia',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'income')
+        );
+    }
+
+    public function testExtractCounterpartySepaOrdinarioOutgoing(): void
+    {
+        $desc = 'BONIFICO - SEPA ORDINARIO MARIO ROSSI VAL. DISP: 03/05/26 '
+              . 'CRO: ABC123 NOTE: pagamento fattura 42';
+        self::assertSame(
+            'Mario Rossi',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'expense')
+        );
+    }
+
+    public function testExtractCounterpartySepaPicksFirstOccurrenceBeforeVal(): void
+    {
+        $desc = 'BONIFICO - SEPA ISTANTANEO GALLO MATTIA VAL. ACCREDITO: 12/12/25 '
+              . 'CRO: 249829FA0B4B4219 GALLO MATTIA A 30035 MIRANO B';
+        self::assertSame(
+            'Gallo Mattia',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'income')
+        );
+    }
+
+    public function testExtractCounterpartyClassicIncomingPrefixStillWorks(): void
+    {
+        $desc = 'BONIFICO DA MARIO ROSSI VAL. ACCREDITO: 01/03/26 CRO: 999';
+        self::assertSame(
+            'Mario Rossi',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'income')
+        );
+    }
+
     /**
      * @param  array<int,mixed> $args
      * @return mixed
