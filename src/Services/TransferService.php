@@ -218,15 +218,27 @@ final class TransferService extends BaseService
     {
         $pdo = Database::pdo();
 
-        // Candidati: expenses con import_hash che termina in :exp o :exp-atm
-        // e ancora orfani di transfer_id.
+        // Candidati: expenses orfani da transfer_id che sembrano partite doppie.
+        // Due formati supportati:
+        //   - moderno: `import_hash` con suffisso `:exp` o `:exp-atm`
+        //   - legacy (Banca Sella di vecchia data): la colonna import_hash e'
+        //     CHAR(64) e ha truncato il suffisso al momento della INSERT, quindi
+        //     l'expense e la income gemella condividono lo stesso hash a 64 char.
+        //     Le riconosciamo dal prefisso descrizione "Ricarica → " /
+        //     "Prelievo ATM → " generato dall'importer.
         $stmt = $pdo->prepare(
             "SELECT id, account_id, amount, expense_date, value_date,
                     description, import_hash
              FROM expenses
              WHERE user_id = ?
                AND transfer_id IS NULL
-               AND (import_hash LIKE '%:exp' OR import_hash LIKE '%:exp-atm')
+               AND import_hash IS NOT NULL
+               AND (
+                   import_hash LIKE '%:exp'
+                   OR import_hash LIKE '%:exp-atm'
+                   OR description LIKE 'Ricarica → %'
+                   OR description LIKE 'Prelievo ATM → %'
+               )
              ORDER BY id ASC"
         );
         $stmt->execute([$userId]);
@@ -238,10 +250,14 @@ final class TransferService extends BaseService
 
         foreach ($candidates as $exp) {
             $expHash = (string) $exp['import_hash'];
-            $isAtm   = str_ends_with($expHash, ':exp-atm');
-            $incHash = $isAtm
-                ? substr($expHash, 0, -strlen(':exp-atm')) . ':inc-atm'
-                : substr($expHash, 0, -strlen(':exp')) . ':inc';
+            if (str_ends_with($expHash, ':exp-atm')) {
+                $incHash = substr($expHash, 0, -strlen(':exp-atm')) . ':inc-atm';
+            } elseif (str_ends_with($expHash, ':exp')) {
+                $incHash = substr($expHash, 0, -strlen(':exp')) . ':inc';
+            } else {
+                // Formato legacy: stesso hash su expense e income.
+                $incHash = $expHash;
+            }
 
             $stmt = $pdo->prepare(
                 'SELECT id, account_id, amount, income_date, transfer_id

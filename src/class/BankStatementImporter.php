@@ -463,10 +463,14 @@ final class BankStatementImporter
 
                     $signed   = -$amount;
                     $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
+                    // Nota: import_hash e' CHAR(64), quindi i suffissi `:exp`/`:inc`
+                    // vengono comunque troncati a livello DB. Per il pre-check ci
+                    // basta verificare il baseHash (sia la riga expense sia la riga
+                    // income gemella vi convergono in storage).
                     $expHash  = $baseHash . ':exp';
                     $incHash  = $baseHash . ':inc';
 
-                    if (isset($existingHashes[$expHash]) || isset($existingHashes[$incHash])) {
+                    if (isset($existingHashes[$baseHash])) {
                         $dupCnt++;
                         continue;
                     }
@@ -503,8 +507,7 @@ final class BankStatementImporter
                             continue;
                         }
                         if (!$alreadyInTx) $pdo->commit();
-                        $existingHashes[$expHash] = true;
-                        $existingHashes[$incHash] = true;
+                        $existingHashes[$baseHash] = true;
                         $pairedCnt++;
                         $importedExp++;
                         $importedInc++;
@@ -542,10 +545,12 @@ final class BankStatementImporter
 
                     $signed   = -$amount;
                     $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
+                    // Vedi nota nel ramo TRANSFER_PAIR: import_hash CHAR(64) tronca
+                    // i suffissi, quindi pre-check sul baseHash.
                     $expHash  = $baseHash . ':exp-atm';
                     $incHash  = $baseHash . ':inc-atm';
 
-                    if (isset($existingHashes[$expHash]) || isset($existingHashes[$incHash])) {
+                    if (isset($existingHashes[$baseHash])) {
                         $dupCnt++;
                         continue;
                     }
@@ -580,8 +585,7 @@ final class BankStatementImporter
                             continue;
                         }
                         if (!$alreadyInTx) $pdo->commit();
-                        $existingHashes[$expHash] = true;
-                        $existingHashes[$incHash] = true;
+                        $existingHashes[$baseHash] = true;
                         $pairedCnt++;
                         $importedExp++;
                         $importedInc++;
