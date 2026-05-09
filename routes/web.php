@@ -17,6 +17,7 @@ use App\Controllers\IncomeController;
 use App\Controllers\RecurringController;
 use App\Controllers\ReportController;
 use App\Controllers\SettingsController;
+use App\Controllers\TransferController;
 
 return [
     // Auth (no middleware -- pre-login pages)
@@ -34,6 +35,7 @@ return [
     ['GET', '/budgets',          [BudgetController::class,   'index'],  ['auth']],
     ['GET', '/incomes',          [IncomeController::class,   'index'],  ['auth']],
     ['GET', '/accounts',         [AccountController::class,  'index'],  ['auth']],
+    ['GET', '/transfers',        [TransferController::class, 'index'],  ['auth']],
     ['GET', '/recurring',        [RecurringController::class,'index'],  ['auth']],
     ['GET', '/contacts',         [ContactController::class,  'index'],  ['auth']],
     ['GET', '/contacts/detail',  [ContactController::class,  'detail'], ['auth']],

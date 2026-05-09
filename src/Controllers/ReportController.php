@@ -46,6 +46,7 @@ final class ReportController extends BaseController
             "SELECT MONTH(expense_date) AS m, SUM(amount) AS total
              FROM expenses
              WHERE user_id = ? AND expense_date >= ? AND expense_date < ?
+               AND is_transfer = 0
              GROUP BY m"
         );
         $stmt->execute([$userId, $start, $end]);
@@ -57,6 +58,7 @@ final class ReportController extends BaseController
             "SELECT MONTH(income_date) AS m, SUM(amount) AS total
              FROM incomes
              WHERE user_id = ? AND income_date >= ? AND income_date < ?
+               AND is_transfer = 0
              GROUP BY m"
         );
         $stmt->execute([$userId, $start, $end]);
@@ -83,6 +85,7 @@ final class ReportController extends BaseController
              FROM expenses e
              LEFT JOIN categories c ON c.id = e.category_id
              WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date < ?
+               AND e.is_transfer = 0
              GROUP BY c.id, c.name, c.color
              ORDER BY total DESC"
         );
@@ -106,6 +109,7 @@ final class ReportController extends BaseController
              FROM expenses e
              LEFT JOIN categories c ON c.id = e.category_id
              WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date < ?
+               AND e.is_transfer = 0
              ORDER BY e.amount DESC, e.expense_date DESC
              LIMIT 10"
         );
@@ -134,6 +138,7 @@ final class ReportController extends BaseController
                     "SELECT MONTH(expense_date) AS m, SUM(amount) AS total
                      FROM expenses
                      WHERE user_id = ? AND category_id = ? AND expense_date >= ? AND expense_date < ?
+                       AND is_transfer = 0
                      GROUP BY m"
                 );
                 $stmt->execute([$userId, $tc['category_id'], $start, $end]);
@@ -142,6 +147,7 @@ final class ReportController extends BaseController
                     "SELECT MONTH(expense_date) AS m, SUM(amount) AS total
                      FROM expenses
                      WHERE user_id = ? AND category_id IS NULL AND expense_date >= ? AND expense_date < ?
+                       AND is_transfer = 0
                      GROUP BY m"
                 );
                 $stmt->execute([$userId, $start, $end]);

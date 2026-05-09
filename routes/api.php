@@ -22,6 +22,7 @@ use App\Controllers\RecurringController;
 use App\Controllers\ReportController;
 use App\Controllers\SettingsController;
 use App\Controllers\TagController;
+use App\Controllers\TransferController;
 
 return [
     // Auth
@@ -76,6 +77,11 @@ return [
     ['POST', '/accounts/reconcile',             [AccountController::class, 'reconcile'],            ['auth', 'csrf']],
     ['GET',  '/accounts/reconciliations',       [AccountController::class, 'reconciliations'],      ['auth']],
     ['POST', '/accounts/reconciliation/delete', [AccountController::class, 'reconciliationDelete'], ['auth', 'csrf']],
+
+    // Transfers (atomic between-accounts movement)
+    ['GET',  '/transfers/list',          [TransferController::class, 'list'],   ['auth']],
+    ['POST', '/transfers/create',        [TransferController::class, 'create'], ['auth', 'csrf']],
+    ['POST', '/transfers/delete',        [TransferController::class, 'delete'], ['auth', 'csrf']],
 
     // Recurring expenses
     ['GET',  '/recurring/list',          [RecurringController::class, 'list'],   ['auth']],

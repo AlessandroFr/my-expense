@@ -9,7 +9,10 @@ use RuntimeException;
 
 final class Account
 {
-    public const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'other'];
+    public const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other'];
+
+    /** Tipi di conto per cui i campi `iban`/`bank_name` rappresentano il broker. */
+    public const TYPES_WITH_BROKER = ['deposit', 'pac'];
 
     private const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
 

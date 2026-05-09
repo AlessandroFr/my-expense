@@ -17,7 +17,9 @@ const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
 const TYPE_LABELS = {
     checking: 'Conto corrente', card: 'Carta', cash: 'Contanti',
-    savings: 'Risparmi', investment: 'Investimenti', other: 'Altro',
+    savings: 'Risparmi', investment: 'Investimenti',
+    deposit: 'Deposito titoli', pac: 'Piano accumulo (PAC)',
+    other: 'Altro',
 };
 
 const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];

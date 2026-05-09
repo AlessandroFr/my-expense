@@ -178,11 +178,14 @@ CREATE TABLE IF NOT EXISTS `expense_attachments` (
 --   "In tasca": riceve i pagamenti contanti e i prelievi bancomat in
 --   partita doppia. Vincoli applicativi nel codice PHP: max 1 default per
 --   user, valido solo se type='cash'.)
+-- Migration: 019_account_types_and_transfers.sql (tipi `deposit` e `pac`
+--   per conto deposito titoli e Piano di Accumulo Capitale; per questi
+--   tipi i campi `iban`/`bank_name` ospitano IBAN e nome del broker.)
 CREATE TABLE IF NOT EXISTS `accounts` (
     `id`              INT UNSIGNED   NOT NULL AUTO_INCREMENT,
     `user_id`         INT UNSIGNED   NOT NULL,
     `name`            VARCHAR(64)    NOT NULL,
-    `type`            ENUM('checking','card','cash','savings','investment','other') NOT NULL DEFAULT 'checking',
+    `type`            ENUM('checking','card','cash','savings','investment','deposit','pac','other') NOT NULL DEFAULT 'checking',
     `color`           VARCHAR(7)     NOT NULL DEFAULT '#6c757d',
     `icon`            VARCHAR(32)    NULL,
     `opening_balance` DECIMAL(12,2)  NOT NULL DEFAULT 0,
@@ -292,3 +295,41 @@ CREATE TABLE IF NOT EXISTS `account_reconciliations` (
     CONSTRAINT `fk_recon_income`
         FOREIGN KEY (`adjustment_income_id`)  REFERENCES `incomes`  (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Trasferimenti atomici fra conti ──────────────────────────────────────────
+-- Migration: 019_account_types_and_transfers.sql
+-- Un Transfer rappresenta un bonifico fra due conti dell'utente. In una
+-- transazione DB unica vengono create:
+--   • una `expenses` row sul conto sorgente con `is_transfer=1` e
+--     `transfer_id` settato (uscita reale dal conto);
+--   • una `incomes`  row sul conto destinazione con `is_transfer=1` e
+--     `transfer_id` settato (entrata reale sul conto).
+-- Saldo conto = include i transfer (sono uscite/entrate vere). KPI mensili
+-- dashboard/reports filtrano `is_transfer=0` per non gonfiare i totali.
+-- ON DELETE CASCADE su `transfer_id` rimuove le due scritture quando il
+-- transfer viene eliminato.
+CREATE TABLE IF NOT EXISTS `transfers` (
+    `id`                       INT UNSIGNED   NOT NULL AUTO_INCREMENT,
+    `user_id`                  INT UNSIGNED   NOT NULL,
+    `source_account_id`        INT UNSIGNED   NOT NULL,
+    `destination_account_id`   INT UNSIGNED   NOT NULL,
+    `amount`                   DECIMAL(12,2)  NOT NULL,
+    `transfer_date`            DATE           NOT NULL,
+    `description`              VARCHAR(255)   NULL,
+    `notes`                    VARCHAR(255)   NULL,
+    `created_at`               DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`               DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `ix_transfers_user_date` (`user_id`, `transfer_date` DESC),
+    KEY `ix_transfers_user_src`  (`user_id`, `source_account_id`),
+    KEY `ix_transfers_user_dst`  (`user_id`, `destination_account_id`),
+    CONSTRAINT `fk_transfers_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_transfers_source`
+        FOREIGN KEY (`source_account_id`)      REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_transfers_destination`
+        FOREIGN KEY (`destination_account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- NOTA: per gli ALTER TABLE che aggiungono `transfer_id` UNIQUE FK + flag
+--       `is_transfer` a expenses/incomes vedere
+--       database/migrations/019_account_types_and_transfers.sql.

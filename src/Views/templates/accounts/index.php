@@ -34,6 +34,8 @@ $this->section('content');
                     <option value="cash">Contanti</option>
                     <option value="savings">Risparmi</option>
                     <option value="investment">Investimenti</option>
+                    <option value="deposit">Deposito titoli</option>
+                    <option value="pac">Piano accumulo (PAC)</option>
                     <option value="other">Altro</option>
                 </select>
             </div>

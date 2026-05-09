@@ -36,6 +36,7 @@ final class BudgetRepository extends BaseRepository
               AND e.category_id = b.category_id
               AND e.expense_date >= ?
               AND e.expense_date <  ?
+              AND e.is_transfer = 0
              WHERE b.user_id = ? AND b.year_month = ?
              GROUP BY b.id, b.category_id, b.year_month, b.amount, c.name, c.color, c.icon
              ORDER BY c.sort_order ASC, c.name ASC",
@@ -63,6 +64,7 @@ final class BudgetRepository extends BaseRepository
               AND e.category_id = b.category_id
               AND e.expense_date >= ?
               AND e.expense_date <  ?
+              AND e.is_transfer = 0
              WHERE b.user_id = ? AND b.category_id = ? AND b.year_month = ?
              GROUP BY b.id, b.category_id, b.year_month, b.amount, c.name, c.color, c.icon
              LIMIT 1",

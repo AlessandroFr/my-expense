@@ -114,7 +114,8 @@ final class IncomeRepository extends BaseRepository
         $end   = date('Y-m-d', (int) strtotime($start . ' +1 month'));
         return (float) $this->fetchScalar(
             'SELECT COALESCE(SUM(amount), 0) FROM incomes
-             WHERE user_id = ? AND income_date >= ? AND income_date < ?',
+             WHERE user_id = ? AND income_date >= ? AND income_date < ?
+               AND is_transfer = 0',
             [$userId, $start, $end],
         );
     }
@@ -123,7 +124,8 @@ final class IncomeRepository extends BaseRepository
     {
         return (float) $this->fetchScalar(
             'SELECT COALESCE(SUM(amount), 0) FROM incomes
-             WHERE user_id = ? AND income_date >= ? AND income_date <= ?',
+             WHERE user_id = ? AND income_date >= ? AND income_date <= ?
+               AND is_transfer = 0',
             [$userId, $from, $to],
         );
     }
@@ -138,6 +140,7 @@ final class IncomeRepository extends BaseRepository
              FROM incomes i
              WHERE i.user_id = ?
                AND i.income_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
+               AND i.is_transfer = 0
              GROUP BY month
              ORDER BY month ASC",
             [$userId, $monthsBack - 1],

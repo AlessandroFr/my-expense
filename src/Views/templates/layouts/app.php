@@ -99,6 +99,7 @@ $title   = (string) ($this->title ?? '');
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/expenses') ?>"><i class="bi bi-receipt me-2"></i>Spese</a></li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/incomes') ?>"><i class="bi bi-cash-stack me-2"></i>Entrate</a></li>
+                    <li><a class="dropdown-item" href="<?= $this->escape($base . '/transfers') ?>"><i class="bi bi-arrow-left-right me-2"></i>Trasferimenti</a></li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/recurring') ?>"><i class="bi bi-arrow-repeat me-2"></i>Ricorrenti</a></li>
                 </ul>
             </li>
