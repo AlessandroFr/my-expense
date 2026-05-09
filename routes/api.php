@@ -13,6 +13,7 @@ use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
 use App\Controllers\FilterController;
+use App\Controllers\IncomeController;
 use App\Controllers\TagController;
 
 return [
@@ -43,4 +44,10 @@ return [
     ['GET',  '/filters/list',            [FilterController::class, 'list'],   ['auth']],
     ['POST', '/filters/save',            [FilterController::class, 'save'],   ['auth', 'csrf']],
     ['POST', '/filters/delete',          [FilterController::class, 'delete'], ['auth', 'csrf']],
+
+    // Incomes
+    ['GET',  '/incomes/list',            [IncomeController::class, 'list'],   ['auth']],
+    ['POST', '/incomes/create',          [IncomeController::class, 'create'], ['auth', 'csrf']],
+    ['POST', '/incomes/update',          [IncomeController::class, 'update'], ['auth', 'csrf']],
+    ['POST', '/incomes/delete',          [IncomeController::class, 'delete'], ['auth', 'csrf']],
 ];

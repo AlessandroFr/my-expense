@@ -12,10 +12,12 @@ declare(strict_types=1);
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
+use App\Controllers\IncomeController;
 
 return [
     ['GET', '/expenses',         [ExpenseController::class,  'index'], ['auth']],
     ['GET', '/categories',       [CategoryController::class, 'index'], ['auth']],
     ['GET', '/categories/edit',  [CategoryController::class, 'edit'],  ['auth']],
     ['GET', '/budgets',          [BudgetController::class,   'index'], ['auth']],
+    ['GET', '/incomes',          [IncomeController::class,   'index'], ['auth']],
 ];
