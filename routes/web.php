@@ -14,6 +14,7 @@ use App\Controllers\ContactController;
 use App\Controllers\DashboardController;
 use App\Controllers\ExpenseController;
 use App\Controllers\IncomeController;
+use App\Controllers\PacController;
 use App\Controllers\RecurringController;
 use App\Controllers\ReportController;
 use App\Controllers\SecuritiesController;
@@ -39,6 +40,8 @@ return [
     ['GET', '/transfers',        [TransferController::class, 'index'],  ['auth']],
     ['GET', '/securities',           [SecuritiesController::class, 'index'],          ['auth']],
     ['GET', '/securities/instrument',[SecuritiesController::class, 'instrumentPage'], ['auth']],
+    ['GET', '/pac',                  [PacController::class,        'index'],          ['auth']],
+    ['GET', '/pac/plan',             [PacController::class,        'planPage'],       ['auth']],
     ['GET', '/recurring',        [RecurringController::class,'index'],  ['auth']],
     ['GET', '/contacts',         [ContactController::class,  'index'],  ['auth']],
     ['GET', '/contacts/detail',  [ContactController::class,  'detail'], ['auth']],

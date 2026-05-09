@@ -9,6 +9,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Income;
 use App\RecurringExpense;
+use App\Services\PacService;
 use Throwable;
 
 /**
@@ -27,6 +28,11 @@ final class DashboardController extends BaseController
             RecurringExpense::generatePending($userId);
         } catch (Throwable) {
             /* silent -- come public/index.php:84 */
+        }
+        try {
+            (new PacService())->generatePending($userId);
+        } catch (Throwable) {
+            /* silent: PAC auto-generation non blocca il dashboard */
         }
         return $this->view('dashboard.index', ['title' => 'Dashboard']);
     }

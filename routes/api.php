@@ -18,6 +18,7 @@ use App\Controllers\DashboardController;
 use App\Controllers\ExpenseController;
 use App\Controllers\FilterController;
 use App\Controllers\IncomeController;
+use App\Controllers\PacController;
 use App\Controllers\RecurringController;
 use App\Controllers\ReportController;
 use App\Controllers\SecuritiesController;
@@ -101,6 +102,25 @@ return [
     ['POST', '/securities/asset-classes/create', [SecuritiesController::class, 'createAssetClass'], ['auth', 'csrf']],
     ['POST', '/securities/asset-classes/update', [SecuritiesController::class, 'updateAssetClass'], ['auth', 'csrf']],
     ['POST', '/securities/asset-classes/delete', [SecuritiesController::class, 'deleteAssetClass'], ['auth', 'csrf']],
+
+    // PAC (funds, plans, contributions)
+    ['GET',  '/pac/funds',                  [PacController::class, 'listFunds'],          ['auth']],
+    ['POST', '/pac/funds/create',           [PacController::class, 'createFund'],         ['auth', 'csrf']],
+    ['POST', '/pac/funds/update',           [PacController::class, 'updateFund'],         ['auth', 'csrf']],
+    ['POST', '/pac/funds/delete',           [PacController::class, 'deleteFund'],         ['auth', 'csrf']],
+    ['GET',  '/pac/funds/navs',             [PacController::class, 'listNavs'],           ['auth']],
+    ['POST', '/pac/funds/nav-update',       [PacController::class, 'updateNav'],          ['auth', 'csrf']],
+    ['POST', '/pac/funds/nav-delete',       [PacController::class, 'deleteNav'],          ['auth', 'csrf']],
+    ['GET',  '/pac/plans',                  [PacController::class, 'listPlans'],          ['auth']],
+    ['POST', '/pac/plans/create',           [PacController::class, 'createPlan'],         ['auth', 'csrf']],
+    ['POST', '/pac/plans/update',           [PacController::class, 'updatePlan'],         ['auth', 'csrf']],
+    ['POST', '/pac/plans/toggle',           [PacController::class, 'togglePlan'],         ['auth', 'csrf']],
+    ['POST', '/pac/plans/delete',           [PacController::class, 'deletePlan'],         ['auth', 'csrf']],
+    ['POST', '/pac/plans/run',              [PacController::class, 'runPlan'],            ['auth', 'csrf']],
+    ['GET',  '/pac/contributions',          [PacController::class, 'listContributions'],  ['auth']],
+    ['POST', '/pac/contributions/create',   [PacController::class, 'createContribution'], ['auth', 'csrf']],
+    ['POST', '/pac/contributions/delete',   [PacController::class, 'deleteContribution'], ['auth', 'csrf']],
+    ['POST', '/pac/run-pending',            [PacController::class, 'runPending'],         ['auth', 'csrf']],
 
     // Recurring expenses
     ['GET',  '/recurring/list',          [RecurringController::class, 'list'],   ['auth']],
