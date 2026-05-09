@@ -9,6 +9,7 @@ declare(strict_types=1);
  * Popolato per dominio da C6 in poi (Expenses pilota).
  */
 
+use App\Controllers\AccountController;
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
@@ -20,4 +21,5 @@ return [
     ['GET', '/categories/edit',  [CategoryController::class, 'edit'],  ['auth']],
     ['GET', '/budgets',          [BudgetController::class,   'index'], ['auth']],
     ['GET', '/incomes',          [IncomeController::class,   'index'], ['auth']],
+    ['GET', '/accounts',         [AccountController::class,  'index'], ['auth']],
 ];

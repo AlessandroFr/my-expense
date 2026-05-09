@@ -9,6 +9,7 @@ declare(strict_types=1);
  * Popolato per dominio da C6 in poi (Expenses pilota).
  */
 
+use App\Controllers\AccountController;
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
@@ -50,4 +51,13 @@ return [
     ['POST', '/incomes/create',          [IncomeController::class, 'create'], ['auth', 'csrf']],
     ['POST', '/incomes/update',          [IncomeController::class, 'update'], ['auth', 'csrf']],
     ['POST', '/incomes/delete',          [IncomeController::class, 'delete'], ['auth', 'csrf']],
+
+    // Accounts (+reconciliation)
+    ['GET',  '/accounts/list',                  [AccountController::class, 'list'],   ['auth']],
+    ['POST', '/accounts/create',                [AccountController::class, 'create'], ['auth', 'csrf']],
+    ['POST', '/accounts/update',                [AccountController::class, 'update'], ['auth', 'csrf']],
+    ['POST', '/accounts/delete',                [AccountController::class, 'delete'], ['auth', 'csrf']],
+    ['POST', '/accounts/reconcile',             [AccountController::class, 'reconcile'],            ['auth', 'csrf']],
+    ['GET',  '/accounts/reconciliations',       [AccountController::class, 'reconciliations'],      ['auth']],
+    ['POST', '/accounts/reconciliation/delete', [AccountController::class, 'reconciliationDelete'], ['auth', 'csrf']],
 ];
