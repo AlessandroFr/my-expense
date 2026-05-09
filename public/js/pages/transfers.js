@@ -5,6 +5,7 @@ import FetchRequest                                       from '../FetchRequest.
 import { apiSend, apiGuard, escapeHtml, escapeAttr,
          confirmDialog }                                  from '../componentBase.js';
 import { toast }                                          from '../toast.js';
+import { renderPager }                                    from '../pager.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -25,12 +26,25 @@ const editForm     = document.getElementById('transfer-edit-form');
 const editModalEl  = document.getElementById('transfer-edit-modal');
 const backfillBtn  = document.getElementById('transfers-backfill-btn');
 const listEl       = document.getElementById('transfers-list');
+const pagerEl      = document.getElementById('transfers-pager');
 const fromInput    = document.getElementById('transfers-filter-date-from');
 const toInput      = document.getElementById('transfers-filter-date-to');
+
+const PAGE_SIZE_OPTIONS  = [10, 25, 50, 100];
+const PAGE_SIZE_KEY      = 'mx-transfers-page-size';
+
+function loadStoredPageSize() {
+    try {
+        const v = Number(localStorage.getItem(PAGE_SIZE_KEY));
+        return PAGE_SIZE_OPTIONS.includes(v) ? v : 25;
+    } catch { return 25; }
+}
 
 let accountsCache  = [];
 let transfersCache = [];
 let editModal      = null; // bootstrap.Modal, lazy-init
+let pageLimit      = loadStoredPageSize();
+let pageOffset     = 0;
 
 async function loadAccounts() {
     try {
@@ -39,7 +53,7 @@ async function loadAccounts() {
         const optionsHtml = ['<option value="">Seleziona…</option>']
             .concat(accountsCache.map(a => {
                 const balance = a.balance != null ? ` — ${fmtMoney(a.balance)}` : '';
-                return `<option value="${escapeAttr(a.id)}">${escapeHtml(a.name)}${escapeHtml(balance)}</option>`;
+                return `<option value="${escapeAttr(a.id)}" data-name="${escapeAttr(a.name)}">${escapeHtml(a.name)}${escapeHtml(balance)}</option>`;
             })).join('');
         for (const sel of createForm.querySelectorAll('select[data-role]')) {
             sel.innerHTML = optionsHtml;
@@ -89,33 +103,53 @@ async function loadList() {
     listEl.innerHTML = `<div class="text-center text-muted py-4">
         <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…</div>`;
     try {
-        const params = {};
+        const params = { limit: pageLimit, offset: pageOffset };
         if (fromInput?.value) params.date_from = fromInput.value;
         if (toInput?.value)   params.date_to   = toInput.value;
         const r = await apiGuard(api.get(`${BASE}/transfers/list`, params));
         transfersCache = r.data?.transfers ?? [];
-        if (!transfersCache.length) {
+        const total = Number(r.data?.total ?? transfersCache.length);
+
+        if (total === 0) {
             listEl.innerHTML = `<div class="text-center text-muted py-4">
                 Nessun trasferimento ancora. Creane uno qui a fianco.</div>`;
-            return;
+        } else {
+            // Se la pagina e' fuori range (es. dopo delete dell'ultima riga)
+            // riallinea offset a una pagina valida e ricarica.
+            if (pageOffset > 0 && pageOffset >= total) {
+                pageOffset = Math.max(0, (Math.ceil(total / pageLimit) - 1) * pageLimit);
+                return loadList();
+            }
+            listEl.innerHTML = `
+                <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr class="text-muted small">
+                            <th>Data</th>
+                            <th>Da</th>
+                            <th></th>
+                            <th>A</th>
+                            <th class="text-end">Importo</th>
+                            <th>Descrizione</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>${transfersCache.map(renderRow).join('')}</tbody>
+                </table>
+                </div>`;
         }
-        listEl.innerHTML = `
-            <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-                <thead>
-                    <tr class="text-muted small">
-                        <th>Data</th>
-                        <th>Da</th>
-                        <th></th>
-                        <th>A</th>
-                        <th class="text-end">Importo</th>
-                        <th>Descrizione</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>${transfersCache.map(renderRow).join('')}</tbody>
-            </table>
-            </div>`;
+        renderPager(pagerEl, {
+            total, limit: pageLimit, offset: pageOffset,
+            label: 'trasferimenti',
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
+            onChange: (newOffset) => { pageOffset = newOffset; loadList(); },
+            onLimitChange: (n) => {
+                pageLimit  = n;
+                pageOffset = 0;
+                try { localStorage.setItem(PAGE_SIZE_KEY, String(n)); } catch {}
+                loadList();
+            },
+        });
     } catch (err) {
         listEl.innerHTML = `<div class="text-center text-danger py-4">
             ${escapeHtml(err.message ?? 'Errore caricamento.')}</div>`;
@@ -170,6 +204,63 @@ listEl?.addEventListener('click', async (ev) => {
         openEditModal(t);
     }
 });
+
+// ─── Auto-causale ──────────────────────────────────────────────────────────
+// Quando l'utente cambia uno dei due conti (sorgente/destinazione) in un form
+// trasferimento, riscriviamo la "causale" — ma SOLO se segue uno dei pattern
+// auto-generati dall'importer/service ("Ricarica → X", "Prelievo ATM → X",
+// "Trasferimento verso X", "Trasferimento da X") oppure e' vuota. Una causale
+// custom inserita a mano dall'utente viene preservata, per non sovrascrivere
+// note tipo "versamento broker" quando si corregge il conto sbagliato.
+
+const AUTO_CAUSALE_PATTERNS = [
+    { test: /^Ricarica → /,             build: (s, d) => d ? `Ricarica → ${d}` : null },
+    { test: /^Prelievo ATM → /,         build: (s, d) => d ? `Prelievo ATM → ${d}` : null },
+    { test: /^Trasferimento verso /,    build: (s, d) => d ? `Trasferimento verso ${d}` : null },
+    { test: /^Trasferimento da /,       build: (s)    => s ? `Trasferimento da ${s}`    : null },
+];
+
+function selectedAccountName(sel) {
+    if (!sel) return '';
+    const opt = sel.options?.[sel.selectedIndex];
+    return opt?.dataset?.name ?? '';
+}
+
+function applyAutoCausale(form) {
+    const descInput = form?.querySelector('input[name="description"]');
+    const sourceSel = form?.querySelector('select[name="source_account_id"]');
+    const destSel   = form?.querySelector('select[name="destination_account_id"]');
+    if (!descInput || !sourceSel || !destSel) return;
+    const sourceName = selectedAccountName(sourceSel);
+    const destName   = selectedAccountName(destSel);
+    const cur        = (descInput.value || '').trim();
+
+    // Causale vuota: defaultiamo a "Trasferimento verso X" appena c'e' un dest.
+    if (cur === '') {
+        if (destName) descInput.value = `Trasferimento verso ${destName}`;
+        return;
+    }
+    // Pattern conosciuto: rimpiazzo la parte variabile mantenendo il prefisso.
+    for (const { test, build } of AUTO_CAUSALE_PATTERNS) {
+        if (test.test(cur)) {
+            const next = build(sourceName, destName);
+            if (next !== null) descInput.value = next;
+            return;
+        }
+    }
+    // Causale custom: non tocco.
+}
+
+function wireAutoCausale(form) {
+    if (!form) return;
+    const sourceSel = form.querySelector('select[name="source_account_id"]');
+    const destSel   = form.querySelector('select[name="destination_account_id"]');
+    sourceSel?.addEventListener('change', () => applyAutoCausale(form));
+    destSel?.addEventListener('change',   () => applyAutoCausale(form));
+}
+
+wireAutoCausale(createForm);
+wireAutoCausale(editForm);
 
 function openEditModal(t) {
     if (!editForm || !editModalEl) return;
@@ -230,7 +321,7 @@ backfillBtn?.addEventListener('click', async () => {
     }
 });
 
-fromInput?.addEventListener('change', loadList);
-toInput?.addEventListener('change',   loadList);
+fromInput?.addEventListener('change', () => { pageOffset = 0; loadList(); });
+toInput?.addEventListener('change',   () => { pageOffset = 0; loadList(); });
 
 loadAccounts().then(loadList);

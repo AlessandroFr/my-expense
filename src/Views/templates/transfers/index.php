@@ -82,6 +82,7 @@ $this->section('content');
                 <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…
             </div>
         </div>
+        <div id="transfers-pager" class="mt-2"></div>
     </div>
 </div>
 </section>

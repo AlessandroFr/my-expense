@@ -56,6 +56,21 @@ final class TransferRepository extends BaseRepository
         return array_map(static fn(array $r): Transfer => Transfer::fromRow($r), $rows);
     }
 
+    /**
+     * @param array{
+     *   date_from?: ?string, date_to?: ?string,
+     *   account_id?: ?int
+     * } $filters
+     */
+    public function count(int $userId, array $filters = []): int
+    {
+        [$where, $params] = $this->buildWhere($userId, $filters);
+        return (int) $this->fetchScalar(
+            "SELECT COUNT(*) FROM transfers t {$where}",
+            $params,
+        );
+    }
+
     public function findById(int $id, int $userId): ?Transfer
     {
         $row = $this->fetchOne(
