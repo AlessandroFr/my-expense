@@ -263,6 +263,61 @@ function renderByMonth(expenses, incomes) {
     });
 }
 
+function renderInvestmentsWidget(inv) {
+    const card = document.getElementById('investments-card');
+    if (!card) return;
+    if (!inv || !inv.has_data) {
+        card.classList.add('d-none');
+        return;
+    }
+    card.classList.remove('d-none');
+
+    const investedEl = document.getElementById('inv-invested');
+    const currentEl  = document.getElementById('inv-current');
+    const pnlEl      = document.getElementById('inv-pnl');
+    if (investedEl) investedEl.textContent = fmtMoney(inv.total_invested);
+    if (currentEl)  currentEl.textContent  = inv.total_current !== null ? fmtMoney(inv.total_current) : '—';
+    if (pnlEl) {
+        if (inv.total_pnl !== null) {
+            pnlEl.textContent = fmtMoney(inv.total_pnl);
+            pnlEl.className   = 'h4 fw-semibold mt-1 ' +
+                (inv.total_pnl > 0 ? 'text-success' : (inv.total_pnl < 0 ? 'text-danger' : 'text-muted'));
+        } else {
+            pnlEl.textContent = '—';
+            pnlEl.className   = 'h4 fw-semibold mt-1 text-muted';
+        }
+    }
+
+    const barsEl = document.getElementById('inv-asset-bars');
+    if (barsEl) {
+        const list = inv.by_asset_class ?? [];
+        const total = list.reduce((s, c) => s + (Number(c.invested) || 0), 0);
+        if (total <= 0 || !list.length) {
+            barsEl.innerHTML = '';
+            return;
+        }
+        barsEl.innerHTML = `
+            <div class="text-muted small mb-1">Allocazione per asset class</div>
+            <div class="progress" style="height:18px">
+                ${list.map(c => {
+                    const w = total > 0 ? ((Number(c.invested) || 0) / total) * 100 : 0;
+                    return `<div class="progress-bar" role="progressbar"
+                                 style="width:${w.toFixed(1)}%; background:${c.asset_class_color || '#6c757d'}"
+                                 title="${c.asset_class_name}: ${fmtMoney(c.invested)}">
+                              ${w >= 8 ? `${w.toFixed(0)}%` : ''}
+                            </div>`;
+                }).join('')}
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                ${list.map(c => `
+                    <span class="small">
+                        <span class="badge me-1" style="background:${c.asset_class_color || '#6c757d'}">&nbsp;</span>
+                        ${c.asset_class_name}
+                    </span>`).join('')}
+            </div>`;
+    }
+}
+
 async function loadData(range = null) {
     try {
         const params = range ? { from: range.from, to: range.to } : {};
@@ -272,6 +327,7 @@ async function loadData(range = null) {
         renderBudgetProgress(d.budget_progress ?? []);
         renderByCategory(d.by_category ?? []);
         renderByMonth(d.by_month ?? [], d.income_by_month ?? []);
+        renderInvestmentsWidget(d.investments ?? null);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento dashboard.');
     }

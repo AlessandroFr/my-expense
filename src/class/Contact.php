@@ -35,26 +35,93 @@ final class Contact
      * Cliente e fornitore coincidono: il parametro $type viene mantenuto per
      * back-compat ma e' un no-op — l'UI adesso non distingue piu' i due ruoli.
      *
-     * @param  ?string $type Ignorato (kept for API compat).
+     * Opts (tutte opzionali, default = back-compat con i caller esistenti):
+     *   - search (?string): filtro LIKE %term% su name/vat_number/iban/email
+     *   - limit  (?int)   : se valorizzato applica LIMIT/OFFSET
+     *   - offset (int)    : default 0
+     *
+     * @param  ?string             $type Ignorato (kept for API compat).
+     * @param  array<string,mixed> $opts
      * @return array<int, array<string,mixed>>
      */
     public static function allForUser(
         int $userId,
         bool $includeArchived = false,
-        ?string $type = null
+        ?string $type = null,
+        array $opts = []
     ): array {
+        [$where, $params] = self::buildListWhereClause($userId, $includeArchived, $opts);
         $sql = 'SELECT id, name, name_norm, type, vat_number, iban, email, notes,
                        color, archived, created_at, updated_at
-                FROM contacts
-                WHERE user_id = ?';
+                FROM contacts'
+              . $where
+              . ' ORDER BY name ASC';
+
+        $limit  = isset($opts['limit'])  ? (int) $opts['limit']  : null;
+        $offset = isset($opts['offset']) ? max(0, (int) $opts['offset']) : 0;
+
+        $stmt = Database::pdo()->prepare(
+            $limit !== null ? $sql . ' LIMIT ? OFFSET ?' : $sql
+        );
+        $i = 1;
+        foreach ($params as $p) {
+            $stmt->bindValue($i++, $p, is_int($p) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        }
+        if ($limit !== null) {
+            $stmt->bindValue($i++, $limit,  \PDO::PARAM_INT);
+            $stmt->bindValue($i,   $offset, \PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Conta i contatti che soddisfano gli stessi predicati di allForUser
+     * (escluso LIMIT/OFFSET). Usato dalla paginazione di /contacts.
+     *
+     * @param array<string,mixed> $opts
+     */
+    public static function countForUser(
+        int $userId,
+        bool $includeArchived = false,
+        array $opts = []
+    ): int {
+        [$where, $params] = self::buildListWhereClause($userId, $includeArchived, $opts);
+        $sql = 'SELECT COUNT(*) FROM contacts' . $where;
+        $stmt = Database::pdo()->prepare($sql);
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Costruisce la WHERE clause condivisa fra allForUser e countForUser.
+     * Ritorna [SQL, params] dove SQL inizia con " WHERE …".
+     *
+     * @param array<string,mixed> $opts
+     * @return array{0:string, 1:array<int,mixed>}
+     */
+    private static function buildListWhereClause(
+        int $userId,
+        bool $includeArchived,
+        array $opts
+    ): array {
+        $sql    = ' WHERE user_id = ?';
         $params = [$userId];
+
         if (!$includeArchived) {
             $sql .= ' AND archived = 0';
         }
-        $sql .= ' ORDER BY name ASC';
-        $stmt = Database::pdo()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+
+        $search = isset($opts['search']) ? trim((string) $opts['search']) : '';
+        if ($search !== '') {
+            // Escapa wildcard LIKE — stesso pattern di previewBackfillCount.
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+            $like    = '%' . $escaped . '%';
+            $sql    .= ' AND (name LIKE ? OR vat_number LIKE ? OR iban LIKE ? OR email LIKE ?)';
+            array_push($params, $like, $like, $like, $like);
+        }
+
+        return [$sql, $params];
     }
 
     public static function findForUser(int $id, int $userId): ?array
@@ -186,6 +253,253 @@ final class Contact
             'DELETE FROM contacts WHERE id = ? AND user_id = ?'
         );
         $stmt->execute([$id, $userId]);
+    }
+
+    /**
+     * Lista unificata dei movimenti (spese + entrate + ricorrenti) collegati
+     * a un'anagrafica, ordinata per data DESC. Usata dal modal di
+     * riassegnazione su /contacts/detail.
+     *
+     * Opts:
+     *   - limit  (?int)
+     *   - offset (int)  default 0
+     *
+     * @param array<string,mixed> $opts
+     * @return array<int, array<string,mixed>>
+     */
+    public static function movementsForUser(
+        int $userId,
+        int $contactId,
+        array $opts = []
+    ): array {
+        $sql = '
+            SELECT
+                "expense" AS kind,
+                e.id AS id,
+                e.expense_date AS date,
+                e.description AS description,
+                e.amount AS amount,
+                c.name  AS category_name,
+                c.color AS category_color,
+                NULL AS last_generated_date
+            FROM expenses e
+            LEFT JOIN categories c ON c.id = e.category_id
+            WHERE e.user_id = ? AND e.contact_id = ?
+            UNION ALL
+            SELECT
+                "income" AS kind,
+                i.id AS id,
+                i.income_date AS date,
+                i.description AS description,
+                i.amount AS amount,
+                NULL AS category_name,
+                NULL AS category_color,
+                NULL AS last_generated_date
+            FROM incomes i
+            WHERE i.user_id = ? AND i.contact_id = ?
+            UNION ALL
+            SELECT
+                "recurring" AS kind,
+                r.id AS id,
+                COALESCE(r.last_generated_date, r.start_date) AS date,
+                r.description AS description,
+                r.amount AS amount,
+                c.name  AS category_name,
+                c.color AS category_color,
+                r.last_generated_date AS last_generated_date
+            FROM recurring_expenses r
+            LEFT JOIN categories c ON c.id = r.category_id
+            WHERE r.user_id = ? AND r.contact_id = ?
+            ORDER BY date DESC, kind ASC, id DESC';
+
+        $limit  = isset($opts['limit'])  ? (int) $opts['limit']  : null;
+        $offset = isset($opts['offset']) ? max(0, (int) $opts['offset']) : 0;
+
+        $stmt = Database::pdo()->prepare(
+            $limit !== null ? $sql . ' LIMIT ? OFFSET ?' : $sql
+        );
+        $i = 1;
+        // 6 placeholders per i 3 SELECT (user_id + contact_id ciascuno).
+        for ($k = 0; $k < 3; $k++) {
+            $stmt->bindValue($i++, $userId,    \PDO::PARAM_INT);
+            $stmt->bindValue($i++, $contactId, \PDO::PARAM_INT);
+        }
+        if ($limit !== null) {
+            $stmt->bindValue($i++, $limit,  \PDO::PARAM_INT);
+            $stmt->bindValue($i,   $offset, \PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        $rows = $stmt->fetchAll();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'kind'                => (string) $r['kind'],
+                'id'                  => (int)    $r['id'],
+                'date'                => (string) $r['date'],
+                'description'         => $r['description'] !== null ? (string) $r['description'] : '',
+                'amount'              => round((float) $r['amount'], 2),
+                'category_name'       => $r['category_name']  !== null ? (string) $r['category_name']  : null,
+                'category_color'      => $r['category_color'] !== null ? (string) $r['category_color'] : null,
+                'last_generated_date' => $r['last_generated_date'] !== null ? (string) $r['last_generated_date'] : null,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Riassegna in blocco un set di movimenti dal contatto sorgente verso
+     * uno o più contatti destinazione (granularità per singolo movimento).
+     *
+     * $items = [
+     *   ['kind' => 'expense'|'income'|'recurring', 'id' => int, 'target_contact_id' => int],
+     *   ...
+     * ]
+     *
+     * $sourceAction = 'leave' | 'archive' | 'delete'
+     *   - leave   : il contatto sorgente resta invariato
+     *   - archive : sorgente viene archiviato
+     *   - delete  : sorgente viene eliminato (richiede 0 movimenti residui
+     *                 dopo la riassegnazione, altrimenti rollback)
+     *
+     * Tutto in una singola transazione: se anche un solo UPDATE ha rowCount
+     * inferiore a quanto richiesto (item non più collegato al sorgente, UI
+     * stale, race) viene fatto rollback e lanciata RuntimeException.
+     *
+     * @param array<int, array{kind:string, id:int, target_contact_id:int}> $items
+     * @return array{
+     *   reassigned: array{expense:int, income:int, recurring:int},
+     *   source_action_applied: string
+     * }
+     */
+    public static function reassignMovements(
+        int $userId,
+        int $sourceContactId,
+        array $items,
+        string $sourceAction = 'leave'
+    ): array {
+        if (!in_array($sourceAction, ['leave', 'archive', 'delete'], true)) {
+            throw new InvalidArgumentException('Azione sul contatto sorgente non valida.');
+        }
+        if ($sourceContactId <= 0) {
+            throw new InvalidArgumentException('Contatto sorgente non valido.');
+        }
+        if (empty($items)) {
+            throw new InvalidArgumentException('Nessun movimento selezionato.');
+        }
+
+        // Source deve esistere e appartenere all'utente.
+        $source = self::findForUser($sourceContactId, $userId);
+        if ($source === null) {
+            throw new InvalidArgumentException('Anagrafica sorgente non trovata.');
+        }
+
+        // Validazione + raggruppamento per (kind, target_contact_id).
+        // grouped[kind][target_id] = [movement_id, ...]
+        $grouped = ['expense' => [], 'income' => [], 'recurring' => []];
+        $targetIds = [];
+        foreach ($items as $idx => $it) {
+            $kind = isset($it['kind']) ? (string) $it['kind'] : '';
+            if (!array_key_exists($kind, $grouped)) {
+                throw new InvalidArgumentException("Tipo movimento non valido (item #{$idx}).");
+            }
+            $mid = (int) ($it['id'] ?? 0);
+            $tid = (int) ($it['target_contact_id'] ?? 0);
+            if ($mid <= 0 || $tid <= 0) {
+                throw new InvalidArgumentException("Movimento o destinazione non valida (item #{$idx}).");
+            }
+            if ($tid === $sourceContactId) {
+                throw new InvalidArgumentException('La destinazione non può coincidere con la sorgente.');
+            }
+            $grouped[$kind][$tid] = $grouped[$kind][$tid] ?? [];
+            $grouped[$kind][$tid][] = $mid;
+            $targetIds[$tid] = true;
+        }
+
+        // Pre-flight: tutti i target devono appartenere all'utente.
+        $targetIdsArr = array_keys($targetIds);
+        $pdo = Database::pdo();
+        $in = implode(',', array_fill(0, count($targetIdsArr), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id FROM contacts WHERE user_id = ? AND id IN ({$in})"
+        );
+        $stmt->execute([$userId, ...$targetIdsArr]);
+        $foundTargets = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        $missing = array_diff($targetIdsArr, $foundTargets);
+        if (!empty($missing)) {
+            throw new InvalidArgumentException(
+                'Una o più anagrafiche di destinazione non esistono o non sono accessibili.'
+            );
+        }
+
+        $tableMap = [
+            'expense'   => 'expenses',
+            'income'    => 'incomes',
+            'recurring' => 'recurring_expenses',
+        ];
+
+        $reassigned = ['expense' => 0, 'income' => 0, 'recurring' => 0];
+
+        $pdo->beginTransaction();
+        try {
+            foreach ($grouped as $kind => $byTarget) {
+                $table = $tableMap[$kind];
+                foreach ($byTarget as $targetId => $movementIds) {
+                    if (empty($movementIds)) continue;
+                    $movementIds = array_values(array_unique($movementIds));
+                    $expected    = count($movementIds);
+                    $inIds = implode(',', array_fill(0, $expected, '?'));
+                    $upd = $pdo->prepare(
+                        "UPDATE {$table}
+                         SET contact_id = ?
+                         WHERE user_id = ? AND contact_id = ? AND id IN ({$inIds})"
+                    );
+                    $upd->execute([
+                        $targetId, $userId, $sourceContactId,
+                        ...$movementIds,
+                    ]);
+                    $rc = $upd->rowCount();
+                    if ($rc !== $expected) {
+                        throw new RuntimeException(
+                            "Alcuni movimenti non sono più collegati a questa anagrafica " .
+                            "(attesi {$expected}, aggiornati {$rc}). " .
+                            'Ricarica la pagina e riprova.'
+                        );
+                    }
+                    $reassigned[$kind] += $rc;
+                }
+            }
+
+            // Azione sul sorgente.
+            if ($sourceAction === 'archive') {
+                $pdo->prepare('UPDATE contacts SET archived = 1 WHERE id = ? AND user_id = ?')
+                    ->execute([$sourceContactId, $userId]);
+            } elseif ($sourceAction === 'delete') {
+                // Ricontrolla che non resti alcun movimento collegato (dentro la
+                // transazione, dopo gli UPDATE).
+                $usage = self::usageCount($sourceContactId, $userId);
+                if ($usage['total'] > 0) {
+                    throw new RuntimeException(
+                        "Anagrafica ha ancora {$usage['total']} movimenti collegati: " .
+                        'eliminazione annullata. Riassegna anche i movimenti residui.'
+                    );
+                }
+                $pdo->prepare('DELETE FROM contacts WHERE id = ? AND user_id = ?')
+                    ->execute([$sourceContactId, $userId]);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return [
+            'reassigned'            => $reassigned,
+            'source_action_applied' => $sourceAction,
+        ];
     }
 
     /**

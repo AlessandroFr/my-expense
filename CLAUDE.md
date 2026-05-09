@@ -137,38 +137,65 @@ There is no separate `php -S` or Docker workflow.
 
 ## Stack
 
-- **PHP + Composer**, PSR-4 autoload of domain classes from `src/class/`
+- **PHP + Composer**, MVC plain-PHP custom (no framework). Architettura
+  Controllers + Services + Repository + Entity + View introdotta nel
+  branch `refactor/mvc-architecture` (commit C1-C15).
 - **MySQL / MariaDB** via XAMPP — schema in `database/schema.sql`,
   history in `database/migrations/`, fixtures in `database/seeds/`
-- **Hybrid frontend** — server-rendered PHP pages composed of reusable
-  components in `public/components/`, progressively enhanced with vanilla
-  JS in `public/js/` that calls AJAX endpoints in `public/endpoints/`
+- **Hybrid frontend** — server-rendered PHP templates in
+  `src/Views/templates/`, progressively enhanced con vanilla JS in
+  `public/js/` che chiama endpoint JSON registrati in `routes/api.php`.
 
 ## Directory layout
 
 | Path | Role |
 |------|------|
-| `public/index.php` | Front controller — every HTTP request enters here |
-| `public/pages/` | Full-page PHP templates (HTML responses) |
-| `public/components/` | Reusable PHP partials included by pages |
-| `public/endpoints/` | JSON / AJAX endpoints called from `public/js/` |
-| `public/js/` | Vanilla JS that hydrates the server-rendered pages |
-| `src/class/` | PHP domain classes (PSR-4 autoloaded via Composer) |
+| `public/index.php` | Front controller — ~13 LOC, delega a `App\Http\Kernel` |
+| `public/js/` | Vanilla JS che chiama gli endpoint (FetchRequest + JSON envelope) |
+| `public/css/` | Stili pastel + transitions |
+| `public/sw.js`, `public/manifest.webmanifest` | PWA |
+| `routes/web.php` | Route HTML (page) |
+| `routes/api.php` | Route JSON (endpoint API) |
+| `src/Http/` | Kernel, Router, Request, Response, HttpException, Middleware |
+| `src/Http/Middleware/` | Auth, Csrf, SetupGate, JsonResponse |
+| `src/Controllers/` | Un controller per dominio (action methods) |
+| `src/Services/` | Business logic, transazioni cross-entity |
+| `src/Models/Entities/` | POPO immutabili (BaseEntity + Expense, Income, Category, ecc.) |
+| `src/Models/Repositories/` | Persistenza pura via PDO (BaseRepository + per-domain) |
+| `src/Validation/` | Validator rule-based + Requests/ |
+| `src/Views/View.php` | Template engine (extends/section/yield/include/asset/csrfField) |
+| `src/Views/templates/layouts/app.php` | Layout master |
+| `src/Views/templates/partials/flash.php` | Banner messaggi flash |
+| `src/Views/templates/{domain}/` | Template per dominio |
+| `src/class/` | Infrastruttura legacy (Auth, Csrf, Config, Database, Session, Json) e classi domain non ancora migrate a Repo+Service |
 | `config/` | App config — DB credentials, environment |
 | `database/schema.sql` | Authoritative MySQL schema |
 | `database/migrations/` | Schema change history |
 | `database/seeds/` | Test / development fixtures |
 | `logs/` | Runtime application log output |
-| `vendor/` | Composer dependencies (gitignore once `composer.json` lands) |
+| `vendor/` | Composer dependencies |
 
 ## Architecture flow
 
-Browser → `public/index.php` (front controller) → routes the request to
-either a page in `public/pages/` (HTML response) or an endpoint in
-`public/endpoints/` (JSON response). Both pull domain logic from
-`src/class/` and render shared UI fragments from `public/components/`.
-JS in `public/js/` is loaded by pages and calls back into
-`public/endpoints/` for asynchronous interactions.
+Browser → `public/index.php` → `App\Http\Kernel::handle()`:
+
+1. Bootstrap: `Config::load`, `Session::start`, `Csrf::token` (sincronizza
+   cookie CSRF prima di qualsiasi output), `View::setProjectRoot`.
+2. Carica `routes/web.php` + `routes/api.php` nel `Router`.
+3. Costruisce `Request` da superglobals.
+4. `Router::dispatch(Request)` matcha la route e costruisce la middleware
+   chain via `array_reduce` (SetupGate → Auth → Csrf → action).
+5. Il Controller invoca `Service` → `Repository` (PDO) → `Entity`.
+6. Restituisce `Response::json()` / `Response::view(...)` / `Response::redirect()`.
+7. `Response::send()` emette status + headers + body.
+
+Errori: `HttpException` catturate dal Router → JSON envelope (route API)
+o HTML (route web). `Throwable` generici → log + 500 generico.
+
+Il JSON envelope mantiene gli stessi codici stringa di `App\Json`
+(`validation_error`, `unauthenticated`, `csrf`, `forbidden`, `not_found`,
+`conflict`, `server_error`) per compatibilità con
+`public/js/componentBase.js::normalizeApiResponse`.
 
 ## Local dev (XAMPP)
 

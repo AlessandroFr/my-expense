@@ -262,7 +262,8 @@ final class Expense
         $stmt = Database::pdo()->prepare(
             'SELECT COALESCE(SUM(amount), 0)
              FROM expenses
-             WHERE user_id = ? AND expense_date >= ? AND expense_date < ?'
+             WHERE user_id = ? AND expense_date >= ? AND expense_date < ?
+               AND is_transfer = 0'
         );
         $stmt->execute([$userId, $start, $end]);
         return (float) $stmt->fetchColumn();
@@ -288,6 +289,7 @@ final class Expense
              FROM expenses e
              LEFT JOIN categories c ON c.id = e.category_id
              WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date < ?
+               AND e.is_transfer = 0
              GROUP BY e.category_id, c.name, c.color, c.icon
              ORDER BY total DESC"
         );
@@ -311,7 +313,8 @@ final class Expense
         $stmt = Database::pdo()->prepare(
             'SELECT COALESCE(SUM(amount), 0)
              FROM expenses
-             WHERE user_id = ? AND expense_date >= ? AND expense_date <= ?'
+             WHERE user_id = ? AND expense_date >= ? AND expense_date <= ?
+               AND is_transfer = 0'
         );
         $stmt->execute([$userId, $from, $to]);
         return (float) $stmt->fetchColumn();
@@ -333,6 +336,7 @@ final class Expense
              FROM expenses e
              LEFT JOIN categories c ON c.id = e.category_id
              WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date <= ?
+               AND e.is_transfer = 0
              GROUP BY e.category_id, c.name, c.color, c.icon
              ORDER BY total DESC"
         );
@@ -361,6 +365,7 @@ final class Expense
              FROM expenses
              WHERE user_id = ?
                AND expense_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
+               AND is_transfer = 0
              GROUP BY month
              ORDER BY month ASC"
         );

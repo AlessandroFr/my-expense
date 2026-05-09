@@ -28,6 +28,8 @@ let trendChart = null;
 let catChart   = null;
 let suppliersChart = null;
 let customersChart = null;
+let assetClassChart = null;
+let dividendsChart  = null;
 
 function tweenMoneyR(el, to) {
     if (!el) return;
@@ -218,6 +220,92 @@ function renderContactBalance(rows) {
     }
 }
 
+function renderInvestments(inv) {
+    const section = document.getElementById('r-investments-section');
+    if (!section) return;
+    if (!inv || !inv.has_data) {
+        section.classList.add('d-none');
+        return;
+    }
+    section.classList.remove('d-none');
+
+    document.getElementById('r-inv-invested').textContent = fmtMoney(inv.total_invested);
+    document.getElementById('r-inv-current').textContent  = inv.total_current !== null
+        ? fmtMoney(inv.total_current) : '—';
+    const pnlEl = document.getElementById('r-inv-pnl');
+    if (inv.total_pnl !== null) {
+        pnlEl.textContent = fmtMoney(inv.total_pnl);
+        pnlEl.className   = 'h4 fw-semibold mt-1 ' +
+            (inv.total_pnl > 0 ? 'text-success' : (inv.total_pnl < 0 ? 'text-danger' : 'text-muted'));
+    } else {
+        pnlEl.textContent = '—';
+        pnlEl.className   = 'h4 fw-semibold mt-1 text-muted';
+    }
+    document.getElementById('r-inv-divyear').textContent = fmtMoney(inv.total_dividends_year || 0);
+
+    // Doughnut asset class
+    if (assetClassChart) assetClassChart.destroy();
+    const acCtx = document.getElementById('chart-asset-classes');
+    if (acCtx && (inv.by_asset_class ?? []).length) {
+        const labels = inv.by_asset_class.map(c => c.asset_class_name);
+        const data   = inv.by_asset_class.map(c => Number(c.invested) || 0);
+        const colors = inv.by_asset_class.map(c => c.asset_class_color || '#6c757d');
+        assetClassChart = new Chart(acCtx, {
+            type: 'doughnut',
+            data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } },
+            },
+        });
+    }
+
+    // Bar dividendi mensili
+    if (dividendsChart) dividendsChart.destroy();
+    const divCtx = document.getElementById('chart-dividends');
+    if (divCtx) {
+        dividendsChart = new Chart(divCtx, {
+            type: 'bar',
+            data: {
+                labels: MONTH_LABELS,
+                datasets: [{
+                    label: 'Dividendi',
+                    data: inv.dividends_by_month ?? Array(12).fill(0),
+                    backgroundColor: 'rgba(25,135,84,0.7)',
+                    borderColor: 'rgba(25,135,84,1)',
+                    borderWidth: 1,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+            },
+        });
+    }
+
+    // Tabella per asset class
+    const tbody = document.getElementById('r-inv-by-class');
+    if (tbody) {
+        const rows = (inv.by_asset_class ?? []).map(c => {
+            const pnlCls = c.pnl !== null
+                ? (c.pnl > 0 ? 'text-success' : (c.pnl < 0 ? 'text-danger' : 'text-muted'))
+                : 'text-muted';
+            return `
+                <tr>
+                    <td><span class="badge me-1" style="background:${c.asset_class_color}">&nbsp;</span>${escapeHtml(c.asset_class_name)}</td>
+                    <td class="text-end">${escapeHtml(fmtMoney(c.invested))}</td>
+                    <td class="text-end">${c.current !== null ? escapeHtml(fmtMoney(c.current)) : '—'}</td>
+                    <td class="text-end ${pnlCls}">${c.pnl !== null ? escapeHtml(fmtMoney(c.pnl)) : '—'}</td>
+                    <td class="text-end">${escapeHtml(fmtMoney(c.dividends || 0))}</td>
+                </tr>`;
+        }).join('');
+        tbody.innerHTML = rows || '<tr><td colspan="5" class="text-center text-muted">—</td></tr>';
+    }
+}
+
 async function load() {
     try {
         const [r, balResp] = await Promise.all([
@@ -231,6 +319,7 @@ async function load() {
         renderHeatmap(d.heatmap ?? { matrix: [] });
         renderTopExpenses(d.top_expenses ?? []);
         renderContactBalance(balResp?.data?.summary ?? []);
+        renderInvestments(d.investments ?? null);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento report.');
     }

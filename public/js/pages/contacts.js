@@ -1,18 +1,33 @@
 // ─── pages/contacts.js ────────────────────────────────────────────────────────
-// Gestione anagrafiche fornitori/clienti: lista filtrabile, modal CRUD,
-// archivio/elimina, badge saldo netto periodo corrente.
+// Gestione anagrafiche fornitori/clienti: lista paginata server-side,
+// ricerca debounced, modal CRUD, archivio/elimina.
 
 import FetchRequest from '../FetchRequest.js';
 import { apiSend }   from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { optimisticDelete } from '../optimistic.js';
+import { renderPager } from '../pager.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 
 const BASE = document.body.dataset.baseUrl ?? '';
 
-let cache = { contacts: [], balances: new Map() };
+const PAGE_SIZE_OPTIONS  = [10, 25, 50, 100];
+const PAGE_SIZE_DEFAULT  = 25;
+const PAGE_SIZE_KEY      = 'mx-contacts-page-size';
+
+function loadStoredPageSize() {
+    const raw = Number(localStorage.getItem(PAGE_SIZE_KEY));
+    return PAGE_SIZE_OPTIONS.includes(raw) ? raw : PAGE_SIZE_DEFAULT;
+}
+function storePageSize(n) {
+    if (PAGE_SIZE_OPTIONS.includes(n)) localStorage.setItem(PAGE_SIZE_KEY, String(n));
+}
+
+let PAGE_SIZE  = loadStoredPageSize();
+let pageOffset = 0;
+let cache = { contactsById: new Map(), balances: new Map() };
 
 function escHtml(s) {
     const d = document.createElement('div');
@@ -26,19 +41,15 @@ function getCsrfToken() {
 function fmtAmount(v) {
     return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(v) || 0);
 }
+function debounce(fn, ms) {
+    let t = null;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), ms);
+    };
+}
 
 // ── Render tabella ──────────────────────────────────────────────────────────
-
-function applyFilters(items) {
-    const q = (document.getElementById('filter-search')?.value ?? '').trim().toLowerCase();
-    return items.filter(c => {
-        if (q !== '') {
-            const haystack = [c.name, c.vat_number, c.iban, c.email].filter(Boolean).join(' ').toLowerCase();
-            if (!haystack.includes(q)) return false;
-        }
-        return true;
-    });
-}
 
 function renderRow(c) {
     const tr = document.createElement('tr');
@@ -79,44 +90,92 @@ function renderRow(c) {
     return tr;
 }
 
-function rerender() {
+function renderRows(items, total) {
     const tbody = document.getElementById('contacts-tbody');
     const empty = document.getElementById('contacts-empty');
     if (!tbody) return;
-    const filtered = applyFilters(cache.contacts);
     tbody.innerHTML = '';
-    if (filtered.length === 0) {
+    cache.contactsById.clear();
+    if (!items || items.length === 0) {
         empty?.classList.remove('d-none');
     } else {
         empty?.classList.add('d-none');
-        for (const c of filtered) tbody.appendChild(renderRow(c));
+        for (const c of items) {
+            cache.contactsById.set(c.id, c);
+            tbody.appendChild(renderRow(c));
+        }
     }
     const countEl = document.getElementById('contacts-count');
     if (countEl) {
-        const active = cache.contacts.filter(c => !c.archived).length;
-        countEl.textContent = `${active} attivi`;
+        countEl.textContent = `${total} totali`;
     }
+}
+
+function renderPagerSection(total) {
+    const node = document.getElementById('contacts-pager');
+    if (!node) return;
+    renderPager(node, {
+        total, limit: PAGE_SIZE, offset: pageOffset,
+        label: 'anagrafiche',
+        pageSizeOptions: PAGE_SIZE_OPTIONS,
+        onChange: (newOffset) => {
+            pageOffset = newOffset;
+            loadList();
+        },
+        onLimitChange: (newLimit) => {
+            PAGE_SIZE = newLimit;
+            storePageSize(newLimit);
+            pageOffset = 0;
+            loadList();
+        },
+    });
 }
 
 // ── Caricamento dati ────────────────────────────────────────────────────────
 
-async function loadAll() {
-    const includeArchived = document.getElementById('filter-archived')?.checked ? 1 : 0;
+function currentFilters() {
+    return {
+        search: (document.getElementById('filter-search')?.value ?? '').trim(),
+        include_archived: document.getElementById('filter-archived')?.checked ? 1 : 0,
+    };
+}
+
+async function loadList() {
+    const { search, include_archived } = currentFilters();
+    const page = Math.floor(pageOffset / PAGE_SIZE) + 1;
+    const params = new URLSearchParams({
+        page:             String(page),
+        page_size:        String(PAGE_SIZE),
+        include_archived: String(include_archived),
+        with_usage:       '1',
+    });
+    if (search !== '') params.set('search', search);
+
     try {
         const [listResp, balanceResp] = await Promise.all([
-            api.get(`${BASE}/contacts/list?include_archived=${includeArchived}&with_usage=1`),
+            api.get(`${BASE}/contacts/list?${params.toString()}`),
             api.get(`${BASE}/contacts/balance?year=${new Date().getFullYear()}`),
         ]);
-        cache.contacts = listResp?.data?.contacts ?? [];
+        const data = listResp?.data ?? {};
+        const items = data.contacts ?? [];
+        const total = Number(data.total ?? items.length);
+
         cache.balances = new Map();
         for (const b of (balanceResp?.data?.summary ?? [])) {
             cache.balances.set(b.contact_id, b);
         }
-        rerender();
+
+        renderRows(items, total);
+        renderPagerSection(total);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento anagrafiche.');
     }
 }
+
+const reloadDebounced = debounce(() => {
+    pageOffset = 0;
+    loadList();
+}, 300);
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
@@ -169,7 +228,7 @@ async function submitForm(ev) {
         await send(url, params);
         toast.success(id ? 'Anagrafica aggiornata.' : 'Anagrafica creata.');
         closeModal();
-        loadAll();
+        loadList();
     } catch (err) {
         toast.error(err.message ?? 'Errore salvataggio.');
     }
@@ -185,7 +244,7 @@ async function archiveCurrent() {
         await send(`${BASE}/contacts/archive`, params);
         toast.success(archived ? 'Anagrafica archiviata.' : 'Anagrafica ripristinata.');
         closeModal();
-        loadAll();
+        loadList();
     } catch (err) {
         toast.error(err.message ?? 'Errore archiviazione.');
     }
@@ -212,12 +271,12 @@ function wire() {
         const editBtn = ev.target.closest('[data-action="edit"]');
         const delBtn  = ev.target.closest('[data-action="delete"]');
         if (editBtn) {
-            const contact = cache.contacts.find(c => c.id === id);
+            const contact = cache.contactsById.get(id);
             if (contact) openModal(contact);
             return;
         }
         if (delBtn) {
-            const contact = cache.contacts.find(c => c.id === id);
+            const contact = cache.contactsById.get(id);
             if (!contact) return;
             const usage = contact.usage?.total ?? 0;
             const msg = usage > 0
@@ -232,19 +291,22 @@ function wire() {
                         return send(`${BASE}/contacts/delete`, params);
                     },
                 });
-                cache.contacts = cache.contacts.filter(c => c.id !== id);
+                cache.contactsById.delete(id);
                 cache.balances.delete(id);
                 toast.success('Anagrafica eliminata.');
-                rerender();
+                loadList();
             } catch { /* toast handled */ }
         }
     });
 
-    document.getElementById('filter-search')?.addEventListener('input', rerender);
-    document.getElementById('filter-archived')?.addEventListener('change', loadAll);
+    document.getElementById('filter-search')?.addEventListener('input', reloadDebounced);
+    document.getElementById('filter-archived')?.addEventListener('change', () => {
+        pageOffset = 0;
+        loadList();
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     wire();
-    loadAll();
+    loadList();
 });

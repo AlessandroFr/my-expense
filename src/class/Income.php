@@ -232,7 +232,8 @@ final class Income
 
         $stmt = Database::pdo()->prepare(
             'SELECT COALESCE(SUM(amount), 0) FROM incomes i
-             WHERE i.user_id = ? AND i.income_date >= ? AND i.income_date < ?'
+             WHERE i.user_id = ? AND i.income_date >= ? AND i.income_date < ?
+               AND i.is_transfer = 0'
         );
         $stmt->execute([$userId, $start, $end]);
         return (float) $stmt->fetchColumn();
@@ -245,7 +246,8 @@ final class Income
     {
         $stmt = Database::pdo()->prepare(
             'SELECT COALESCE(SUM(amount), 0) FROM incomes
-             WHERE user_id = ? AND income_date >= ? AND income_date <= ?'
+             WHERE user_id = ? AND income_date >= ? AND income_date <= ?
+               AND is_transfer = 0'
         );
         $stmt->execute([$userId, $from, $to]);
         return (float) $stmt->fetchColumn();
@@ -263,6 +265,7 @@ final class Income
              FROM incomes i
              WHERE i.user_id = ?
                AND i.income_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
+               AND i.is_transfer = 0
              GROUP BY month
              ORDER BY month ASC"
         );
