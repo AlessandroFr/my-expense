@@ -10,6 +10,7 @@ use App\Http\Middleware\CsrfMiddleware;
 use App\Http\Middleware\JsonResponseMiddleware;
 use App\Http\Middleware\SetupGateMiddleware;
 use App\Session;
+use App\Views\View;
 
 /**
  * Kernel HTTP. Singolo entry point dell'applicazione.
@@ -51,6 +52,8 @@ final class Kernel
         Session::start();
         // Sincronizza il cookie CSRF *prima* di qualsiasi output (cfr. public/index.php:20).
         Csrf::token();
+
+        View::setProjectRoot($this->projectRoot);
     }
 
     private function configureRouter(): void
