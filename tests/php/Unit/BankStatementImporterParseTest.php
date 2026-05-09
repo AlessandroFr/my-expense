@@ -101,6 +101,40 @@ final class BankStatementImporterParseTest extends TestCase
         );
     }
 
+    public function testExtractCounterpartyForeignAtmWithdrawalReturnsNull(): void
+    {
+        // Prelievo ATM in formato "PRELIEVI PAESI UE": il "C/O CA ITALIA STRA"
+        // e' il nome operativo dell'ATM, non un fornitore vero. La guard deve
+        // restituire null per evitare di creare un contatto fasullo.
+        $desc = 'PRELIEVI PAESI UE CARTA N. 000 DEL 20/12/25 VALUTA EUR PAESE ITALIA '
+              . 'C/O CA ITALIA STRA CARTA N. 537572******5048 - CIRCUITO MASTERCARD '
+              . 'COD. MCC 6011 000010420581';
+        self::assertNull(
+            BankStatementImporter::extractCounterparty('Prelievo carta', $desc, 'expense')
+        );
+    }
+
+    public function testExtractCounterpartyMcc6011ReturnsNull(): void
+    {
+        // Anche senza il prefisso testuale, MCC 6011 = ATM cash disbursement.
+        $desc = 'OPERAZIONE GENERICA C/O FOO BANK COD. MCC 6011 RIF: 12345';
+        self::assertNull(
+            BankStatementImporter::extractCounterparty('Pagamenti', $desc, 'expense')
+        );
+    }
+
+    public function testIsAtmWithdrawalDescriptionMatchesAllFormats(): void
+    {
+        $invoke = fn (string $desc): bool => $this->invoke('isAtmWithdrawalDescription', [$desc]);
+
+        self::assertTrue($invoke('PRELIEVO DI CONTANTE C/O ATM ROMA'));
+        self::assertTrue($invoke('PRELIEVI PAESI UE CARTA N. 000 DEL 20/12/25 ...'));
+        self::assertTrue($invoke('PRELIEVI PAESI EXTRA UE CARTA N. 000 ...'));
+        self::assertTrue($invoke('Lorem ipsum COD. MCC 6011 fine'));
+        self::assertFalse($invoke('PAGAMENTO POS C/O ESSELUNGA COD. MCC 5411'));
+        self::assertFalse($invoke('BONIFICO DA MARIO ROSSI VAL. 01/03/26'));
+    }
+
     /**
      * @param  array<int,mixed> $args
      * @return mixed

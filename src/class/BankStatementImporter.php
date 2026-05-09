@@ -188,7 +188,7 @@ final class BankStatementImporter
                     && stripos($descrizione, 'RICARICA/RIMBORSO') !== false;
 
                 $isAtmWithdrawal = $isExpense
-                    && stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false;
+                    && self::isAtmWithdrawalDescription($descrizione);
 
                 if ($isPrepaidRecharge && $autoPairRicariche) {
                     $kind = self::KIND_TRANSFER_PAIR;
@@ -647,6 +647,23 @@ final class BankStatementImporter
         return hash('sha256', $key);
     }
 
+    /**
+     * Riconosce le righe di prelievo ATM in tutti i formati osservati
+     * (Banca Sella):
+     *   - "PRELIEVO DI CONTANTE ..."         (sportello/ATM domestico)
+     *   - "PRELIEVI PAESI UE CARTA ..."      (ATM UE / EXTRA UE)
+     *   - "PRELIEVI PAESI EXTRA UE CARTA ..."
+     *   - qualsiasi descrizione con "COD. MCC 6011" (ATM cash disbursement
+     *     code ISO 8583, anche se il prefisso testuale e' diverso)
+     */
+    private static function isAtmWithdrawalDescription(string $desc): bool
+    {
+        if (stripos($desc, 'PRELIEVO DI CONTANTE') !== false) return true;
+        if (stripos($desc, 'PRELIEVI PAESI') !== false) return true;
+        if (preg_match('/\bCOD\.\s*MCC\s*6011\b/i', $desc) === 1) return true;
+        return false;
+    }
+
     /** @return array{category: string} */
     private static function classifyExpense(string $tipologia, string $descrizione): array
     {
@@ -668,7 +685,7 @@ final class BankStatementImporter
                 return ['category' => self::MCC_MAP[$mcc]];
             }
         }
-        if (stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false) {
+        if (self::isAtmWithdrawalDescription($descrizione)) {
             return ['category' => 'Prelievo contante'];
         }
         return ['category' => 'Pagamenti'];
@@ -747,6 +764,15 @@ final class BankStatementImporter
         // ── Expense ────────────────────────────────────────────────────────
         $tlow = mb_strtolower($tipologia);
 
+        // Short-circuit: prelievi ATM (in tutti i formati: "PRELIEVO DI
+        // CONTANTE", "PRELIEVI PAESI UE/EXTRA UE", o qualsiasi descrizione
+        // con MCC 6011). Il "C/O ..." in queste righe e' il nome operativo
+        // dell'ATM, non un fornitore. Va short-circuitato PRIMA del pattern
+        // C/O sotto, altrimenti l'ATM operator finisce come contatto fasullo.
+        if (self::isAtmWithdrawalDescription($desc)) {
+            return null;
+        }
+
         // Bonifici in uscita: "BONIFICO A NOME ..."
         if (str_contains($tlow, 'bonifici')) {
             if (preg_match('/\bA\s+([A-Z][A-Z\s\.\']+?)(?:\s+NOTE:|\s+VAL\.|\s+CRO|\s+DATA|$)/u', $desc, $m)) {
@@ -802,9 +828,6 @@ final class BankStatementImporter
 
         // Ricariche/rimborsi prepagata e similari sono trasferimenti interni → no contact.
         if (stripos($desc, 'RICARICA') !== false || stripos($desc, 'RIMBORSO CARTA') !== false) {
-            return null;
-        }
-        if (stripos($desc, 'PRELIEVO DI CONTANTE') !== false) {
             return null;
         }
         if (stripos($desc, 'COMMISSIONE') !== false || stripos($desc, 'IMPOSTA DI BOLLO') !== false) {
