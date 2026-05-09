@@ -81,9 +81,11 @@ return [
     ['POST', '/accounts/reconciliation/delete', [AccountController::class, 'reconciliationDelete'], ['auth', 'csrf']],
 
     // Transfers (atomic between-accounts movement)
-    ['GET',  '/transfers/list',          [TransferController::class, 'list'],   ['auth']],
-    ['POST', '/transfers/create',        [TransferController::class, 'create'], ['auth', 'csrf']],
-    ['POST', '/transfers/delete',        [TransferController::class, 'delete'], ['auth', 'csrf']],
+    ['GET',  '/transfers/list',                [TransferController::class, 'list'],             ['auth']],
+    ['POST', '/transfers/create',              [TransferController::class, 'create'],           ['auth', 'csrf']],
+    ['POST', '/transfers/update',              [TransferController::class, 'update'],           ['auth', 'csrf']],
+    ['POST', '/transfers/delete',              [TransferController::class, 'delete'],           ['auth', 'csrf']],
+    ['POST', '/transfers/backfill-imported',   [TransferController::class, 'backfillImported'], ['auth', 'csrf']],
 
     // Securities (instruments + transactions + prices + asset classes + holdings)
     ['GET',  '/securities/list',                 [SecuritiesController::class, 'listInstruments'],   ['auth']],

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Models\Repositories\TransferRepository;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -410,6 +411,13 @@ final class BankStatementImporter
         // Cache delle Account::findForUser quando l'utente sceglie un dest
         // diverso dai default. Riduce le query in import con tante righe pair.
         $destCache = [];
+        // Pre-load degli import_hash gia' presenti: la pair-creation richiede
+        // di sapere upfront se la coppia esiste prima di inserire la testata
+        // `transfers` (altrimenti lasceremmo orfani di transfers se l'expense
+        // o l'income falliscono come duplicati).
+        $existingHashes  = self::loadExistingHashes($userId);
+        $transferRepo    = new TransferRepository();
+        $pdo             = Database::pdo();
 
         foreach ($rows as $rowIn) {
             $idx = (int) ($rowIn['idx'] ?? -1);
@@ -458,22 +466,51 @@ final class BankStatementImporter
                     $expHash  = $baseHash . ':exp';
                     $incHash  = $baseHash . ':inc';
 
-                    $expId = Expense::createImported(
-                        $userId, $catId, (string) $amount,
-                        'Ricarica → ' . $usedName,
-                        'transfer', $opDate, $accountId, $valueDate, $expHash
-                    );
-                    $incId = Income::createImported(
-                        $userId, 'Trasferimento da conto',
-                        'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $usedId, $valueDate, $incHash, 'transfer'
-                    );
-                    if ($expId === null && $incId === null) {
+                    if (isset($existingHashes[$expHash]) || isset($existingHashes[$incHash])) {
                         $dupCnt++;
-                    } else {
+                        continue;
+                    }
+
+                    $alreadyInTx = $pdo->inTransaction();
+                    if (!$alreadyInTx) $pdo->beginTransaction();
+                    try {
+                        $transferId = $transferRepo->create([
+                            'user_id'                => $userId,
+                            'source_account_id'      => $accountId,
+                            'destination_account_id' => $usedId,
+                            'amount'                 => number_format($amount, 2, '.', ''),
+                            'transfer_date'          => $opDate,
+                            'description'            => $description !== '' ? mb_substr($description, 0, 255) : ('Ricarica → ' . $usedName),
+                            'notes'                  => null,
+                        ]);
+                        $expId = Expense::createImported(
+                            $userId, $catId, (string) $amount,
+                            'Ricarica → ' . $usedName,
+                            'transfer', $opDate, $accountId, $valueDate, $expHash,
+                            null, $transferId
+                        );
+                        $incId = Income::createImported(
+                            $userId, 'Trasferimento da conto',
+                            'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
+                            (string) $amount, $opDate, $usedId, $valueDate, $incHash, 'transfer',
+                            null, $transferId
+                        );
+                        if ($expId === null || $incId === null) {
+                            // Race: hash apparso fra il pre-check e l'insert.
+                            // Rollback per non lasciare un transfers orfano.
+                            if (!$alreadyInTx) $pdo->rollBack();
+                            $dupCnt++;
+                            continue;
+                        }
+                        if (!$alreadyInTx) $pdo->commit();
+                        $existingHashes[$expHash] = true;
+                        $existingHashes[$incHash] = true;
                         $pairedCnt++;
-                        $importedExp += ($expId !== null ? 1 : 0);
-                        $importedInc += ($incId !== null ? 1 : 0);
+                        $importedExp++;
+                        $importedInc++;
+                    } catch (\Throwable $e) {
+                        if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+                        throw $e;
                     }
                     continue;
                 }
@@ -508,22 +545,49 @@ final class BankStatementImporter
                     $expHash  = $baseHash . ':exp-atm';
                     $incHash  = $baseHash . ':inc-atm';
 
-                    $expId = Expense::createImported(
-                        $userId, $catId, (string) $amount,
-                        'Prelievo ATM → ' . $usedCashName,
-                        'transfer', $opDate, $accountId, $valueDate, $expHash
-                    );
-                    $incId = Income::createImported(
-                        $userId, 'Prelievo ATM',
-                        'Prelievo da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $usedCashId, $valueDate, $incHash, 'cash'
-                    );
-                    if ($expId === null && $incId === null) {
+                    if (isset($existingHashes[$expHash]) || isset($existingHashes[$incHash])) {
                         $dupCnt++;
-                    } else {
+                        continue;
+                    }
+
+                    $alreadyInTx = $pdo->inTransaction();
+                    if (!$alreadyInTx) $pdo->beginTransaction();
+                    try {
+                        $transferId = $transferRepo->create([
+                            'user_id'                => $userId,
+                            'source_account_id'      => $accountId,
+                            'destination_account_id' => $usedCashId,
+                            'amount'                 => number_format($amount, 2, '.', ''),
+                            'transfer_date'          => $opDate,
+                            'description'            => $description !== '' ? mb_substr($description, 0, 255) : ('Prelievo ATM → ' . $usedCashName),
+                            'notes'                  => null,
+                        ]);
+                        $expId = Expense::createImported(
+                            $userId, $catId, (string) $amount,
+                            'Prelievo ATM → ' . $usedCashName,
+                            'transfer', $opDate, $accountId, $valueDate, $expHash,
+                            null, $transferId
+                        );
+                        $incId = Income::createImported(
+                            $userId, 'Prelievo ATM',
+                            'Prelievo da ' . (string) ($sourceAccount['name'] ?? 'conto'),
+                            (string) $amount, $opDate, $usedCashId, $valueDate, $incHash, 'cash',
+                            null, $transferId
+                        );
+                        if ($expId === null || $incId === null) {
+                            if (!$alreadyInTx) $pdo->rollBack();
+                            $dupCnt++;
+                            continue;
+                        }
+                        if (!$alreadyInTx) $pdo->commit();
+                        $existingHashes[$expHash] = true;
+                        $existingHashes[$incHash] = true;
                         $pairedCnt++;
-                        $importedExp += ($expId !== null ? 1 : 0);
-                        $importedInc += ($incId !== null ? 1 : 0);
+                        $importedExp++;
+                        $importedInc++;
+                    } catch (\Throwable $e) {
+                        if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+                        throw $e;
                     }
                     continue;
                 }

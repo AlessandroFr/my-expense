@@ -62,6 +62,25 @@ final class TransferController extends BaseController
         return $this->json(['transfer' => $entity->toArray()]);
     }
 
+    /** POST /transfers/update */
+    public function update(Request $request): Response
+    {
+        $userId = $this->userId();
+        $id     = (int) ($request->input('id') ?? 0);
+        if ($id <= 0) {
+            throw HttpException::badRequest('ID trasferimento mancante.');
+        }
+        $entity = $this->service->update($id, $userId, [
+            'source_account_id'      => $request->input('source_account_id'),
+            'destination_account_id' => $request->input('destination_account_id'),
+            'amount'                 => $request->input('amount'),
+            'transfer_date'          => $request->input('transfer_date'),
+            'description'            => $request->input('description'),
+            'notes'                  => $request->input('notes'),
+        ]);
+        return $this->json(['transfer' => $entity->toArray()]);
+    }
+
     /** POST /transfers/delete */
     public function delete(Request $request): Response
     {
@@ -72,6 +91,14 @@ final class TransferController extends BaseController
         }
         $this->service->delete($id, $userId);
         return $this->json(['deleted' => true, 'id' => $id]);
+    }
+
+    /** POST /transfers/backfill-imported */
+    public function backfillImported(Request $request): Response
+    {
+        $userId = $this->userId();
+        $stats  = $this->service->backfillImportedPairs($userId);
+        return $this->json($stats);
     }
 
     private function trimNullable(mixed $v): ?string

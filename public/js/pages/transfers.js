@@ -20,13 +20,17 @@ const fmtDate = (iso) => {
     return dateFmt.format(new Date(Number(y), Number(m) - 1, Number(d)));
 };
 
-const createForm = document.getElementById('transfer-create-form');
-const listEl     = document.getElementById('transfers-list');
-const fromInput  = document.getElementById('transfers-filter-date-from');
-const toInput    = document.getElementById('transfers-filter-date-to');
+const createForm   = document.getElementById('transfer-create-form');
+const editForm     = document.getElementById('transfer-edit-form');
+const editModalEl  = document.getElementById('transfer-edit-modal');
+const backfillBtn  = document.getElementById('transfers-backfill-btn');
+const listEl       = document.getElementById('transfers-list');
+const fromInput    = document.getElementById('transfers-filter-date-from');
+const toInput      = document.getElementById('transfers-filter-date-to');
 
-let accountsCache = [];
+let accountsCache  = [];
 let transfersCache = [];
+let editModal      = null; // bootstrap.Modal, lazy-init
 
 async function loadAccounts() {
     try {
@@ -39,6 +43,11 @@ async function loadAccounts() {
             })).join('');
         for (const sel of createForm.querySelectorAll('select[data-role]')) {
             sel.innerHTML = optionsHtml;
+        }
+        if (editForm) {
+            for (const sel of editForm.querySelectorAll('select[data-role]')) {
+                sel.innerHTML = optionsHtml;
+            }
         }
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento conti.');
@@ -64,7 +73,10 @@ function renderRow(t) {
             </td>
             <td class="text-end fw-semibold">${escapeHtml(fmtMoney(t.amount))}</td>
             <td>${escapeHtml(t.description || '')}</td>
-            <td class="text-end">
+            <td class="text-end text-nowrap">
+                <button type="button" class="btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="${escapeAttr(t.id)}" title="Modifica">
+                    <i class="bi bi-pencil"></i>
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-id="${escapeAttr(t.id)}" title="Elimina">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -131,22 +143,90 @@ createForm?.addEventListener('submit', async (ev) => {
 });
 
 listEl?.addEventListener('click', async (ev) => {
-    const btn = ev.target.closest('button[data-action="delete"]');
+    const btn = ev.target.closest('button[data-action]');
     if (!btn) return;
+    const action = btn.dataset.action;
     const id = btn.dataset.id;
     const t = transfersCache.find(x => String(x.id) === String(id));
     if (!t) return;
-    const ok = await confirmDialog(
-        `Eliminare il trasferimento di ${fmtMoney(t.amount)} da "${t.source_name}" a "${t.destination_name}"? Le scritture su spese ed entrate vengono rimosse in cascata.`,
-        { confirmText: 'Elimina', confirmClass: 'btn-danger' }
-    );
-    if (!ok) return;
+
+    if (action === 'delete') {
+        const ok = await confirmDialog(
+            `Eliminare il trasferimento di ${fmtMoney(t.amount)} da "${t.source_name}" a "${t.destination_name}"? Le scritture su spese ed entrate vengono rimosse in cascata.`,
+            { confirmText: 'Elimina', confirmClass: 'btn-danger' }
+        );
+        if (!ok) return;
+        try {
+            await send(`${BASE}/transfers/delete`, { id });
+            toast.success('Trasferimento eliminato.');
+            loadList();
+        } catch (err) {
+            toast.error(err.message ?? 'Errore eliminazione.');
+        }
+        return;
+    }
+
+    if (action === 'edit') {
+        openEditModal(t);
+    }
+});
+
+function openEditModal(t) {
+    if (!editForm || !editModalEl) return;
+    editForm.querySelector('#transfer-edit-id').value = String(t.id);
+    editForm.querySelector('select[name="source_account_id"]').value      = String(t.source_account_id);
+    editForm.querySelector('select[name="destination_account_id"]').value = String(t.destination_account_id);
+    editForm.querySelector('input[name="amount"]').value        = String(t.amount).replace('.', ',');
+    editForm.querySelector('input[name="transfer_date"]').value = String(t.transfer_date || '').slice(0, 10);
+    editForm.querySelector('input[name="description"]').value   = t.description || '';
+    editForm.querySelector('input[name="notes"]').value         = t.notes || '';
+    if (!editModal && window.bootstrap?.Modal) {
+        editModal = new window.bootstrap.Modal(editModalEl);
+    }
+    editModal?.show();
+}
+
+editForm?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(editForm);
+    const payload = Object.fromEntries(fd.entries());
+    if (payload.source_account_id === payload.destination_account_id) {
+        toast.error('Conto sorgente e destinazione devono essere diversi.');
+        return;
+    }
     try {
-        await send(`${BASE}/transfers/delete`, { id });
-        toast.success('Trasferimento eliminato.');
+        await send(`${BASE}/transfers/update`, payload);
+        toast.success('Trasferimento aggiornato.');
+        editModal?.hide();
         loadList();
     } catch (err) {
-        toast.error(err.message ?? 'Errore eliminazione.');
+        toast.error(err.message ?? 'Errore aggiornamento.');
+    }
+});
+
+backfillBtn?.addEventListener('click', async () => {
+    const ok = await confirmDialog(
+        'Cerco le coppie di expense+income importate dall\'estratto conto e le converto in trasferimenti veri (idempotente). Procedo?',
+        { confirmText: 'Migra', confirmClass: 'btn-primary' }
+    );
+    if (!ok) return;
+    backfillBtn.disabled = true;
+    try {
+        const r = await send(`${BASE}/transfers/backfill-imported`, {});
+        const d = r?.data ?? {};
+        const m = Number(d.migrated ?? 0);
+        const np = Number(d.skipped_no_pair ?? 0);
+        const mm = Number(d.skipped_mismatch ?? 0);
+        if (m === 0 && np === 0 && mm === 0) {
+            toast.success('Nessuna coppia da migrare.');
+        } else {
+            toast.success(`Migrati ${m}. Saltati: ${np} senza coppia, ${mm} con discrepanze.`);
+        }
+        loadList();
+    } catch (err) {
+        toast.error(err.message ?? 'Errore migrazione.');
+    } finally {
+        backfillBtn.disabled = false;
     }
 });
 

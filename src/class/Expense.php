@@ -169,7 +169,8 @@ final class Expense
         ?int $accountId,
         ?string $valueDate,
         string $importHash,
-        ?int $contactId = null
+        ?int $contactId = null,
+        ?int $transferId = null
     ): ?int {
         $row = self::validate($userId, $categoryId, $amount, $description, $paymentMethod, $expenseDate, $accountId, null, null, $contactId);
         if ($valueDate !== null && !self::isValidDate($valueDate)) {
@@ -179,8 +180,9 @@ final class Expense
         try {
             $stmt = Database::pdo()->prepare(
                 'INSERT INTO expenses (user_id, category_id, contact_id, account_id, amount, description,
-                                       payment_method, expense_date, value_date, import_hash)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                                       payment_method, expense_date, value_date, import_hash,
+                                       is_transfer, transfer_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $userId,
@@ -193,6 +195,8 @@ final class Expense
                 $row['expense_date'],
                 $valueDate,
                 $importHash,
+                $transferId !== null ? 1 : 0,
+                $transferId,
             ]);
         } catch (PDOException $e) {
             // 23000 + errno 1062 = duplicate key on (user_id, import_hash)
