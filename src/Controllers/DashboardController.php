@@ -8,6 +8,10 @@ use App\Expense;
 use App\Http\Request;
 use App\Http\Response;
 use App\Income;
+use App\Models\Repositories\HoldingsRepository;
+use App\Models\Repositories\PacContributionRepository;
+use App\Models\Repositories\PacFundRepository;
+use App\Models\Repositories\PacPlanRepository;
 use App\RecurringExpense;
 use App\Services\PacService;
 use Throwable;
@@ -75,6 +79,8 @@ final class DashboardController extends BaseController
         $incomeByMonth  = Income::totalsByMonth($userId, 6);
         $budgetProgress = Budget::progressForMonth($userId, $currentMonth);
 
+        $investments = $this->buildInvestmentsKpi($userId);
+
         return $this->json([
             'range' => [
                 'from'      => $from,
@@ -96,6 +102,57 @@ final class DashboardController extends BaseController
             'by_month'        => $byMonth,
             'income_by_month' => $incomeByMonth,
             'budget_progress' => $budgetProgress,
+            'investments'     => $investments,
         ]);
+    }
+
+    /**
+     * KPI investimenti per il widget dashboard.
+     *
+     * @return array<string,mixed>
+     */
+    private function buildInvestmentsKpi(int $userId): array
+    {
+        $holdingsRepo = new HoldingsRepository();
+        $byAssetClass = $holdingsRepo->byAssetClass($userId);
+        $holdings     = $holdingsRepo->forUser($userId);
+
+        $invested  = 0.0;
+        $current   = 0.0;
+        $hasMarked = false;
+        foreach ($holdings as $h) {
+            $invested += $h['qty'] * $h['avg_cost'];
+            if ($h['mark_value'] !== null) {
+                $current   += $h['mark_value'];
+                $hasMarked  = true;
+            }
+        }
+
+        $pacInvested = 0.0;
+        $pacCurrent  = 0.0;
+        $pacPlans    = (new PacPlanRepository())->listForUser($userId);
+        $contRepo    = new PacContributionRepository();
+        $fundsRepo   = new PacFundRepository();
+        foreach ($pacPlans as $plan) {
+            $sum = $contRepo->summaryForPlan($plan->id);
+            $pacInvested += $sum['total_amount'];
+            $fund = $fundsRepo->findById($plan->fundId, $userId);
+            if ($fund !== null && $fund->lastNav !== null && $sum['total_units'] > 0) {
+                $pacCurrent += $sum['total_units'] * $fund->lastNav;
+                $hasMarked   = true;
+            }
+        }
+
+        $totalInvested = $invested + $pacInvested;
+        $totalCurrent  = $hasMarked ? ($current + $pacCurrent) : null;
+        $pnl           = $totalCurrent !== null ? ($totalCurrent - $totalInvested) : null;
+
+        return [
+            'has_data'       => $totalInvested > 0,
+            'total_invested' => round($totalInvested, 2),
+            'total_current'  => $totalCurrent !== null ? round($totalCurrent, 2) : null,
+            'total_pnl'      => $pnl !== null ? round($pnl, 2) : null,
+            'by_asset_class' => $byAssetClass,
+        ];
     }
 }

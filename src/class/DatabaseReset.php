@@ -23,11 +23,13 @@ final class DatabaseReset
 {
     public const SCOPE_MOVEMENTS           = 'movements';
     public const SCOPE_MOVEMENTS_RECURRING = 'movements_recurring';
+    public const SCOPE_INVESTMENTS         = 'investments';
     public const SCOPE_ALL                 = 'all';
 
     public const ALLOWED_SCOPES = [
         self::SCOPE_MOVEMENTS,
         self::SCOPE_MOVEMENTS_RECURRING,
+        self::SCOPE_INVESTMENTS,
         self::SCOPE_ALL,
     ];
 
@@ -49,26 +51,49 @@ final class DatabaseReset
         $pdo = Database::pdo();
 
         $counters = [
-            'expense_attachments_deleted' => 0,
-            'expense_tags_deleted'        => 0,
-            'expenses_deleted'            => 0,
-            'incomes_deleted'             => 0,
-            'recurring_reset'             => 0,
-            'recurring_deleted'           => 0,
-            'budgets_deleted'             => 0,
-            'saved_filters_deleted'       => 0,
-            'tags_deleted'                => 0,
-            'accounts_deleted'            => 0,
-            'contacts_deleted'            => 0,
-            'categories_deleted'          => 0,
-            'attachment_files_deleted'    => 0,
+            'expense_attachments_deleted'  => 0,
+            'expense_tags_deleted'         => 0,
+            'expenses_deleted'             => 0,
+            'incomes_deleted'              => 0,
+            'recurring_reset'              => 0,
+            'recurring_deleted'            => 0,
+            'budgets_deleted'              => 0,
+            'saved_filters_deleted'        => 0,
+            'tags_deleted'                 => 0,
+            'accounts_deleted'             => 0,
+            'contacts_deleted'             => 0,
+            'categories_deleted'           => 0,
+            'transfers_deleted'            => 0,
+            'securities_tx_deleted'        => 0,
+            'securities_instr_deleted'     => 0,
+            'asset_classes_deleted'        => 0,
+            'pac_contrib_deleted'          => 0,
+            'pac_plans_deleted'            => 0,
+            'pac_funds_deleted'            => 0,
+            'attachment_files_deleted'     => 0,
         ];
 
         $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
         $pdo->beginTransaction();
 
         try {
-            // ── Movimenti (in tutti gli scope) ───────────────────────────
+            // ── Scope investments: solo le tabelle finanziarie ───────────
+            // Mantiene expenses/incomes esistenti (le scritture linkate
+            // restano con FK SET NULL su securities_transactions).
+            if ($scope === self::SCOPE_INVESTMENTS) {
+                $counters['pac_contrib_deleted']      = self::deleteByUser($pdo, 'pac_contributions',       $userId);
+                $counters['pac_plans_deleted']        = self::deleteByUser($pdo, 'pac_plans',               $userId);
+                $counters['pac_funds_deleted']        = self::deleteByUser($pdo, 'pac_funds',               $userId);
+                $counters['securities_tx_deleted']    = self::deleteByUser($pdo, 'securities_transactions', $userId);
+                $counters['securities_instr_deleted'] = self::deleteByUser($pdo, 'securities_instruments',  $userId);
+                $counters['asset_classes_deleted']    = self::deleteByUser($pdo, 'asset_classes',           $userId);
+                $counters['transfers_deleted']        = self::deleteByUser($pdo, 'transfers',               $userId);
+                $pdo->commit();
+                $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+                return $counters;
+            }
+
+            // ── Movimenti (in tutti gli scope tranne investments) ────────
             $counters['expense_attachments_deleted'] = self::deleteByUser($pdo, 'expense_attachments', $userId);
 
             $stmt = $pdo->prepare(
@@ -93,13 +118,21 @@ final class DatabaseReset
 
             // ── Tabula rasa (scope all) ─────────────────────────────────
             if ($scope === self::SCOPE_ALL) {
-                $counters['saved_filters_deleted'] = self::deleteByUser($pdo, 'saved_filters',      $userId);
-                $counters['budgets_deleted']       = self::deleteByUser($pdo, 'budgets',            $userId);
-                $counters['recurring_deleted']     = self::deleteByUser($pdo, 'recurring_expenses', $userId);
-                $counters['tags_deleted']          = self::deleteByUser($pdo, 'tags',               $userId);
-                $counters['accounts_deleted']      = self::deleteByUser($pdo, 'accounts',           $userId);
-                $counters['contacts_deleted']      = self::deleteByUser($pdo, 'contacts',           $userId);
-                $counters['categories_deleted']    = self::deleteByUser($pdo, 'categories',         $userId);
+                // Investimenti prima delle tabelle parent (categories/accounts)
+                $counters['pac_contrib_deleted']      = self::deleteByUser($pdo, 'pac_contributions',       $userId);
+                $counters['pac_plans_deleted']        = self::deleteByUser($pdo, 'pac_plans',               $userId);
+                $counters['pac_funds_deleted']        = self::deleteByUser($pdo, 'pac_funds',               $userId);
+                $counters['securities_tx_deleted']    = self::deleteByUser($pdo, 'securities_transactions', $userId);
+                $counters['securities_instr_deleted'] = self::deleteByUser($pdo, 'securities_instruments',  $userId);
+                $counters['asset_classes_deleted']    = self::deleteByUser($pdo, 'asset_classes',           $userId);
+                $counters['transfers_deleted']        = self::deleteByUser($pdo, 'transfers',               $userId);
+                $counters['saved_filters_deleted']    = self::deleteByUser($pdo, 'saved_filters',           $userId);
+                $counters['budgets_deleted']          = self::deleteByUser($pdo, 'budgets',                 $userId);
+                $counters['recurring_deleted']        = self::deleteByUser($pdo, 'recurring_expenses',      $userId);
+                $counters['tags_deleted']             = self::deleteByUser($pdo, 'tags',                    $userId);
+                $counters['accounts_deleted']         = self::deleteByUser($pdo, 'accounts',                $userId);
+                $counters['contacts_deleted']         = self::deleteByUser($pdo, 'contacts',                $userId);
+                $counters['categories_deleted']       = self::deleteByUser($pdo, 'categories',              $userId);
             }
 
             $pdo->commit();

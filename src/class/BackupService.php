@@ -18,18 +18,27 @@ use ZipArchive;
 final class BackupService
 {
     private const TABLES_USER_SCOPED = [
-        'users'              => ['user_filter' => 'id'],
-        'categories'         => ['user_filter' => 'user_id'],
-        'accounts'           => ['user_filter' => 'user_id'],
-        'contacts'           => ['user_filter' => 'user_id'],
-        'tags'               => ['user_filter' => 'user_id'],
-        'budgets'            => ['user_filter' => 'user_id'],
-        'recurring_expenses' => ['user_filter' => 'user_id'],
-        'incomes'            => ['user_filter' => 'user_id'],
-        'expenses'           => ['user_filter' => 'user_id'],
-        'expense_tags'       => ['user_filter_via' => 'expenses.user_id'],
-        'expense_attachments'=> ['user_filter' => 'user_id'],
-        'saved_filters'      => ['user_filter' => 'user_id'],
+        'users'                   => ['user_filter' => 'id'],
+        'categories'              => ['user_filter' => 'user_id'],
+        'accounts'                => ['user_filter' => 'user_id'],
+        'contacts'                => ['user_filter' => 'user_id'],
+        'tags'                    => ['user_filter' => 'user_id'],
+        'budgets'                 => ['user_filter' => 'user_id'],
+        'recurring_expenses'      => ['user_filter' => 'user_id'],
+        'incomes'                 => ['user_filter' => 'user_id'],
+        'expenses'                => ['user_filter' => 'user_id'],
+        'expense_tags'            => ['user_filter_via' => 'expenses.user_id'],
+        'expense_attachments'     => ['user_filter' => 'user_id'],
+        'saved_filters'           => ['user_filter' => 'user_id'],
+        'transfers'               => ['user_filter' => 'user_id'],
+        'asset_classes'           => ['user_filter' => 'user_id'],
+        'securities_instruments'  => ['user_filter' => 'user_id'],
+        'securities_prices'       => ['user_filter_via' => 'securities_instruments.user_id'],
+        'securities_transactions' => ['user_filter' => 'user_id'],
+        'pac_funds'               => ['user_filter' => 'user_id'],
+        'pac_fund_navs'           => ['user_filter_via' => 'pac_funds.user_id'],
+        'pac_plans'               => ['user_filter' => 'user_id'],
+        'pac_contributions'       => ['user_filter' => 'user_id'],
     ];
 
     public static function streamBackupForUser(int $userId): void
@@ -127,6 +136,24 @@ final class BackupService
                 'SELECT et.* FROM expense_tags et
                  INNER JOIN expenses e ON e.id = et.expense_id
                  WHERE e.user_id = ?'
+            );
+            $stmt->execute([$userId]);
+            return $stmt->fetchAll();
+        }
+        if ($table === 'securities_prices') {
+            $stmt = $pdo->prepare(
+                'SELECT p.* FROM securities_prices p
+                 INNER JOIN securities_instruments s ON s.id = p.instrument_id
+                 WHERE s.user_id = ?'
+            );
+            $stmt->execute([$userId]);
+            return $stmt->fetchAll();
+        }
+        if ($table === 'pac_fund_navs') {
+            $stmt = $pdo->prepare(
+                'SELECT n.* FROM pac_fund_navs n
+                 INNER JOIN pac_funds f ON f.id = n.fund_id
+                 WHERE f.user_id = ?'
             );
             $stmt->execute([$userId]);
             return $stmt->fetchAll();

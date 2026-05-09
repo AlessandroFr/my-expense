@@ -106,6 +106,52 @@ $thisYear = (int) date('Y');
     </div>
 </div></div>
 
+<div id="r-investments-section" class="card shadow-sm mb-4 d-none">
+    <div class="card-body">
+        <h2 class="h6 mb-3"><i class="bi bi-graph-up-arrow me-1"></i>Investimenti</h2>
+        <div class="row g-3 mb-3">
+            <div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
+                <div class="text-muted small text-uppercase">Investito totale</div>
+                <div id="r-inv-invested" class="h4 fw-semibold mt-1">—</div>
+            </div></div></div>
+            <div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
+                <div class="text-muted small text-uppercase">Valore attuale</div>
+                <div id="r-inv-current" class="h4 fw-semibold mt-1">—</div>
+            </div></div></div>
+            <div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
+                <div class="text-muted small text-uppercase">P&L</div>
+                <div id="r-inv-pnl" class="h4 fw-semibold mt-1">—</div>
+            </div></div></div>
+            <div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
+                <div class="text-muted small text-uppercase">Dividendi anno</div>
+                <div id="r-inv-divyear" class="h4 fw-semibold mt-1">—</div>
+            </div></div></div>
+        </div>
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <h3 class="h6 mb-3"><i class="bi bi-pie-chart me-1"></i>Per asset class</h3>
+                <div style="position:relative;height:260px"><canvas id="chart-asset-classes"></canvas></div>
+            </div>
+            <div class="col-lg-7">
+                <h3 class="h6 mb-3"><i class="bi bi-bar-chart-line me-1"></i>Dividendi mensili</h3>
+                <div style="position:relative;height:260px"><canvas id="chart-dividends"></canvas></div>
+            </div>
+        </div>
+        <div class="table-responsive mt-3">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light"><tr>
+                    <th>Asset class</th>
+                    <th class="text-end">Investito</th>
+                    <th class="text-end">Valore</th>
+                    <th class="text-end">P&L</th>
+                    <th class="text-end">Dividendi</th>
+                </tr></thead>
+                <tbody id="r-inv-by-class"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <div class="card shadow-sm"><div class="card-body">
     <h2 class="h6 mb-3"><i class="bi bi-trophy me-1"></i>Top 10 spese</h2>
     <div class="table-responsive">

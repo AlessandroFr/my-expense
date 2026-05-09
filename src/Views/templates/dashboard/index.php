@@ -104,6 +104,32 @@ $base = $this->baseUrl();
     </div>
 </div>
 
+<div class="card shadow-sm mb-4 d-none" id="investments-card">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+            <h2 class="h6 mb-0 flex-grow-1"><i class="bi bi-graph-up-arrow me-1"></i>Patrimonio investito</h2>
+            <a href="<?= $this->escape($this->baseUrl() . '/securities') ?>" class="small text-decoration-none">
+                Dettaglio <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-muted small text-uppercase">Investito</div>
+                <div id="inv-invested" class="h4 fw-semibold mt-1">—</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small text-uppercase">Valore attuale</div>
+                <div id="inv-current" class="h4 fw-semibold mt-1">—</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small text-uppercase">P&L</div>
+                <div id="inv-pnl" class="h4 fw-semibold mt-1">—</div>
+            </div>
+        </div>
+        <div id="inv-asset-bars" class="mt-3 small"></div>
+    </div>
+</div>
+
 <div class="row g-3">
     <div class="col-lg-5">
         <div class="card shadow-sm h-100"><div class="card-body">
