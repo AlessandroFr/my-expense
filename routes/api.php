@@ -12,6 +12,8 @@ declare(strict_types=1);
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
+use App\Controllers\FilterController;
+use App\Controllers\TagController;
 
 return [
     // Expenses
@@ -31,4 +33,14 @@ return [
     ['GET',  '/budgets/list',            [BudgetController::class, 'list'],   ['auth']],
     ['POST', '/budgets/set',             [BudgetController::class, 'set'],    ['auth', 'csrf']],
     ['POST', '/budgets/delete',          [BudgetController::class, 'delete'], ['auth', 'csrf']],
+
+    // Tags
+    ['GET',  '/tags/list',               [TagController::class, 'list'],   ['auth']],
+    ['POST', '/tags/assign',             [TagController::class, 'assign'], ['auth', 'csrf']],
+    ['POST', '/tags/delete',             [TagController::class, 'delete'], ['auth', 'csrf']],
+
+    // Saved filters
+    ['GET',  '/filters/list',            [FilterController::class, 'list'],   ['auth']],
+    ['POST', '/filters/save',            [FilterController::class, 'save'],   ['auth', 'csrf']],
+    ['POST', '/filters/delete',          [FilterController::class, 'delete'], ['auth', 'csrf']],
 ];
