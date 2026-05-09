@@ -16,6 +16,7 @@ use App\Controllers\ExpenseController;
 use App\Controllers\IncomeController;
 use App\Controllers\RecurringController;
 use App\Controllers\ReportController;
+use App\Controllers\SecuritiesController;
 use App\Controllers\SettingsController;
 use App\Controllers\TransferController;
 
@@ -36,6 +37,8 @@ return [
     ['GET', '/incomes',          [IncomeController::class,   'index'],  ['auth']],
     ['GET', '/accounts',         [AccountController::class,  'index'],  ['auth']],
     ['GET', '/transfers',        [TransferController::class, 'index'],  ['auth']],
+    ['GET', '/securities',           [SecuritiesController::class, 'index'],          ['auth']],
+    ['GET', '/securities/instrument',[SecuritiesController::class, 'instrumentPage'], ['auth']],
     ['GET', '/recurring',        [RecurringController::class,'index'],  ['auth']],
     ['GET', '/contacts',         [ContactController::class,  'index'],  ['auth']],
     ['GET', '/contacts/detail',  [ContactController::class,  'detail'], ['auth']],

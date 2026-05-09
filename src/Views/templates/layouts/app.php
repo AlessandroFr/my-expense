@@ -111,6 +111,7 @@ $title   = (string) ($this->title ?? '');
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/categories') ?>"><i class="bi bi-tags me-2"></i>Categorie</a></li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/budgets') ?>"><i class="bi bi-bullseye me-2"></i>Budget</a></li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/accounts') ?>"><i class="bi bi-bank me-2"></i>Conti</a></li>
+                    <li><a class="dropdown-item" href="<?= $this->escape($base . '/securities') ?>"><i class="bi bi-graph-up-arrow me-2"></i>Investimenti</a></li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/contacts') ?>"><i class="bi bi-person-rolodex me-2"></i>Anagrafiche</a></li>
                 </ul>
             </li>

@@ -20,6 +20,7 @@ use App\Controllers\FilterController;
 use App\Controllers\IncomeController;
 use App\Controllers\RecurringController;
 use App\Controllers\ReportController;
+use App\Controllers\SecuritiesController;
 use App\Controllers\SettingsController;
 use App\Controllers\TagController;
 use App\Controllers\TransferController;
@@ -82,6 +83,24 @@ return [
     ['GET',  '/transfers/list',          [TransferController::class, 'list'],   ['auth']],
     ['POST', '/transfers/create',        [TransferController::class, 'create'], ['auth', 'csrf']],
     ['POST', '/transfers/delete',        [TransferController::class, 'delete'], ['auth', 'csrf']],
+
+    // Securities (instruments + transactions + prices + asset classes + holdings)
+    ['GET',  '/securities/list',                 [SecuritiesController::class, 'listInstruments'],   ['auth']],
+    ['GET',  '/securities/holdings',             [SecuritiesController::class, 'holdings'],         ['auth']],
+    ['POST', '/securities/instrument/create',    [SecuritiesController::class, 'createInstrument'], ['auth', 'csrf']],
+    ['POST', '/securities/instrument/update',    [SecuritiesController::class, 'updateInstrument'], ['auth', 'csrf']],
+    ['POST', '/securities/instrument/archive',   [SecuritiesController::class, 'archiveInstrument'],['auth', 'csrf']],
+    ['POST', '/securities/instrument/delete',    [SecuritiesController::class, 'deleteInstrument'], ['auth', 'csrf']],
+    ['GET',  '/securities/transactions/list',    [SecuritiesController::class, 'listTransactions'], ['auth']],
+    ['POST', '/securities/transactions/create',  [SecuritiesController::class, 'createTransaction'],['auth', 'csrf']],
+    ['POST', '/securities/transactions/delete',  [SecuritiesController::class, 'deleteTransaction'],['auth', 'csrf']],
+    ['GET',  '/securities/prices',               [SecuritiesController::class, 'listPrices'],       ['auth']],
+    ['POST', '/securities/prices/update',        [SecuritiesController::class, 'updatePrice'],      ['auth', 'csrf']],
+    ['POST', '/securities/prices/delete',        [SecuritiesController::class, 'deletePrice'],      ['auth', 'csrf']],
+    ['GET',  '/securities/asset-classes',        [SecuritiesController::class, 'listAssetClasses'], ['auth']],
+    ['POST', '/securities/asset-classes/create', [SecuritiesController::class, 'createAssetClass'], ['auth', 'csrf']],
+    ['POST', '/securities/asset-classes/update', [SecuritiesController::class, 'updateAssetClass'], ['auth', 'csrf']],
+    ['POST', '/securities/asset-classes/delete', [SecuritiesController::class, 'deleteAssetClass'], ['auth', 'csrf']],
 
     // Recurring expenses
     ['GET',  '/recurring/list',          [RecurringController::class, 'list'],   ['auth']],
