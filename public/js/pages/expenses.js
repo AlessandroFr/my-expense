@@ -848,6 +848,8 @@ let bankPreviewState = {
     pair: 1,
     rows: [],
     categories: [],
+    accounts: [],
+    destSuggestions: { transfer_pair: null, atm_pair: null },
     page: 1,
 };
 
@@ -872,6 +874,17 @@ function bankRenderKindOptions(selected) {
         const sel = k.value === selected ? ' selected' : '';
         return `<option value="${k.value}"${sel}>${escHtml(k.label)}</option>`;
     }).join('');
+}
+
+function bankRenderDestAccountOptions(selectedId) {
+    const sourceId = Number(bankPreviewState.accountId) || 0;
+    const opts = [`<option value="">— default —</option>`];
+    for (const a of bankPreviewState.accounts) {
+        if (Number(a.id) === sourceId) continue; // non si trasferisce a se stessi
+        const sel = (selectedId !== null && selectedId !== undefined && Number(selectedId) === Number(a.id)) ? ' selected' : '';
+        opts.push(`<option value="${a.id}"${sel}>${escHtml(a.name)} (${escHtml(a.type)})</option>`);
+    }
+    return opts.join('');
 }
 
 function bankRenderRow(r) {
@@ -963,12 +976,20 @@ function bankRenderRow(r) {
                     ${middleField}
                 </div>
                 ${contactBlock}
-                <div class="col-6 col-md-${cols.pay}">
-                    <label class="form-label small mb-1">Pagamento</label>
-                    <select class="form-select form-select-sm bank-cell" data-field="payment_method">
-                        ${bankRenderPaymentOptions(payDefault)}
-                    </select>
-                </div>
+                ${isPair
+                    ? `<div class="col-6 col-md-${cols.pay}">
+                           <label class="form-label small mb-1">Conto destinazione</label>
+                           <select class="form-select form-select-sm bank-cell" data-field="dest_account_id" title="Conto su cui finisce il trasferimento (incasso della partita doppia)">
+                               ${bankRenderDestAccountOptions(r.dest_account_id ?? null)}
+                           </select>
+                       </div>`
+                    : `<div class="col-6 col-md-${cols.pay}">
+                           <label class="form-label small mb-1">Pagamento</label>
+                           <select class="form-select form-select-sm bank-cell" data-field="payment_method">
+                               ${bankRenderPaymentOptions(payDefault)}
+                           </select>
+                       </div>`
+                }
                 <div class="col-6 col-md-${cols.amt}">
                     <label class="form-label small mb-1">Importo €</label>
                     <input type="number" step="0.01" min="0.01" class="form-control form-control-sm text-end bank-cell"
@@ -1156,6 +1177,8 @@ function bankSyncRowFromTr(tr) {
     }
     const payEl = get('payment_method');
     if (payEl) r.payment_method = payEl.value;
+    const destEl = get('dest_account_id');
+    if (destEl) r.dest_account_id = destEl.value !== '' ? Number(destEl.value) : null;
 
     // Anagrafica editata: se l'utente ha cambiato il testo, scarta il match
     // precedente (saranno creati al volo via Contact::findOrCreate). L'edit
@@ -1241,9 +1264,12 @@ function wireBankImport() {
                 // backend consuma direttamente (resolveContactFromRow).
                 contact_id:   r.contact_id   ?? r.contact_id_matched ?? null,
                 contact_name: r.contact_name ?? r.contact_suggested_name ?? '',
+                dest_account_id: r.dest_account_id ?? null,
             }));
-            bankPreviewState.categories = d.categories ?? [];
-            bankPreviewState.page       = 1;
+            bankPreviewState.categories      = d.categories ?? [];
+            bankPreviewState.accounts        = d.accounts ?? [];
+            bankPreviewState.destSuggestions = d.dest_suggestions ?? { transfer_pair: null, atm_pair: null };
+            bankPreviewState.page            = 1;
             if (toggleAll) toggleAll.checked = bankPreviewState.rows.some(r => !r.skip);
 
             if (resultBox) resultBox.innerHTML = '';
@@ -1291,12 +1317,21 @@ function wireBankImport() {
             return;
         }
         if (field === 'kind') {
-            // Pair kinds (transfer/atm) non hanno anagrafica → la pulisco
-            // perche' altrimenti il commit la propagherebbe per errore.
             if (BANK_PAIR_KINDS.has(r.kind)) {
+                // Pair kinds non hanno anagrafica → la pulisco perche'
+                // altrimenti il commit la propagherebbe per errore.
                 r.contact_id = null;
                 r.contact_id_matched = null;
                 r.contact_name = '';
+                // Seed del conto destinazione col suggerimento globale
+                // SOLO se la riga non ne ha gia' uno (es. l'utente sta
+                // appena passando da expense a transfer_pair).
+                if (r.dest_account_id == null) {
+                    r.dest_account_id = bankPreviewState.destSuggestions?.[r.kind] ?? null;
+                }
+            } else {
+                // Lasciando il pair, il dest_account_id non ha piu' senso.
+                r.dest_account_id = null;
             }
             // Re-render solo la riga interessata mantenendo posizione in pagina.
             tr.outerHTML = bankRenderRow(r);

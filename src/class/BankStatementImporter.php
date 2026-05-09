@@ -144,6 +144,32 @@ final class BankStatementImporter
 
         $existingHashes = self::loadExistingHashes($userId);
 
+        // Lista conti dell'utente + suggerimenti default per le partite doppie.
+        // Vengono spedite in preview cosi' il frontend puo' presentare un
+        // <select> "Conto destinazione" inline su ogni riga pair.
+        $allAccounts = Account::allForUser($userId, false);
+        $accountsOut = [];
+        foreach ($allAccounts as $a) {
+            $accountsOut[] = [
+                'id'   => (int) $a['id'],
+                'name' => (string) $a['name'],
+                'type' => (string) $a['type'],
+            ];
+        }
+        $suggestPrepaidId = null;
+        foreach ($allAccounts as $a) {
+            if (mb_strtolower((string) $a['name']) === 'carta prepagata') {
+                $suggestPrepaidId = (int) $a['id'];
+                break;
+            }
+        }
+        $defaultCash       = Account::defaultCashFor($userId);
+        $suggestCashId     = $defaultCash !== null ? (int) $defaultCash['id'] : null;
+        // Se i suggerimenti coincidono col conto sorgente non hanno senso
+        // (non si trasferisce a se stessi): null forza la scelta esplicita.
+        if ($suggestPrepaidId === $accountId) $suggestPrepaidId = null;
+        if ($suggestCashId    === $accountId) $suggestCashId    = null;
+
         $rows         = [];
         $emptyCnt     = 0;
         $parseErrors  = [];
@@ -216,7 +242,14 @@ final class BankStatementImporter
                     'category_suggested' => null,
                     'source'             => null,
                     'payment_method'     => null,
+                    'dest_account_id'    => null,
                 ];
+
+                if ($kind === self::KIND_TRANSFER_PAIR) {
+                    $row['dest_account_id'] = $suggestPrepaidId;
+                } elseif ($kind === self::KIND_ATM_PAIR) {
+                    $row['dest_account_id'] = $suggestCashId;
+                }
 
                 if ($kind === self::KIND_EXPENSE || $kind === self::KIND_TRANSFER_PAIR || $kind === self::KIND_ATM_PAIR) {
                     if ($kind === self::KIND_TRANSFER_PAIR) {
@@ -326,6 +359,11 @@ final class BankStatementImporter
             ],
             'account_iban_detected' => $iban,
             'categories'            => $categories,
+            'accounts'              => $accountsOut,
+            'dest_suggestions'      => [
+                'transfer_pair' => $suggestPrepaidId,
+                'atm_pair'      => $suggestCashId,
+            ],
             'skipped_empty'         => $emptyCnt,
             'parse_errors'          => $parseErrors,
             'rows'                  => $rows,
@@ -369,6 +407,9 @@ final class BankStatementImporter
 
         $prepaidAccountId = null;
         $cashAccountId    = null;
+        // Cache delle Account::findForUser quando l'utente sceglie un dest
+        // diverso dai default. Riduce le query in import con tante righe pair.
+        $destCache = [];
 
         foreach ($rows as $rowIn) {
             $idx = (int) ($rowIn['idx'] ?? -1);
@@ -388,13 +429,25 @@ final class BankStatementImporter
                 }
 
                 if ($kind === self::KIND_TRANSFER_PAIR) {
-                    if ($prepaidAccountId === null) {
-                        $prepaidAccountId = self::resolvePrepaidAccount($userId, $prepaidAccountName);
-                    }
-                    if ($prepaidAccountId === $accountId) {
-                        throw new InvalidArgumentException(
-                            "Il conto sorgente coincide con '{$prepaidAccountName}': impossibile fare partita doppia."
-                        );
+                    // Conto destinazione: prima la scelta esplicita per riga
+                    // (campo `dest_account_id` editato dall'utente in preview),
+                    // poi fallback al default "Carta Prepagata" globale (creato
+                    // al volo se mancante, per retro-compatibilita').
+                    $rowDestId = self::resolveRowDestAccount($rowIn, $userId, $accountId, $destCache);
+                    if ($rowDestId !== null) {
+                        $usedId   = $rowDestId;
+                        $usedName = (string) ($destCache[$rowDestId]['name'] ?? $prepaidAccountName);
+                    } else {
+                        if ($prepaidAccountId === null) {
+                            $prepaidAccountId = self::resolvePrepaidAccount($userId, $prepaidAccountName);
+                        }
+                        if ($prepaidAccountId === $accountId) {
+                            throw new InvalidArgumentException(
+                                "Il conto sorgente coincide con '{$prepaidAccountName}': impossibile fare partita doppia."
+                            );
+                        }
+                        $usedId   = $prepaidAccountId;
+                        $usedName = $prepaidAccountName;
                     }
                     $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
                         ? (int) $rowIn['category_id']
@@ -407,13 +460,13 @@ final class BankStatementImporter
 
                     $expId = Expense::createImported(
                         $userId, $catId, (string) $amount,
-                        'Ricarica → ' . $prepaidAccountName,
+                        'Ricarica → ' . $usedName,
                         'transfer', $opDate, $accountId, $valueDate, $expHash
                     );
                     $incId = Income::createImported(
                         $userId, 'Trasferimento da conto',
                         'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $prepaidAccountId, $valueDate, $incHash, 'transfer'
+                        (string) $amount, $opDate, $usedId, $valueDate, $incHash, 'transfer'
                     );
                     if ($expId === null && $incId === null) {
                         $dupCnt++;
@@ -426,20 +479,29 @@ final class BankStatementImporter
                 }
 
                 if ($kind === self::KIND_ATM_PAIR) {
-                    if ($cashAccountId === null) {
-                        $cashAccountId = Account::ensureDefaultCash($userId);
-                    }
-                    if ($cashAccountId === $accountId) {
-                        throw new InvalidArgumentException(
-                            'Il conto sorgente coincide con la cassa contanti: impossibile fare partita doppia.'
-                        );
+                    // Conto cassa: la scelta esplicita per riga vince sul
+                    // default; il default "In tasca" viene creato al volo
+                    // solo se il dest non e' stato impostato dall'utente.
+                    $rowDestId = self::resolveRowDestAccount($rowIn, $userId, $accountId, $destCache);
+                    if ($rowDestId !== null) {
+                        $usedCashId   = $rowDestId;
+                        $usedCashName = (string) ($destCache[$rowDestId]['name'] ?? 'In tasca');
+                    } else {
+                        if ($cashAccountId === null) {
+                            $cashAccountId = Account::ensureDefaultCash($userId);
+                        }
+                        if ($cashAccountId === $accountId) {
+                            throw new InvalidArgumentException(
+                                'Il conto sorgente coincide con la cassa contanti: impossibile fare partita doppia.'
+                            );
+                        }
+                        $cashAccount  = Account::findForUser($cashAccountId, $userId);
+                        $usedCashId   = $cashAccountId;
+                        $usedCashName = (string) ($cashAccount['name'] ?? 'In tasca');
                     }
                     $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
                         ? (int) $rowIn['category_id']
                         : null;
-
-                    $cashAccount = Account::findForUser($cashAccountId, $userId);
-                    $cashName    = (string) ($cashAccount['name'] ?? 'In tasca');
 
                     $signed   = -$amount;
                     $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
@@ -448,13 +510,13 @@ final class BankStatementImporter
 
                     $expId = Expense::createImported(
                         $userId, $catId, (string) $amount,
-                        'Prelievo ATM → ' . $cashName,
+                        'Prelievo ATM → ' . $usedCashName,
                         'transfer', $opDate, $accountId, $valueDate, $expHash
                     );
                     $incId = Income::createImported(
                         $userId, 'Prelievo ATM',
                         'Prelievo da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $cashAccountId, $valueDate, $incHash, 'cash'
+                        (string) $amount, $opDate, $usedCashId, $valueDate, $incHash, 'cash'
                     );
                     if ($expId === null && $incId === null) {
                         $dupCnt++;
@@ -906,5 +968,33 @@ final class BankStatementImporter
     private static function resolvePrepaidAccount(int $userId, string $name): int
     {
         return Account::findOrCreateByName($userId, $name, 'card', '#9c27b0', 'credit-card', 100);
+    }
+
+    /**
+     * Risolve il conto destinazione di una riga pair (transfer_pair / atm_pair):
+     *  - legge `dest_account_id` dalla riga (impostabile dall'utente in preview)
+     *  - verifica che esista, sia di proprieta' dell'utente, e diverso dal sorgente
+     *  - cache-a la riga `findForUser` in `$destCache` per ridurre query
+     *  - ritorna null se non c'e' una scelta esplicita (chiamante usera' il default globale)
+     *
+     * @param array<string,mixed> $rowIn
+     * @param array<int, array<string,mixed>|null> $destCache
+     */
+    private static function resolveRowDestAccount(array $rowIn, int $userId, int $sourceAccountId, array &$destCache): ?int
+    {
+        $raw = $rowIn['dest_account_id'] ?? null;
+        if ($raw === null || $raw === '' || $raw === 0 || $raw === '0') return null;
+        $destId = (int) $raw;
+        if ($destId <= 0) return null;
+        if ($destId === $sourceAccountId) {
+            throw new InvalidArgumentException('Conto destinazione coincide con quello sorgente.');
+        }
+        if (!array_key_exists($destId, $destCache)) {
+            $destCache[$destId] = Account::findForUser($destId, $userId);
+        }
+        if ($destCache[$destId] === null) {
+            throw new InvalidArgumentException("Conto destinazione id={$destId} non trovato.");
+        }
+        return $destId;
     }
 }
