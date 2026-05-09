@@ -3,23 +3,35 @@ declare(strict_types=1);
 
 /**
  * Route JSON (endpoint). Caricate da App\Http\Kernel::loadRoutes().
- *
  * Formato tuple: [method, path, [Controller::class, 'action'], middleware[]]
- *
- * Popolato per dominio da C6 in poi (Expenses pilota).
  */
 
 use App\Controllers\AccountController;
+use App\Controllers\AttachmentController;
+use App\Controllers\AuthController;
+use App\Controllers\BackupController;
+use App\Controllers\BankImportController;
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ContactController;
+use App\Controllers\DashboardController;
 use App\Controllers\ExpenseController;
 use App\Controllers\FilterController;
 use App\Controllers\IncomeController;
 use App\Controllers\RecurringController;
+use App\Controllers\ReportController;
+use App\Controllers\SettingsController;
 use App\Controllers\TagController;
 
 return [
+    // Auth
+    ['POST', '/setup',                   [AuthController::class,    'setup'],  []],
+    ['POST', '/login',                   [AuthController::class,    'login'],  []],
+    ['POST', '/logout',                  [AuthController::class,    'logout'], ['auth']],
+
+    // Dashboard
+    ['GET',  '/dashboard/data',          [DashboardController::class,'data'],  ['auth']],
+
     // Expenses
     ['GET',  '/expenses/list',           [ExpenseController::class, 'list'],   ['auth']],
     ['POST', '/expenses/create',         [ExpenseController::class, 'create'], ['auth', 'csrf']],
@@ -27,6 +39,8 @@ return [
     ['POST', '/expenses/delete',         [ExpenseController::class, 'delete'], ['auth', 'csrf']],
     ['GET',  '/expenses/export',         [ExpenseController::class, 'export'], ['auth']],
     ['POST', '/expenses/import',         [ExpenseController::class, 'import'], ['auth', 'csrf']],
+    ['POST', '/import/bank-statement/preview', [BankImportController::class, 'preview'], ['auth', 'csrf']],
+    ['POST', '/import/bank-statement/commit',  [BankImportController::class, 'commit'],  ['auth', 'csrf']],
 
     // Categories
     ['POST', '/categories/create',       [CategoryController::class, 'create'], ['auth', 'csrf']],
@@ -80,4 +94,20 @@ return [
     ['POST', '/contacts/archive',        [ContactController::class, 'archive'],   ['auth', 'csrf']],
     ['POST', '/contacts/delete',         [ContactController::class, 'delete'],    ['auth', 'csrf']],
     ['POST', '/contacts/reassign',       [ContactController::class, 'reassign'],  ['auth', 'csrf']],
+
+    // Reports
+    ['GET',  '/reports/year',            [ReportController::class, 'year'], ['auth']],
+
+    // Attachments
+    ['GET',  '/attachments/list',        [AttachmentController::class, 'list'],     ['auth']],
+    ['POST', '/attachments/upload',      [AttachmentController::class, 'upload'],   ['auth', 'csrf']],
+    ['POST', '/attachments/delete',      [AttachmentController::class, 'delete'],   ['auth', 'csrf']],
+    ['GET',  '/attachments/download',    [AttachmentController::class, 'download'], ['auth']],
+
+    // Backup
+    ['GET',  '/backup/download',         [BackupController::class, 'download'], ['auth']],
+    ['POST', '/backup/restore',          [BackupController::class, 'restore'],  ['auth', 'csrf']],
+
+    // Settings / DB reset
+    ['POST', '/db/reset',                [SettingsController::class, 'dbReset'], ['auth', 'csrf']],
 ];
