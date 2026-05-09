@@ -273,6 +273,15 @@ switch ($route) {
     case 'POST /accounts/delete':
         require __DIR__ . '/endpoints/accounts_delete.php';
         break;
+    case 'POST /accounts/reconcile':
+        require __DIR__ . '/endpoints/accounts_reconcile.php';
+        break;
+    case 'GET /accounts/reconciliations':
+        require __DIR__ . '/endpoints/accounts_reconciliations_list.php';
+        break;
+    case 'POST /accounts/reconciliation/delete':
+        require __DIR__ . '/endpoints/accounts_reconciliation_delete.php';
+        break;
 
     // ── Saved filters ────────────────────────────────────────────────────
     case 'GET /filters/list':

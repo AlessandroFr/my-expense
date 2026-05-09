@@ -198,4 +198,67 @@ $base = rtrim(Config::get('app')['base_url'] ?? '', '/');
     </form>
 </dialog>
 
+<dialog id="account-reconcile-modal" class="border-0 rounded-3 shadow p-0" style="max-width: 720px; width: 95%">
+    <div class="modal-content border-0">
+        <div class="modal-header">
+            <h5 class="modal-title">
+                <i class="bi bi-check2-circle me-2"></i>Riconcilia conto
+                <span id="reconcile-account-name" class="text-muted fw-normal"></span>
+            </h5>
+            <button type="button" class="btn-close" data-recon-action="close" aria-label="Chiudi"></button>
+        </div>
+        <div class="modal-body">
+            <p class="small text-muted mb-3">
+                Allinea il saldo del conto alla realtà dichiarando il valore reale a una certa data.
+                Il sistema genera automaticamente un movimento di rettifica (entrata o spesa, categoria
+                <em>Rettifica</em>) per coprire la differenza. Lo storico tiene traccia di tutte le verifiche.
+            </p>
+
+            <form id="account-reconcile-form" class="row g-2">
+                <input type="hidden" name="account_id" value="">
+
+                <div class="col-md-6">
+                    <label class="form-label small mb-1">Saldo calcolato dal sistema</label>
+                    <input type="text" id="reconcile-calculated" class="form-control" readonly>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-1">Saldo reale dichiarato (EUR)</label>
+                    <input type="text" name="declared_balance" class="form-control"
+                           inputmode="decimal" required placeholder="Es: 1234,56">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small mb-1">Data riconciliazione</label>
+                    <input type="date" name="reconciled_at" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-1">Note (opzionali)</label>
+                    <input type="text" name="notes" class="form-control" maxlength="255"
+                           placeholder="Es: estratto conto al 30/04/2026">
+                </div>
+
+                <div class="col-12">
+                    <div id="reconcile-preview" class="alert alert-secondary small mb-0 py-2">
+                        Inserisci il saldo reale per vedere la differenza.
+                    </div>
+                </div>
+
+                <div class="col-12 d-flex justify-content-end gap-2 mt-2">
+                    <button type="button" class="btn btn-secondary" data-recon-action="close">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2-circle me-1"></i>Riconcilia
+                    </button>
+                </div>
+            </form>
+
+            <hr class="my-3">
+
+            <h6 class="mb-2"><i class="bi bi-clock-history me-1"></i>Storico riconciliazioni</h6>
+            <div id="account-reconcile-history" class="small">
+                <div class="text-muted">Caricamento...</div>
+            </div>
+        </div>
+    </div>
+</dialog>
+
 <script type="module" src="<?= $asset('js/pages/accounts.js') ?>"></script>

@@ -96,6 +96,39 @@ final class Account
         return self::create($userId, $name, $type, $color, $icon, '0.00', $sortOrder);
     }
 
+    /**
+     * Saldo live di un singolo conto (versione one-shot di withBalances).
+     * Ritorna opening_balance + somma entrate − somma spese.
+     */
+    public static function balanceFor(int $userId, int $accountId): float
+    {
+        $stmt = Database::pdo()->prepare(
+            'SELECT opening_balance FROM accounts
+             WHERE id = ? AND user_id = ? LIMIT 1'
+        );
+        $stmt->execute([$accountId, $userId]);
+        $opening = $stmt->fetchColumn();
+        if ($opening === false) {
+            return 0.0;
+        }
+
+        $stmt = Database::pdo()->prepare(
+            'SELECT COALESCE(SUM(amount), 0) FROM expenses
+             WHERE user_id = ? AND account_id = ?'
+        );
+        $stmt->execute([$userId, $accountId]);
+        $exp = (float) $stmt->fetchColumn();
+
+        $stmt = Database::pdo()->prepare(
+            'SELECT COALESCE(SUM(amount), 0) FROM incomes
+             WHERE user_id = ? AND account_id = ?'
+        );
+        $stmt->execute([$userId, $accountId]);
+        $inc = (float) $stmt->fetchColumn();
+
+        return round((float) $opening + $inc - $exp, 2);
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function withBalances(int $userId, bool $includeArchived = false): array
     {

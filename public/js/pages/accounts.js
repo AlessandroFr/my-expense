@@ -61,6 +61,9 @@ function renderCard(a) {
                     <button type="button" class="btn btn-sm btn-outline-primary" data-action="edit" data-id="${a.id}" title="Modifica">
                         <i class="bi bi-pencil"></i>
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-success" data-action="reconcile" data-id="${a.id}" title="Riconcilia">
+                        <i class="bi bi-check2-circle"></i>
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-action="archive" data-id="${a.id}">
                         <i class="bi ${Number(a.archived)===1 ? 'bi-archive-fill' : 'bi-archive'}"></i>
                     </button>
@@ -200,6 +203,8 @@ list.addEventListener('click', async (ev) => {
         }
     } else if (btn.dataset.action === 'edit') {
         openEditModal(a);
+    } else if (btn.dataset.action === 'reconcile') {
+        openReconcileModal(a);
     }
 });
 
@@ -226,3 +231,213 @@ if (editForm) {
 }
 
 document.addEventListener('DOMContentLoaded', loadList);
+
+// ─── Riconciliazione conti ────────────────────────────────────────────────────
+const reconcileModal   = document.getElementById('account-reconcile-modal');
+const reconcileForm    = document.getElementById('account-reconcile-form');
+const reconcileHistory = document.getElementById('account-reconcile-history');
+const reconcilePreview = document.getElementById('reconcile-preview');
+const reconcileNameEl  = document.getElementById('reconcile-account-name');
+const reconcileCalcEl  = document.getElementById('reconcile-calculated');
+
+let reconcileCurrentAccount = null;
+
+function todayIso() {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function formatDateIt(iso) {
+    if (!iso) return '';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return iso;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function parseAmountIt(raw) {
+    if (raw === null || raw === undefined) return NaN;
+    const s = String(raw).trim().replace(/\s/g, '').replace(',', '.');
+    if (s === '') return NaN;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+}
+
+function updateReconcilePreview() {
+    if (!reconcileCurrentAccount || !reconcilePreview) return;
+    const declared = parseAmountIt(reconcileForm?.elements['declared_balance']?.value);
+    const calculated = Number(reconcileCurrentAccount.balance) || 0;
+
+    if (!Number.isFinite(declared)) {
+        reconcilePreview.className = 'alert alert-secondary small mb-0 py-2';
+        reconcilePreview.textContent = 'Inserisci il saldo reale per vedere la differenza.';
+        return;
+    }
+
+    const diff = Math.round((declared - calculated) * 100) / 100;
+    if (diff === 0) {
+        reconcilePreview.className = 'alert alert-secondary small mb-0 py-2';
+        reconcilePreview.innerHTML = '<i class="bi bi-check-circle me-1"></i>'
+            + 'Nessuna differenza: verrà registrata la verifica senza generare movimenti.';
+    } else if (diff > 0) {
+        reconcilePreview.className = 'alert alert-success small mb-0 py-2';
+        reconcilePreview.innerHTML = `<i class="bi bi-arrow-up-circle me-1"></i>`
+            + `Differenza: <strong>+${fmtMoney(diff)}</strong> → verrà creata un'<strong>entrata di rettifica</strong>.`;
+    } else {
+        reconcilePreview.className = 'alert alert-warning small mb-0 py-2';
+        reconcilePreview.innerHTML = `<i class="bi bi-arrow-down-circle me-1"></i>`
+            + `Differenza: <strong>${fmtMoney(diff)}</strong> → verrà creata una <strong>spesa di rettifica</strong>.`;
+    }
+}
+
+function openReconcileModal(a) {
+    if (!reconcileModal || !reconcileForm) return;
+    reconcileCurrentAccount = a;
+    reconcileNameEl.textContent = a.name ? `· ${a.name}` : '';
+    reconcileCalcEl.value = fmtMoney(a.balance);
+    reconcileForm.elements['account_id'].value = a.id;
+    reconcileForm.elements['declared_balance'].value = '';
+    reconcileForm.elements['reconciled_at'].value = todayIso();
+    reconcileForm.elements['reconciled_at'].max = todayIso();
+    reconcileForm.elements['notes'].value = '';
+    updateReconcilePreview();
+    loadReconciliationHistory(a.id);
+
+    if (typeof reconcileModal.showModal === 'function') reconcileModal.showModal();
+    else reconcileModal.setAttribute('open', '');
+}
+
+function closeReconcileModal() {
+    if (!reconcileModal) return;
+    if (typeof reconcileModal.close === 'function') reconcileModal.close();
+    else reconcileModal.removeAttribute('open');
+}
+
+async function loadReconciliationHistory(accountId) {
+    if (!reconcileHistory) return;
+    reconcileHistory.innerHTML = '<div class="text-muted">Caricamento...</div>';
+    try {
+        const r = await apiGuard(api.get(`${BASE}/accounts/reconciliations`, { account_id: accountId }));
+        const items = r.data?.reconciliations ?? [];
+        if (!items.length) {
+            reconcileHistory.innerHTML = '<div class="text-muted">Nessuna riconciliazione registrata.</div>';
+            return;
+        }
+        reconcileHistory.innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th class="text-end">Dichiarato</th>
+                            <th class="text-end">Calcolato</th>
+                            <th class="text-end">Differenza</th>
+                            <th>Esito</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(renderHistoryRow).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+    } catch (err) {
+        reconcileHistory.innerHTML = `<div class="text-danger">${escapeHtml(err.message ?? 'Errore caricamento storico.')}</div>`;
+    }
+}
+
+function renderHistoryRow(r) {
+    const diff = Number(r.difference) || 0;
+    let badge;
+    if (r.adjustment_type === 'income') {
+        const removed = (r.adjustment_income_id && r.income_amount === null);
+        badge = removed
+            ? '<span class="badge bg-secondary">entrata · rimossa</span>'
+            : '<span class="badge bg-success">entrata di rettifica</span>';
+    } else if (r.adjustment_type === 'expense') {
+        const removed = (r.adjustment_expense_id && r.expense_amount === null);
+        badge = removed
+            ? '<span class="badge bg-secondary">spesa · rimossa</span>'
+            : '<span class="badge bg-warning text-dark">spesa di rettifica</span>';
+    } else {
+        badge = '<span class="badge bg-light text-dark border">verifica OK</span>';
+    }
+    const diffCls = diff > 0 ? 'text-success' : (diff < 0 ? 'text-danger' : 'text-muted');
+    const diffSign = diff > 0 ? '+' : '';
+    const noteLine = r.notes
+        ? `<div class="text-muted small">${escapeHtml(String(r.notes))}</div>`
+        : '';
+    return `
+        <tr>
+            <td>${formatDateIt(r.reconciled_at)}${noteLine}</td>
+            <td class="text-end">${fmtMoney(r.declared_balance)}</td>
+            <td class="text-end">${fmtMoney(r.calculated_balance)}</td>
+            <td class="text-end ${diffCls}"><strong>${diffSign}${fmtMoney(diff)}</strong></td>
+            <td>${badge}</td>
+            <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        data-recon-history-action="delete" data-id="${r.id}" title="Rimuovi dallo storico">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+}
+
+if (reconcileModal) {
+    reconcileModal.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-recon-action="close"]');
+        if (btn) { ev.preventDefault(); closeReconcileModal(); }
+    });
+}
+
+if (reconcileForm) {
+    reconcileForm.addEventListener('input', (ev) => {
+        if (ev.target?.name === 'declared_balance') updateReconcilePreview();
+    });
+
+    reconcileForm.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(reconcileForm);
+        const declaredRaw = String(fd.get('declared_balance') ?? '').replace(',', '.');
+        fd.set('declared_balance', declaredRaw);
+        try {
+            const r = await send(`${BASE}/accounts/reconcile`, Object.fromEntries(fd.entries()));
+            const newBal = Number(r.data?.new_balance);
+            toast.success(`Conto riconciliato (saldo allineato a ${fmtMoney(newBal)}).`);
+            const accountId = Number(reconcileForm.elements['account_id'].value);
+            await loadList();
+            const fresh = cache.find(x => Number(x.id) === accountId);
+            if (fresh) {
+                reconcileCurrentAccount = fresh;
+                reconcileCalcEl.value = fmtMoney(fresh.balance);
+            }
+            reconcileForm.elements['declared_balance'].value = '';
+            updateReconcilePreview();
+            await loadReconciliationHistory(accountId);
+        } catch (err) {
+            toast.error(err.message ?? 'Errore riconciliazione.');
+        }
+    });
+}
+
+if (reconcileHistory) {
+    reconcileHistory.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('button[data-recon-history-action="delete"]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const ok = await confirmDialog(
+            'Rimuovere questa riga dallo storico? Il movimento di rettifica già generato resterà invariato.',
+            { confirmText: 'Rimuovi', confirmClass: 'btn-danger' }
+        );
+        if (!ok) return;
+        try {
+            await send(`${BASE}/accounts/reconciliation/delete`, { id });
+            toast.success('Riga rimossa dallo storico.');
+            const accountId = Number(reconcileForm.elements['account_id'].value);
+            if (accountId) await loadReconciliationHistory(accountId);
+        } catch (err) {
+            toast.error(err.message ?? 'Errore rimozione.');
+        }
+    });
+}

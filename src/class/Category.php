@@ -36,6 +36,29 @@ final class Category
         return $row === false ? null : $row;
     }
 
+    /**
+     * Lookup case-insensitive per nome; se la categoria non esiste la
+     * crea con i parametri di default forniti. Usata per le categorie
+     * "di sistema" come "Rettifica" della riconciliazione conti.
+     */
+    public static function findOrCreateByName(
+        int $userId,
+        string $name,
+        ?string $color = '#6c757d',
+        ?string $icon = 'arrow-repeat'
+    ): int {
+        $needle = mb_strtolower(trim($name));
+        if ($needle === '') {
+            throw new InvalidArgumentException('Nome categoria obbligatorio.');
+        }
+        foreach (self::allForUser($userId) as $c) {
+            if (mb_strtolower((string) $c['name']) === $needle) {
+                return (int) $c['id'];
+            }
+        }
+        return self::create($userId, $name, $color ?? '#6c757d', $icon, 100);
+    }
+
     public static function create(int $userId, string $name, string $color, ?string $icon, int $sortOrder = 0): int
     {
         [$name, $color, $icon, $sortOrder] = self::validate($name, $color, $icon, $sortOrder);
