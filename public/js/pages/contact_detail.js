@@ -6,6 +6,7 @@ import FetchRequest from '../FetchRequest.js';
 import { apiSend }   from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { renderPager } from '../pager.js';
+import { setupQuickCreate } from '../components/quickCreateContact.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -166,6 +167,27 @@ async function ensureTargetsLoaded() {
     reassign.loaded = true;
 }
 
+// Aggiunge un nuovo target (creato via quick-create) alle strutture in-memory
+// usate dal modal: array `reassign.targets`, indice `reassign.targetByName` e
+// `<datalist>` visuale. Idempotente: se l'id e' gia' noto non duplica.
+function appendTargetToCache(id, name) {
+    const numericId = Number(id);
+    const cleanName = String(name ?? '').trim();
+    if (!Number.isFinite(numericId) || numericId <= 0 || cleanName === '') return;
+    const key = cleanName.toLowerCase();
+    if (!reassign.targetByName.has(key)) {
+        reassign.targets.push({ id: numericId, name: cleanName });
+        reassign.targetByName.set(key, numericId);
+        const dl = document.getElementById('reassign-targets-datalist');
+        if (dl) {
+            const opt = document.createElement('option');
+            opt.value = cleanName;
+            opt.dataset.id = String(numericId);
+            dl.appendChild(opt);
+        }
+    }
+}
+
 function resolveTargetId(name) {
     const k = String(name ?? '').trim().toLowerCase();
     if (k === '') return null;
@@ -227,7 +249,29 @@ function renderReassignRows() {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nessun movimento residuo collegato a questa anagrafica.</td></tr>';
         return;
     }
-    for (const m of reassign.rows) tbody.appendChild(renderReassignRow(m));
+    for (const m of reassign.rows) {
+        const tr = renderReassignRow(m);
+        tbody.appendChild(tr);
+        // Aggancia il pattern "+ Crea «X»" all'input della riga. Quando il
+        // nome digitato non risolve, appare il bottone; al successo la riga
+        // viene auto-selezionata col nuovo target.
+        const inp = tr.querySelector('.reassign-row-target');
+        if (inp) {
+            setupQuickCreate({
+                inputEl:     inp,
+                knownByName: reassign.targetByName,
+                onCreated:   (id, name) => {
+                    appendTargetToCache(id, name);
+                    inp.value = name;
+                    if (!reassign.selected.has(selKey(tr.dataset.kind, Number(tr.dataset.id)))) {
+                        toggleRowSelection(tr, true);
+                    } else {
+                        syncRowFromInput(tr);
+                    }
+                },
+            });
+        }
+    }
 }
 
 async function loadReassignPage(page) {
@@ -268,10 +312,18 @@ async function openReassignModal() {
         return;
     }
     if (reassign.targets.length === 0) {
-        toast.warning('Non esistono altre anagrafiche verso cui riassegnare. Creane una in /contacts.');
-        return;
+        // Niente target ancora? Non blocchiamo: l'utente puo' crearne uno
+        // direttamente dal pulsante "+ Crea «X»" nel campo predefinito.
+        toast.info('Nessuna altra anagrafica esistente. Digita un nome nel campo "destinazione predefinita" per crearla al volo.');
     }
     dlg.showModal();
+    if (defaultInput) {
+        setupQuickCreate({
+            inputEl:     defaultInput,
+            knownByName: reassign.targetByName,
+            onCreated:   (id, name) => appendTargetToCache(id, name),
+        });
+    }
     await loadReassignPage(1);
 }
 
@@ -301,6 +353,8 @@ function applyDefaultToSelected() {
             if (inp) {
                 inp.value = targetName;
                 inp.classList.remove('is-invalid');
+                // Trigger refresh del pulsante "+ Crea" agganciato dal quick-create.
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }
     });

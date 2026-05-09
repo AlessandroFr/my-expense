@@ -227,6 +227,44 @@ final class ContactController extends BaseController
         return $this->json(['deleted' => true]);
     }
 
+    /**
+     * POST /contacts/quick-create
+     *
+     * Crea (o riusa, idempotente) un fornitore a partire dal solo nome,
+     * pensato per i pulsanti "+ Crea «X»" iniettati nelle modal di
+     * riassegnazione/edit. Riusa Contact::findOrCreate (lookup case-insensitive
+     * via name_norm + create con type='both' se mancante + backfill best-effort
+     * delle operazioni orfane la cui descrizione menziona il nome).
+     *
+     * Risposta: { id, name, color, created } -- created=false segnala al
+     * frontend che il nome corrispondeva gia' a un'anagrafica esistente
+     * (UI mostra toast "info" invece di "success").
+     */
+    public function quickCreate(Request $request): Response
+    {
+        $userId = $this->userId();
+        $name   = trim((string) ($request->input('name') ?? ''));
+        if ($name === '') {
+            throw HttpException::badRequest('Nome anagrafica obbligatorio.');
+        }
+        try {
+            $existing = LegacyContact::findByNormalizedName($userId, LegacyContact::normalize($name));
+            $created  = $existing === null;
+            $id       = LegacyContact::findOrCreate($userId, $name);
+        } catch (InvalidArgumentException $e) {
+            throw HttpException::badRequest($e->getMessage());
+        } catch (RuntimeException $e) {
+            throw HttpException::conflict($e->getMessage());
+        }
+        $contact = LegacyContact::findForUser($id, $userId);
+        return $this->json([
+            'id'      => $id,
+            'name'    => (string) ($contact['name']  ?? $name),
+            'color'   => (string) ($contact['color'] ?? '#6c757d'),
+            'created' => $created,
+        ]);
+    }
+
     /** POST /contacts/reassign */
     public function reassign(Request $request): Response
     {

@@ -134,11 +134,12 @@ return [
     ['GET',  '/contacts/list',           [ContactController::class, 'list'],      ['auth']],
     ['GET',  '/contacts/balance',        [ContactController::class, 'balance'],   ['auth']],
     ['GET',  '/contacts/movements',      [ContactController::class, 'movements'], ['auth']],
-    ['POST', '/contacts/create',         [ContactController::class, 'create'],    ['auth', 'csrf']],
-    ['POST', '/contacts/update',         [ContactController::class, 'update'],    ['auth', 'csrf']],
-    ['POST', '/contacts/archive',        [ContactController::class, 'archive'],   ['auth', 'csrf']],
-    ['POST', '/contacts/delete',         [ContactController::class, 'delete'],    ['auth', 'csrf']],
-    ['POST', '/contacts/reassign',       [ContactController::class, 'reassign'],  ['auth', 'csrf']],
+    ['POST', '/contacts/create',         [ContactController::class, 'create'],      ['auth', 'csrf']],
+    ['POST', '/contacts/quick-create',   [ContactController::class, 'quickCreate'], ['auth', 'csrf']],
+    ['POST', '/contacts/update',         [ContactController::class, 'update'],      ['auth', 'csrf']],
+    ['POST', '/contacts/archive',        [ContactController::class, 'archive'],     ['auth', 'csrf']],
+    ['POST', '/contacts/delete',         [ContactController::class, 'delete'],      ['auth', 'csrf']],
+    ['POST', '/contacts/reassign',       [ContactController::class, 'reassign'],    ['auth', 'csrf']],
 
     // Reports
     ['GET',  '/reports/year',            [ReportController::class, 'year'], ['auth']],
