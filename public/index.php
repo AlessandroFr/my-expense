@@ -255,6 +255,12 @@ switch ($route) {
     case 'GET /contacts/balance':
         require __DIR__ . '/endpoints/contacts_balance.php';
         break;
+    case 'GET /contacts/movements':
+        require __DIR__ . '/endpoints/contacts_movements.php';
+        break;
+    case 'POST /contacts/reassign':
+        require __DIR__ . '/endpoints/contacts_reassign.php';
+        break;
 
     // ── Conti (multi-account) ────────────────────────────────────────────
     case 'GET /accounts':
