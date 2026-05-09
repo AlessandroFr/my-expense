@@ -503,9 +503,9 @@ export function escapeHtml(str) {
     return div.innerHTML;
 }
 
-/** Escape attributo HTML */
+/** Escape attributo HTML — accetta anche numeri, null, undefined (coerce a stringa). */
 export function escapeAttr(str) {
-    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(str ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** @deprecated Alias interno — usare escapeHtml() */
