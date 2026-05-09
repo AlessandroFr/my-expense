@@ -12,6 +12,7 @@ declare(strict_types=1);
 use App\Controllers\AccountController;
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
+use App\Controllers\ContactController;
 use App\Controllers\ExpenseController;
 use App\Controllers\FilterController;
 use App\Controllers\IncomeController;
@@ -69,4 +70,14 @@ return [
     ['POST', '/recurring/toggle',        [RecurringController::class, 'toggle'], ['auth', 'csrf']],
     ['POST', '/recurring/delete',        [RecurringController::class, 'delete'], ['auth', 'csrf']],
     ['POST', '/recurring/run',           [RecurringController::class, 'run'],    ['auth', 'csrf']],
+
+    // Contacts
+    ['GET',  '/contacts/list',           [ContactController::class, 'list'],      ['auth']],
+    ['GET',  '/contacts/balance',        [ContactController::class, 'balance'],   ['auth']],
+    ['GET',  '/contacts/movements',      [ContactController::class, 'movements'], ['auth']],
+    ['POST', '/contacts/create',         [ContactController::class, 'create'],    ['auth', 'csrf']],
+    ['POST', '/contacts/update',         [ContactController::class, 'update'],    ['auth', 'csrf']],
+    ['POST', '/contacts/archive',        [ContactController::class, 'archive'],   ['auth', 'csrf']],
+    ['POST', '/contacts/delete',         [ContactController::class, 'delete'],    ['auth', 'csrf']],
+    ['POST', '/contacts/reassign',       [ContactController::class, 'reassign'],  ['auth', 'csrf']],
 ];

@@ -12,6 +12,7 @@ declare(strict_types=1);
 use App\Controllers\AccountController;
 use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
+use App\Controllers\ContactController;
 use App\Controllers\ExpenseController;
 use App\Controllers\IncomeController;
 use App\Controllers\RecurringController;
@@ -24,4 +25,6 @@ return [
     ['GET', '/incomes',          [IncomeController::class,   'index'], ['auth']],
     ['GET', '/accounts',         [AccountController::class,  'index'], ['auth']],
     ['GET', '/recurring',        [RecurringController::class,'index'], ['auth']],
+    ['GET', '/contacts',         [ContactController::class,  'index'], ['auth']],
+    ['GET', '/contacts/detail',  [ContactController::class,  'detail'],['auth']],
 ];
