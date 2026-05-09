@@ -167,7 +167,7 @@ final class IncomeRepository extends BaseRepository
     /** @return array{0:string, 1:list<int|string|float>} */
     private function buildWhere(int $userId, array $filters): array
     {
-        $clauses = ['i.user_id = ?'];
+        $clauses = ['i.user_id = ?', 'i.is_transfer = 0'];
         $params  = [$userId];
 
         if (!empty($filters['date_from']) && self::isValidDate((string) $filters['date_from'])) {

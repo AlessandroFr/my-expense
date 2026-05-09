@@ -384,7 +384,7 @@ final class Expense
      */
     private static function buildWhere(int $userId, array $filters): array
     {
-        $clauses = ['e.user_id = ?'];
+        $clauses = ['e.user_id = ?', 'e.is_transfer = 0'];
         $params  = [$userId];
 
         if (!empty($filters['date_from']) && self::isValidDate((string) $filters['date_from'])) {
