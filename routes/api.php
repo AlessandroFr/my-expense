@@ -9,6 +9,7 @@ declare(strict_types=1);
  * Popolato per dominio da C6 in poi (Expenses pilota).
  */
 
+use App\Controllers\BudgetController;
 use App\Controllers\CategoryController;
 use App\Controllers\ExpenseController;
 
@@ -25,4 +26,9 @@ return [
     ['POST', '/categories/create',       [CategoryController::class, 'create'], ['auth', 'csrf']],
     ['POST', '/categories/update',       [CategoryController::class, 'update'], ['auth', 'csrf']],
     ['POST', '/categories/delete',       [CategoryController::class, 'delete'], ['auth', 'csrf']],
+
+    // Budgets
+    ['GET',  '/budgets/list',            [BudgetController::class, 'list'],   ['auth']],
+    ['POST', '/budgets/set',             [BudgetController::class, 'set'],    ['auth', 'csrf']],
+    ['POST', '/budgets/delete',          [BudgetController::class, 'delete'], ['auth', 'csrf']],
 ];
