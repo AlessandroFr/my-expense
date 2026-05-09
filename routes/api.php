@@ -142,6 +142,7 @@ return [
     ['POST', '/contacts/archive',        [ContactController::class, 'archive'],     ['auth', 'csrf']],
     ['POST', '/contacts/delete',         [ContactController::class, 'delete'],      ['auth', 'csrf']],
     ['POST', '/contacts/reassign',       [ContactController::class, 'reassign'],    ['auth', 'csrf']],
+    ['POST', '/contacts/merge',          [ContactController::class, 'merge'],       ['auth', 'csrf']],
 
     // Reports
     ['GET',  '/reports/year',            [ReportController::class, 'year'], ['auth']],
