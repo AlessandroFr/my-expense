@@ -81,6 +81,26 @@ final class ExpenseController extends BaseController
         $rows  = array_map(static fn(Expense $e): array => $e->toArray(), $repo->list($userId, $filters));
         $total = $repo->count($userId, $filters);
 
+        // Arricchimento batch per le righe rateizzate: aggiunge group_count e
+        // group_total (somma di tutte le rate del gruppo) per il tooltip badge.
+        $instIds = [];
+        foreach ($rows as $r) {
+            if (!empty($r['installment_total']) && (int) $r['installment_total'] > 0) {
+                $instIds[] = (int) $r['id'];
+            }
+        }
+        if ($instIds !== []) {
+            $summary = $repo->installmentGroupSummary($userId, $instIds);
+            foreach ($rows as &$r) {
+                $info = $summary[(int) $r['id']] ?? null;
+                if ($info !== null) {
+                    $r['installment_group_count'] = $info['group_count'];
+                    $r['installment_group_total'] = $info['group_total'];
+                }
+            }
+            unset($r);
+        }
+
         return $this->json([
             'expenses' => $rows,
             'total'    => $total,

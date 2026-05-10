@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Models\Repositories\ExpenseRepository;
 use App\Models\Repositories\TransferRepository;
+use App\Services\InstallmentCalculator;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -376,12 +378,18 @@ final class BankStatementImporter
      * Scrive su DB le righe (potenzialmente editate dall'utente).
      *
      * @param array<int, array<string,mixed>> $rows
+     * @param array<int, array{count:int, frequency:string, custom_days:?int}> $installmentsMap
+     *        indicizzato per row_idx; per ogni entry la riga viene esplosa
+     *        in N rate (solo se kind === expense). La rata #1 mantiene
+     *        l'import_hash originale, le rate #2..N hanno hash NULL e
+     *        parent_expense_id = id(rata #1).
      * @return array{
      *   imported_expenses: int,
      *   imported_incomes:  int,
      *   transfers_paired:  int,
      *   skipped_duplicate: int,
      *   skipped_user:      int,
+     *   installments_exploded: int,
      *   errors: array<int, array{idx:int, message:string}>,
      * }
      */
@@ -389,7 +397,8 @@ final class BankStatementImporter
         int $userId,
         int $accountId,
         array $rows,
-        string $prepaidAccountName = 'Carta Prepagata'
+        string $prepaidAccountName = 'Carta Prepagata',
+        array $installmentsMap = []
     ): array {
         $sourceAccount = Account::findForUser($accountId, $userId);
         if ($sourceAccount === null) {
@@ -399,12 +408,13 @@ final class BankStatementImporter
             $prepaidAccountName = 'Carta Prepagata';
         }
 
-        $importedExp = 0;
-        $importedInc = 0;
-        $pairedCnt   = 0;
-        $dupCnt      = 0;
-        $skipUser    = 0;
-        $errors      = [];
+        $importedExp     = 0;
+        $importedInc     = 0;
+        $pairedCnt       = 0;
+        $dupCnt          = 0;
+        $skipUser        = 0;
+        $installmentsExp = 0;
+        $errors          = [];
 
         $prepaidAccountId = null;
         $cashAccountId    = null;
@@ -417,6 +427,7 @@ final class BankStatementImporter
         // o l'income falliscono come duplicati).
         $existingHashes  = self::loadExistingHashes($userId);
         $transferRepo    = new TransferRepository();
+        $expenseRepo     = new ExpenseRepository();
         $pdo             = Database::pdo();
 
         foreach ($rows as $rowIn) {
@@ -605,6 +616,40 @@ final class BankStatementImporter
                     $signed  = -$amount;
                     $hash    = self::computeImportHash($accountId, $opDate, $signed, $description);
 
+                    // Rateizzazione: se l'utente ha richiesto di esplodere
+                    // questa riga in N rate, la riga originale del CSV viene
+                    // sostituita da N spese (rata #1 mantiene l'import_hash
+                    // originale per idempotenza re-import; rate #2..N hash NULL).
+                    $instSpec = $installmentsMap[$idx] ?? null;
+                    if ($instSpec !== null) {
+                        try {
+                            $r = self::insertExpenseInstallments(
+                                $expenseRepo,
+                                $existingHashes,
+                                $userId,
+                                $accountId,
+                                $catId,
+                                $contactId,
+                                $payment,
+                                $description,
+                                $valueDate,
+                                $hash,
+                                (string) $amount,
+                                $opDate,
+                                $instSpec,
+                            );
+                            if ($r['skipped_duplicate']) {
+                                $dupCnt++;
+                            } else {
+                                $importedExp     += $r['inserted'];
+                                $installmentsExp += $r['inserted'];
+                            }
+                        } catch (\Throwable $e) {
+                            $errors[] = ['idx' => $idx, 'message' => 'Rate: ' . $e->getMessage()];
+                        }
+                        continue;
+                    }
+
                     $id = Expense::createImported(
                         $userId, $catId, (string) $amount, $description,
                         $payment, $opDate, $accountId, $valueDate, $hash, $contactId
@@ -629,13 +674,101 @@ final class BankStatementImporter
         }
 
         return [
-            'imported_expenses' => $importedExp,
-            'imported_incomes'  => $importedInc,
-            'transfers_paired'  => $pairedCnt,
-            'skipped_duplicate' => $dupCnt,
-            'skipped_user'      => $skipUser,
-            'errors'            => $errors,
+            'imported_expenses'     => $importedExp,
+            'imported_incomes'      => $importedInc,
+            'transfers_paired'      => $pairedCnt,
+            'skipped_duplicate'     => $dupCnt,
+            'skipped_user'          => $skipUser,
+            'installments_exploded' => $installmentsExp,
+            'errors'                => $errors,
         ];
+    }
+
+    /**
+     * Esplode una riga di import in N rate. La rata #1 ha import_hash =
+     * $hash originale (idempotenza re-import); rate #2..N hash NULL e
+     * parent_expense_id = id(rata #1).
+     *
+     * Tutto in una transazione locale (o nel contesto della transaction
+     * esterna se il chiamante l'ha gia' aperta).
+     *
+     * @param array<string,true> &$existingHashes  cache hashes (mutata)
+     * @param array{count:int, frequency:string, custom_days:?int} $spec
+     * @return array{inserted:int, skipped_duplicate:bool}
+     */
+    private static function insertExpenseInstallments(
+        ExpenseRepository $repo,
+        array &$existingHashes,
+        int $userId,
+        int $accountId,
+        ?int $categoryId,
+        ?int $contactId,
+        string $payment,
+        string $description,
+        ?string $valueDate,
+        string $hash,
+        string $amount,
+        string $opDate,
+        array $spec
+    ): array {
+        if (isset($existingHashes[$hash])) {
+            return ['inserted' => 0, 'skipped_duplicate' => true];
+        }
+        $clean = InstallmentCalculator::validate($spec);
+        $rates = InstallmentCalculator::explode(
+            $amount,
+            $clean['count'],
+            $opDate,
+            $clean['frequency'],
+            $clean['custom_days'],
+        );
+
+        $pdo         = Database::pdo();
+        $alreadyInTx = $pdo->inTransaction();
+        if (!$alreadyInTx) $pdo->beginTransaction();
+
+        try {
+            $count = $clean['count'];
+            $ids   = [];
+            foreach ($rates as $r) {
+                $isFirst = $r['seq'] === 1;
+                $payload = [
+                    'user_id'           => $userId,
+                    'category_id'       => $categoryId,
+                    'contact_id'        => $contactId,
+                    'account_id'        => $accountId,
+                    'amount'            => $r['amount'],
+                    'description'       => $description !== '' ? $description : null,
+                    'payment_method'    => $payment,
+                    'expense_date'      => $r['date'],
+                    'value_date'        => $isFirst ? $valueDate : null,
+                    'import_hash'       => $isFirst ? $hash : null,
+                    'is_transfer'       => 0,
+                    'installment_seq'   => $r['seq'],
+                    'installment_total' => $count,
+                ];
+                if (!$isFirst) {
+                    $payload['parent_expense_id'] = $ids[0];
+                }
+                if ($isFirst) {
+                    $id = $repo->createImported($payload);
+                    if ($id === null) {
+                        // Race con duplicato apparso fra pre-check e insert.
+                        if (!$alreadyInTx) $pdo->rollBack();
+                        return ['inserted' => 0, 'skipped_duplicate' => true];
+                    }
+                } else {
+                    $id = $repo->create($payload);
+                }
+                $ids[] = $id;
+            }
+            if (!$alreadyInTx) $pdo->commit();
+            $existingHashes[$hash] = true;
+            return ['inserted' => $count, 'skipped_duplicate' => false];
+        } catch (\Throwable $e) {
+            if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

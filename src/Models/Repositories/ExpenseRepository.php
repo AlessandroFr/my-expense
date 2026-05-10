@@ -39,7 +39,9 @@ final class ExpenseRepository extends BaseRepository
 
         $sql = "SELECT e.id, e.user_id, e.category_id, e.contact_id, e.account_id, e.amount, e.description,
                        e.shared_with, e.share_amount,
-                       e.payment_method, e.expense_date, e.value_date, e.import_hash, e.created_at, e.updated_at,
+                       e.payment_method, e.expense_date, e.value_date, e.import_hash,
+                       e.parent_expense_id, e.installment_seq, e.installment_total,
+                       e.created_at, e.updated_at,
                        c.name  AS category_name,
                        c.color AS category_color,
                        c.icon  AS category_icon,
@@ -91,7 +93,9 @@ final class ExpenseRepository extends BaseRepository
         $row = $this->fetchOne(
             'SELECT e.id, e.user_id, e.category_id, e.contact_id, e.account_id, e.amount, e.description,
                     e.shared_with, e.share_amount,
-                    e.payment_method, e.expense_date, e.value_date, e.import_hash, e.created_at, e.updated_at,
+                    e.payment_method, e.expense_date, e.value_date, e.import_hash,
+                    e.parent_expense_id, e.installment_seq, e.installment_total,
+                    e.created_at, e.updated_at,
                     c.name AS category_name, c.color AS category_color, c.icon AS category_icon,
                     a.name AS account_name,  a.color AS account_color,  a.icon AS account_icon,
                     co.name  AS contact_name,
@@ -257,6 +261,54 @@ final class ExpenseRepository extends BaseRepository
     {
         $d = DateTime::createFromFormat('Y-m-d', $date);
         return $d !== false && $d->format('Y-m-d') === $date;
+    }
+
+    /**
+     * Per ogni id appartenente a un piano rate, ritorna {group_count, group_total}
+     * calcolati sul gruppo identificato da COALESCE(parent_expense_id, id).
+     * Usato dal listing per popolare il tooltip del badge "Rata X di N".
+     *
+     * @param list<int> $expenseIds
+     * @return array<int, array{group_count:int, group_total:string}>
+     */
+    public function installmentGroupSummary(int $userId, array $expenseIds): array
+    {
+        if ($expenseIds === []) {
+            return [];
+        }
+        $in = implode(',', array_fill(0, count($expenseIds), '?'));
+        // CTE non necessaria: gli expense in input fanno parte di un piano se
+        // installment_total > 0; il group_id e' COALESCE(parent_expense_id, id).
+        // Aggrego sui MEMBRI del gruppo: prima trovo i group_id distinti dagli
+        // id selezionati, poi sommo SU TUTTI i membri del gruppo.
+        $rows = $this->fetchAll(
+            "SELECT e.id,
+                    COALESCE(e.parent_expense_id, e.id) AS group_id,
+                    (
+                        SELECT COUNT(*) FROM expenses g
+                        WHERE g.user_id = e.user_id
+                          AND (g.id = COALESCE(e.parent_expense_id, e.id)
+                               OR g.parent_expense_id = COALESCE(e.parent_expense_id, e.id))
+                    ) AS group_count,
+                    (
+                        SELECT SUM(g.amount) FROM expenses g
+                        WHERE g.user_id = e.user_id
+                          AND (g.id = COALESCE(e.parent_expense_id, e.id)
+                               OR g.parent_expense_id = COALESCE(e.parent_expense_id, e.id))
+                    ) AS group_total
+             FROM expenses e
+             WHERE e.user_id = ? AND e.id IN ({$in})
+               AND e.installment_total IS NOT NULL AND e.installment_total > 0",
+            [$userId, ...$expenseIds],
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int) $r['id']] = [
+                'group_count' => (int) $r['group_count'],
+                'group_total' => number_format((float) $r['group_total'], 2, '.', ''),
+            ];
+        }
+        return $out;
     }
 
     /**

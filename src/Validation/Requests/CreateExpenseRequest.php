@@ -30,6 +30,14 @@ final class CreateExpenseRequest extends ValidatedRequest
             'shared_with'    => 'nullable|string|max:255',
             'share_amount'   => 'nullable|numeric|min:0.01|max:99999999.99',
             'tags'           => 'nullable|string|max:1024',
+            // Rateizzazione opzionale. Se installment_enabled=1 e count>=2 il
+            // Service esplode l'importo in N rate (vedi InstallmentCalculator).
+            // I bounds duri (count 2..60, days 1..365, frequency in {...}) sono
+            // applicati lato Service/Calculator: qui solo shape minimo.
+            'installment_enabled'     => 'nullable',
+            'installment_count'       => 'nullable|integer|min:1|max:60',
+            'installment_frequency'   => 'nullable|in:monthly,weekly,custom',
+            'installment_custom_days' => 'nullable|integer|min:1|max:365',
         ];
     }
 }

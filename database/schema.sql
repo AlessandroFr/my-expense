@@ -223,6 +223,16 @@ CREATE TABLE IF NOT EXISTS `accounts` (
 -- ALTER TABLE incomes  ADD COLUMN value_date  DATE     NULL AFTER income_date;
 -- ALTER TABLE incomes  ADD COLUMN import_hash CHAR(64) NULL AFTER updated_at;
 -- ALTER TABLE incomes  ADD UNIQUE KEY uq_incomes_user_imphash  (user_id, import_hash);
+--
+-- Rateizzazione (Migration: 022_expense_installments.sql)
+-- ALTER TABLE expenses ADD COLUMN parent_expense_id INT UNSIGNED NULL AFTER import_hash;
+-- ALTER TABLE expenses ADD COLUMN installment_seq   INT UNSIGNED NULL AFTER parent_expense_id;
+-- ALTER TABLE expenses ADD COLUMN installment_total INT UNSIGNED NULL AFTER installment_seq;
+-- ALTER TABLE expenses ADD KEY ix_expenses_parent (parent_expense_id);
+-- ALTER TABLE expenses ADD CONSTRAINT fk_expenses_parent
+--     FOREIGN KEY (parent_expense_id) REFERENCES expenses(id) ON DELETE SET NULL;
+-- (rata #1: parent_expense_id NULL + installment_seq=1; rate #2..N puntano alla #1.
+--  ON DELETE SET NULL preserva le rate residue se la #1 viene cancellata.)
 
 CREATE TABLE IF NOT EXISTS `saved_filters` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,

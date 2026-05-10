@@ -65,8 +65,30 @@ final class BankImportController extends BaseController
         if (!is_array($rows)) {
             throw HttpException::badRequest('Formato righe non valido (JSON atteso).');
         }
+
+        // Installments: array opzionale di {row_idx, count, frequency, custom_days?}.
+        // Indicizzato per row_idx -> spec; il commit() esplode la riga corrispondente.
+        $installmentsRaw = (string) ($request->input('installments') ?? '');
+        $installmentsMap = [];
+        if ($installmentsRaw !== '') {
+            $decoded = json_decode($installmentsRaw, true);
+            if (!is_array($decoded)) {
+                throw HttpException::badRequest('Formato installments non valido (JSON atteso).');
+            }
+            foreach ($decoded as $entry) {
+                if (!is_array($entry) || !isset($entry['row_idx'])) continue;
+                $rowIdx = (int) $entry['row_idx'];
+                $installmentsMap[$rowIdx] = [
+                    'count'       => isset($entry['count'])       ? (int) $entry['count']       : 0,
+                    'frequency'   => isset($entry['frequency'])   ? (string) $entry['frequency'] : 'monthly',
+                    'custom_days' => isset($entry['custom_days']) && $entry['custom_days'] !== null
+                        ? (int) $entry['custom_days'] : null,
+                ];
+            }
+        }
+
         try {
-            $result = BankStatementImporter::commit($userId, $accountId, $rows, $prepaid);
+            $result = BankStatementImporter::commit($userId, $accountId, $rows, $prepaid, $installmentsMap);
         } catch (InvalidArgumentException $e) {
             throw HttpException::badRequest($e->getMessage());
         }

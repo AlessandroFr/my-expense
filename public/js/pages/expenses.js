@@ -65,6 +65,39 @@ function getCsrfToken() {
 
 function fmtMoney(n) { return moneyFmt.format(Number(n) || 0); }
 
+// ── Installment helpers (form spesa + bank import) ─────────────────────────
+
+// Ricalcolo lato client speculare a App\Services\InstallmentCalculator::explode:
+// integer-cents, resto sulla rata #1, formato decimale "NN.NN".
+function installmentSplitAmounts(totalAmount, count) {
+    const totalF = Number(String(totalAmount).replace(',', '.')) || 0;
+    const cents  = Math.round(totalF * 100);
+    if (count < 2 || cents < count) return null;
+    const perRate   = Math.floor(cents / count);
+    const remainder = cents - perRate * count;
+    return {
+        first: (perRate + remainder) / 100,
+        rest:  perRate / 100,
+        total: cents / 100,
+    };
+}
+
+function installmentPreviewText(totalAmount, count, frequency, customDays) {
+    const split = installmentSplitAmounts(totalAmount, count);
+    if (!split) return '';
+    const freqLabel = frequency === 'custom'
+        ? `${Number(customDays) || 0} giorni`
+        : (frequency === 'weekly' ? '1 settimana' : '1 mese');
+    const parts = [
+        `${count} rate da ${fmtMoney(split.rest)} ogni ${freqLabel}`,
+        `totale ${fmtMoney(split.total)}`,
+    ];
+    if (split.first !== split.rest) {
+        parts.push(`prima rata ${fmtMoney(split.first)}`);
+    }
+    return parts.join(' — ');
+}
+
 function showBudgetWarning(w) {
     if (!w) return;
     if (w.exceeded) {
@@ -106,6 +139,20 @@ function shareBadge(e) {
     const tip   = e.shared_with ? `Diviso con: ${e.shared_with}` : 'Spesa condivisa';
     return `<span class="badge bg-info-subtle text-info-emphasis ms-1" title="${escHtml(tip)}">
         <i class="bi bi-people me-1"></i>${yours || 'split'}</span>`;
+}
+
+function installmentBadge(e) {
+    if (!e.installment_total || e.installment_total < 2) return '';
+    const seq   = Number(e.installment_seq) || 1;
+    const total = Number(e.installment_total);
+    let tip = `Rata ${seq} di ${total}`;
+    if (e.installment_group_total) {
+        tip += ` — totale ${fmtMoney(e.installment_group_total)}`;
+    }
+    return `<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1"
+              title="${escHtml(tip)}"
+              data-bs-toggle="tooltip">
+        <i class="bi bi-card-list me-1"></i>${seq}/${total}</span>`;
 }
 
 function tagsCell(tags) {
@@ -223,7 +270,7 @@ function renderViewRow(e) {
         <td class="mx-cell-truncate">${descCell}</td>
         <td class="text-center">${tagBadge}</td>
         <td class="text-center"><i class="bi ${paymentIcon(e.payment_method)}" title="${escHtml(payLabel)}"></i></td>
-        <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}</td>
+        <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}${installmentBadge(e)}</td>
         <td class="text-end mx-row-actions">
             <div class="dropdown">
                 <button type="button" class="btn btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Azioni">
@@ -524,11 +571,69 @@ function setupCashPreselect(form) {
     });
 }
 
+/**
+ * Sezione "Rateizza questa spesa" del form di creazione: gestisce checkbox,
+ * frequenza/giorni-custom visibility, e preview live.
+ *
+ * Quando la checkbox e' off (caso normale), il browser non sottomette i
+ * campi disabled e il backend si comporta come prima (1 spesa singola).
+ */
+function wireInstallmentSection(form) {
+    const section   = form.querySelector('[data-installment-section]');
+    if (!section) return;
+
+    const enabled   = form.querySelector('input[name="installment_enabled"]');
+    const countEl   = form.querySelector('input[name="installment_count"]');
+    const freqEl    = form.querySelector('select[name="installment_frequency"]');
+    const customWrap= section.querySelector('[data-installment-custom]');
+    const customEl  = form.querySelector('input[name="installment_custom_days"]');
+    const previewEl = section.querySelector('[data-installment-preview]');
+    const amountEl  = form.querySelector('input[name="amount"]');
+
+    const setSubFieldsEnabled = (on) => {
+        countEl.disabled  = !on;
+        freqEl.disabled   = !on;
+        customEl.disabled = !on || freqEl.value !== 'custom';
+    };
+    const updateCustomVisibility = () => {
+        const isCustom = freqEl.value === 'custom';
+        customWrap.classList.toggle('d-none', !isCustom);
+        customEl.disabled = !enabled.checked || !isCustom;
+        if (!isCustom) customEl.value = '';
+    };
+    const updatePreview = () => {
+        if (!enabled.checked) { previewEl.textContent = ''; return; }
+        const count = Number(countEl.value) || 0;
+        if (count < 2) {
+            previewEl.textContent = 'Inserisci numero rate >= 2 per vedere la preview.';
+            return;
+        }
+        previewEl.textContent = installmentPreviewText(
+            amountEl.value, count, freqEl.value, customEl.value,
+        ) || 'Importo non valido.';
+    };
+
+    enabled.addEventListener('change', () => {
+        setSubFieldsEnabled(enabled.checked);
+        if (enabled.checked) section.open = true;
+        updatePreview();
+    });
+    freqEl.addEventListener('change', () => {
+        updateCustomVisibility();
+        updatePreview();
+    });
+    [countEl, customEl, amountEl].forEach(el => el.addEventListener('input', updatePreview));
+
+    setSubFieldsEnabled(false);
+    updateCustomVisibility();
+}
+
 function wireCreateForm() {
     const form = document.getElementById('expense-create-form');
     if (!form) return;
 
     setupCashPreselect(form);
+    wireInstallmentSection(form);
 
     form.addEventListener('submit', async (ev) => {
         ev.preventDefault();
@@ -565,6 +670,7 @@ function wireCreateForm() {
             });
 
             const exp = r.data?.expense;
+            const installmentIds = r.data?.installments ?? null;
             // optimisticCreate inserisce solo la view row; aggancio il detail row
             // come sibling, partendo chiuso (d-none).
             if (exp) {
@@ -583,13 +689,34 @@ function wireCreateForm() {
                 await loadTags();
             }
             updateTotalFromTable();
+            // Rateizzazione: l'optimistic UI mostra solo la rata #1; le altre
+            // sono inserite lato server e appaiono solo dopo reload.
+            if (Array.isArray(installmentIds) && installmentIds.length > 1) {
+                await loadList();
+            }
 
             form.reset();
+            // form.reset() rimette i disabled programmatici? No: gestiamo a mano.
+            const enabledCb = form.querySelector('input[name="installment_enabled"]');
+            if (enabledCb) {
+                enabledCb.checked = false;
+                form.querySelector('input[name="installment_count"]').disabled = true;
+                form.querySelector('select[name="installment_frequency"]').disabled = true;
+                const cd = form.querySelector('input[name="installment_custom_days"]');
+                if (cd) cd.disabled = true;
+                const prev = form.querySelector('[data-installment-preview]');
+                if (prev) prev.textContent = '';
+                const sect = form.querySelector('[data-installment-section]');
+                if (sect) sect.open = false;
+            }
             window.MxRichEditor?.setContent('expense-create-description', '');
             const dateEl = form.querySelector('input[name="expense_date"]');
             if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
 
-            toast.success('Spesa registrata.');
+            const successMsg = (Array.isArray(installmentIds) && installmentIds.length > 1)
+                ? `Spesa rateizzata in ${installmentIds.length} rate.`
+                : 'Spesa registrata.';
+            toast.success(successMsg);
             showBudgetWarning(r.data?.budget_warning);
         } catch (err) {
             toast.error(err.message ?? 'Errore creazione spesa.');
@@ -890,11 +1017,15 @@ function bankRenderDestAccountOptions(selectedId) {
 function bankRenderRow(r) {
     const isPair   = BANK_PAIR_KINDS.has(r.kind);
     const isIncome = r.kind === 'income';
+    const canInstallment = !isPair && !isIncome; // solo spese semplici sono rateizzabili
 
     const dupBadge = r.is_duplicate
         ? `<span class="badge bg-warning text-dark" title="Gia' presente in DB">duplicato</span>`
         : '';
     const kindBadge = `<span class="badge ${BANK_KIND_BADGE[r.kind] ?? 'bg-secondary'}">${escHtml(BANK_KIND_LABEL[r.kind] ?? r.kind)}</span>`;
+    const installmentBadgeHtml = (r.installment && Number(r.installment.count) >= 2)
+        ? `<span class="badge bg-info text-dark ms-1" title="Verra' suddivisa in ${Number(r.installment.count)} rate al commit">→ ${Number(r.installment.count)} rate</span>`
+        : '';
 
     // Importo grande, segnato e colorato in base al kind
     const amountSign = isIncome ? '+' : '−';
@@ -943,16 +1074,29 @@ function bankRenderRow(r) {
         ? { kind: 3, mid: 4, pay: 3, amt: 2 }
         : { kind: 2, mid: 3, pay: 2, amt: 2 };
 
+    const installmentBtn = canInstallment
+        ? `<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                  data-bank-action="installment"
+                  title="${(r.installment && Number(r.installment.count) >= 2) ? 'Modifica rateizzazione' : 'Suddividi in N rate'}">
+              <i class="bi bi-card-list"></i>
+          </button>`
+        : `<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" disabled
+                  title="${isPair ? 'Trasferimenti e prelievi non sono rateizzabili' : 'Le entrate non sono rateizzabili'}">
+              <i class="bi bi-card-list"></i>
+          </button>`;
+
     return `<div data-idx="${r.idx}" class="card ${r.skip ? 'opacity-50 bg-body-tertiary' : 'shadow-sm'} bank-row-card">
         <div class="card-body py-2 px-3">
             <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                 <input type="checkbox" class="form-check-input bank-cell mt-0" data-field="include" ${r.skip ? '' : 'checked'} title="Importa questa riga">
                 ${kindBadge}
                 ${dupBadge}
+                ${installmentBadgeHtml}
                 <span class="text-muted small text-nowrap">
                     <i class="bi bi-calendar3 me-1"></i>${escHtml(fmtDate(r.op_date ?? ''))}
                     ${r.value_date ? `<span class="ms-2"><i class="bi bi-calendar-check"></i> val. ${escHtml(fmtDate(r.value_date))}</span>` : ''}
                 </span>
+                ${installmentBtn}
                 <div class="ms-auto fw-semibold ${amountClass}" style="font-size:1.15rem;">
                     ${amountSign} € ${amountFmt}
                 </div>
@@ -1199,6 +1343,89 @@ function bankSyncRowFromTr(tr) {
     return r;
 }
 
+// ── Bank installment modal (Step 2 wizard) ─────────────────────────────────
+
+let bankInstallmentModalInst = null;
+let bankInstallmentEditingIdx = null;
+
+function bankInstallmentOpen(idx) {
+    const modalEl = document.getElementById('bank-installment-modal');
+    if (!modalEl) return;
+    if (!bankInstallmentModalInst) bankInstallmentModalInst = new bootstrap.Modal(modalEl);
+
+    const row = bankPreviewState.rows.find(x => x.idx === idx);
+    if (!row) return;
+    bankInstallmentEditingIdx = idx;
+
+    const cur = row.installment ?? { count: '', frequency: 'monthly', custom_days: '' };
+    document.getElementById('bank-installment-row-idx').value = String(idx);
+    document.getElementById('bank-installment-count').value         = cur.count ?? '';
+    document.getElementById('bank-installment-frequency').value     = cur.frequency ?? 'monthly';
+    document.getElementById('bank-installment-custom-days').value   = cur.custom_days ?? '';
+    bankInstallmentSyncCustomVisibility();
+    bankInstallmentUpdatePreview(row);
+    bankInstallmentModalInst.show();
+}
+
+function bankInstallmentSyncCustomVisibility() {
+    const freq    = document.getElementById('bank-installment-frequency').value;
+    const wrap    = document.getElementById('bank-installment-custom-wrap');
+    const isCust  = freq === 'custom';
+    wrap.classList.toggle('d-none', !isCust);
+    if (!isCust) document.getElementById('bank-installment-custom-days').value = '';
+}
+
+function bankInstallmentUpdatePreview(row) {
+    const countEl = document.getElementById('bank-installment-count');
+    const freqEl  = document.getElementById('bank-installment-frequency');
+    const daysEl  = document.getElementById('bank-installment-custom-days');
+    const out     = document.getElementById('bank-installment-preview');
+    const count = Number(countEl.value) || 0;
+    if (!row || count < 2) {
+        out.textContent = 'Inserisci numero di rate >= 2.';
+        return;
+    }
+    const text = installmentPreviewText(row.amount ?? 0, count, freqEl.value, daysEl.value);
+    out.textContent = text || 'Importo non valido.';
+}
+
+function bankInstallmentApply() {
+    if (bankInstallmentEditingIdx === null) return;
+    const row = bankPreviewState.rows.find(x => x.idx === bankInstallmentEditingIdx);
+    if (!row) return;
+
+    const count     = Number(document.getElementById('bank-installment-count').value) || 0;
+    const frequency = document.getElementById('bank-installment-frequency').value;
+    const days      = Number(document.getElementById('bank-installment-custom-days').value) || null;
+
+    if (count < 2 || count > 60) {
+        toast.warning('Numero rate deve essere tra 2 e 60.');
+        return;
+    }
+    if (frequency === 'custom' && (!days || days < 1 || days > 365)) {
+        toast.warning('Per frequenza personalizzata serve un numero di giorni 1–365.');
+        return;
+    }
+
+    row.installment = {
+        count,
+        frequency,
+        custom_days: frequency === 'custom' ? days : null,
+    };
+    bankRenderRows();
+    bankInstallmentModalInst?.hide();
+    toast.success(`Riga rateizzata in ${count} ${frequency === 'monthly' ? 'rate mensili' : (frequency === 'weekly' ? 'rate settimanali' : 'rate')}.`);
+}
+
+function bankInstallmentClear() {
+    if (bankInstallmentEditingIdx === null) return;
+    const row = bankPreviewState.rows.find(x => x.idx === bankInstallmentEditingIdx);
+    if (!row) return;
+    row.installment = null;
+    bankRenderRows();
+    bankInstallmentModalInst?.hide();
+}
+
 function wireBankImport() {
     const form = document.getElementById('bank-import-form');
     if (!form) return;
@@ -1265,6 +1492,7 @@ function wireBankImport() {
                 contact_id:   r.contact_id   ?? r.contact_id_matched ?? null,
                 contact_name: r.contact_name ?? r.contact_suggested_name ?? '',
                 dest_account_id: r.dest_account_id ?? null,
+                installment: null, // {count, frequency, custom_days?} se l'utente rateizza la riga
             }));
             bankPreviewState.categories      = d.categories ?? [];
             bankPreviewState.accounts        = d.accounts ?? [];
@@ -1323,6 +1551,9 @@ function wireBankImport() {
                 r.contact_id = null;
                 r.contact_id_matched = null;
                 r.contact_name = '';
+                // Pair kinds non sono rateizzabili: scarto eventuale
+                // installment impostato da kind precedente.
+                r.installment = null;
                 // Seed del conto destinazione col suggerimento globale
                 // SOLO se la riga non ne ha gia' uno (es. l'utente sta
                 // appena passando da expense a transfer_pair).
@@ -1333,6 +1564,9 @@ function wireBankImport() {
                 // Lasciando il pair, il dest_account_id non ha piu' senso.
                 r.dest_account_id = null;
             }
+            // Income kinds non sono rateizzabili lato UI: scarto installment
+            // se l'utente ha cambiato da expense a income.
+            if (r.kind === 'income') r.installment = null;
             // Re-render solo la riga interessata mantenendo posizione in pagina.
             tr.outerHTML = bankRenderRow(r);
             return;
@@ -1350,6 +1584,36 @@ function wireBankImport() {
                 tr.outerHTML = bankRenderRow(r);
             }
         }
+    });
+
+    // Bottone "Rateizza" per riga: apre modale di gestione installment.
+    tbody?.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-bank-action="installment"]');
+        if (!btn || btn.disabled) return;
+        const tr = btn.closest('[data-idx]');
+        if (!tr) return;
+        // Sincronizza prima lo state della riga (importo/categoria potrebbero
+        // essere stati editati): la modale lavora su quei valori aggiornati.
+        bankSyncRowFromTr(tr);
+        bankInstallmentOpen(Number(tr.dataset.idx));
+    });
+
+    // Modale rateizzazione: handler.
+    document.getElementById('bank-installment-frequency')?.addEventListener('change', () => {
+        bankInstallmentSyncCustomVisibility();
+        const row = bankPreviewState.rows.find(x => x.idx === bankInstallmentEditingIdx);
+        bankInstallmentUpdatePreview(row);
+    });
+    ['bank-installment-count', 'bank-installment-custom-days'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => {
+            const row = bankPreviewState.rows.find(x => x.idx === bankInstallmentEditingIdx);
+            bankInstallmentUpdatePreview(row);
+        });
+    });
+    document.getElementById('bank-installment-apply')?.addEventListener('click', bankInstallmentApply);
+    document.getElementById('bank-installment-clear')?.addEventListener('click', bankInstallmentClear);
+    document.getElementById('bank-installment-modal')?.addEventListener('hidden.bs.modal', () => {
+        bankInstallmentEditingIdx = null;
     });
 
     // Pager: click su numeri di pagina o prev/next.
@@ -1420,6 +1684,20 @@ function wireBankImport() {
             const fd = new FormData();
             fd.append('account_id', String(bankPreviewState.accountId));
             fd.append('rows', JSON.stringify(rows));
+            // Installments: array di {row_idx, count, frequency, custom_days?}.
+            // Il backend (BankStatementImporter::commit) le esplode nelle N rate
+            // associate alla riga `row_idx`. Solo per kind=expense.
+            const installments = rows
+                .filter(r => r.installment && Number(r.installment.count) >= 2 && r.kind === 'expense' && !r.skip)
+                .map(r => ({
+                    row_idx:     r.idx,
+                    count:       Number(r.installment.count),
+                    frequency:   r.installment.frequency,
+                    custom_days: r.installment.custom_days ?? null,
+                }));
+            if (installments.length > 0) {
+                fd.append('installments', JSON.stringify(installments));
+            }
             const r = await fetch(`${BASE}/import/bank-statement/commit`, {
                 method: 'POST',
                 body: fd,
@@ -1429,10 +1707,13 @@ function wireBankImport() {
             if (!json.ok) throw new Error(json.error?.message ?? 'Errore conferma import.');
             const d = json.data ?? {};
             const errs = (d.errors ?? []).slice(0, 10);
+            const explodedLine = d.installments_exploded
+                ? `<br>Espanse <strong>${d.installments_exploded}</strong> rate da righe rateizzate.`
+                : '';
             let html = `<div class="alert alert-success small mb-2">
                 <strong>${d.imported_expenses}</strong> spese, <strong>${d.imported_incomes}</strong> entrate importate.<br>
                 <strong>${d.transfers_paired}</strong> ricariche con partita doppia.
-                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_user}</strong> deselezionate dall'utente.
+                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_user}</strong> deselezionate dall'utente.${explodedLine}
             </div>`;
             if (errs.length) {
                 html += `<div class="small text-muted">Errori (${(d.errors ?? []).length}):</div>
