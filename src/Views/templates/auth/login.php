@@ -32,6 +32,11 @@ $username = (string) ($this->username ?? '');
                         <i class="bi bi-box-arrow-in-right me-1"></i>Accedi
                     </button>
                 </form>
+                <div class="text-center mt-3">
+                    <a href="<?= $this->escape($base . '/password/forgot') ?>" class="small text-muted">
+                        <i class="bi bi-question-circle me-1"></i>Password dimenticata?
+                    </a>
+                </div>
             </div>
         </div>
     </div>

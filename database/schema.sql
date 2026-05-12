@@ -13,13 +13,17 @@ CREATE DATABASE IF NOT EXISTS `my_expense`
 USE `my_expense`;
 
 -- ── Utenti (singolo utente per ora; schema pronto per multi se in futuro) ────
+-- Migration: 023_password_reset.sql aggiunge reset_token_hash/expires_at per
+-- il flusso di recovery file-based su /password/forgot.
 CREATE TABLE IF NOT EXISTS `users` (
-    `id`             INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `username`       VARCHAR(64)  NOT NULL,
-    `password_hash`  VARCHAR(255) NOT NULL,
-    `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `last_login_at`  DATETIME     NULL,
+    `id`                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `username`               VARCHAR(64)  NOT NULL,
+    `password_hash`          VARCHAR(255) NOT NULL,
+    `created_at`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `last_login_at`          DATETIME     NULL,
+    `reset_token_hash`       CHAR(64)     NULL,
+    `reset_token_expires_at` DATETIME     NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_users_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

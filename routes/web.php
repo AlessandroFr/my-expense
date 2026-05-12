@@ -24,8 +24,10 @@ use App\Controllers\WikiController;
 
 return [
     // Auth (no middleware -- pre-login pages)
-    ['GET', '/setup',            [AuthController::class,     'showSetup'], []],
-    ['GET', '/login',            [AuthController::class,     'showLogin'], []],
+    ['GET', '/setup',            [AuthController::class,     'showSetup'],  []],
+    ['GET', '/login',            [AuthController::class,     'showLogin'],  []],
+    ['GET', '/password/forgot',  [AuthController::class,     'showForgot'], []],
+    ['GET', '/password/reset',   [AuthController::class,     'showReset'],  []],
 
     // Guida utente (pubblica: il template gestisce ospite vs loggato)
     ['GET', '/wiki',             [WikiController::class,     'index'], []],

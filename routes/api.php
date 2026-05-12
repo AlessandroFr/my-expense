@@ -28,9 +28,11 @@ use App\Controllers\TransferController;
 
 return [
     // Auth
-    ['POST', '/setup',                   [AuthController::class,    'setup'],  []],
-    ['POST', '/login',                   [AuthController::class,    'login'],  []],
-    ['POST', '/logout',                  [AuthController::class,    'logout'], ['auth']],
+    ['POST', '/setup',                   [AuthController::class,    'setup'],   []],
+    ['POST', '/login',                   [AuthController::class,    'login'],   []],
+    ['POST', '/logout',                  [AuthController::class,    'logout'],  ['auth']],
+    ['POST', '/password/forgot',         [AuthController::class,    'forgot'],  []],
+    ['POST', '/password/reset',          [AuthController::class,    'reset'],   []],
 
     // Dashboard
     ['GET',  '/dashboard/data',          [DashboardController::class,'data'],  ['auth']],
