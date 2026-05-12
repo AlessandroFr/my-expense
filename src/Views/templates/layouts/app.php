@@ -145,6 +145,7 @@ $title   = (string) ($this->title ?? '');
                     </li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/backup/download') ?>"><i class="bi bi-cloud-download me-2"></i>Backup ZIP</a></li>
                     <li><a class="dropdown-item" href="<?= $this->escape($base . '/settings') ?>"><i class="bi bi-gear me-2"></i>Impostazioni</a></li>
+                    <li><a class="dropdown-item" href="<?= $this->escape($base . '/wiki') ?>"><i class="bi bi-question-circle me-2"></i>Guida</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <form method="post" action="<?= $this->escape($base . '/logout') ?>" class="m-0">
@@ -169,5 +170,8 @@ $title   = (string) ($this->title ?? '');
 <script type="module" src="<?= $this->asset('js/theme.js') ?>"></script>
 <script type="module" src="<?= $this->asset('js/icon-picker.js') ?>"></script>
 <script type="module" src="<?= $this->asset('js/rich-editor.js') ?>"></script>
+<?php if (Auth::check()): ?>
+<script type="module" src="<?= $this->asset('js/wiki-link.js') ?>"></script>
+<?php endif; ?>
 </body>
 </html>

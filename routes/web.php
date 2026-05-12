@@ -20,11 +20,15 @@ use App\Controllers\ReportController;
 use App\Controllers\SecuritiesController;
 use App\Controllers\SettingsController;
 use App\Controllers\TransferController;
+use App\Controllers\WikiController;
 
 return [
     // Auth (no middleware -- pre-login pages)
     ['GET', '/setup',            [AuthController::class,     'showSetup'], []],
     ['GET', '/login',            [AuthController::class,     'showLogin'], []],
+
+    // Guida utente (pubblica: il template gestisce ospite vs loggato)
+    ['GET', '/wiki',             [WikiController::class,     'index'], []],
 
     // Dashboard
     ['GET', '/',                 [DashboardController::class,'index'],  ['auth']],
