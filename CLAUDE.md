@@ -1,239 +1,124 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guida per Claude Code (claude.ai/code) su questo repository.
 
-## Project
+## Cos'è
 
-`my-expense` is a personal expense tracker. **Phase 4 complete (2026-05-02)** —
-MVP + budgets + incomes + recurring + CSV (fase 2) + warnings + tags + reports +
-attachments (fase 3) + multi-account, saved searches, expense splitting,
-dark mode, PWA installable + offline cache, full ZIP backup, client-side OCR
-(fase 4).
+`my-expense` è un tracker di spese personali **monoutente**: la registrazione si
+chiude dopo il primo utente (`src/class/Auth.php`), non ci sono ruoli né tenant.
+Gira in locale, per una persona sola, sulla sua macchina.
 
-- `composer.json` (PSR-4 autoload of `App\` from `src/class/`)
-- `database/schema.sql` cumulative + numbered migrations in `database/migrations/`
-  (`001_categories.sql`, `002_expenses.sql`, `003_budgets.sql`,
-  `004_incomes.sql`, `005_recurring_expenses.sql`, `006_tags.sql`,
-  `007_attachments.sql`, `008_accounts.sql`, `009_saved_filters.sql`,
-  `010_expense_split.sql`, `011_bank_import.sql`)
-- **Auth**: one-time setup at `/setup`, login at `/login`, POST logout, session
-  + bcrypt + dual-source CSRF (hidden `_csrf` field + `csrf_token` cookie consumed
-  by `public/js/FetchRequest.js` as `X-CSRF-Token` header)
-- **Categorie** (`/categories`, `/categories/edit?id=N`): per-user CRUD with name
-  (UNIQUE per user), color, Bootstrap Icon, sort order; AJAX via FetchRequest +
-  JSON envelope (`App\Json::ok` / `App\Json::error`)
-- **Spese** (`/expenses`): full CRUD with inline create form, inline row edit,
-  delete with confirm; filter bar (date range, category, amount min/max,
-  text search, debounced); JOIN to categories with color/icon. **CSV
-  import/export** (UTF-8 BOM + `;` separator; header
-  `Data;Categoria;Descrizione;Importo;Pagamento`; auto-creates missing
-  categories; tolerant of `DD/MM/YYYY`, `,` decimal, IT payment labels).
-- **Entrate** (`/incomes`): mirror of expenses with free-form `source` field
-  (Stipendio/Freelance/Rimborso ecc.); same filter bar + inline CRUD.
-- **Budget mensili** (`/budgets`): set per-category cap per month (`YYYY-MM`),
-  view real-time progress bars (green <80% / yellow ≥80% / red ≥100%); also
-  rendered on dashboard for current month.
-- **Spese ricorrenti** (`/recurring`): templates (weekly/monthly/yearly) with
-  optional end date; `App\RecurringExpense::generatePending()` runs on every
-  `GET /dashboard` request and inserts pending occurrences into `expenses`,
-  idempotent via `last_generated_date`. Manual "Genera ora" button available.
-- **Dashboard** (`/dashboard`): 4 KPI cards (Spese mese / Entrate mese /
-  Bilancio netto / Variazione spese%), Chart.js doughnut (by category),
-  dual-bar chart (spese rosso + entrate verdi, ultimi 6 mesi), budget
-  progress widget.
-- **Tag liberi**: tabelle `tags` + `expense_tags` (many-to-many); `App\Tag`
-  classe con `setForExpense($expenseId, $userId, $names)` che fa upsert dei
-  nomi. UI in `/expenses`: input testuale CSV con datalist autocomplete dai
-  tag esistenti; chip colorate nelle righe; filtro select per tag.
-  `Expense::listForUser` espone `tags` per riga via batch query.
-- **Budget warnings**: `App\Budget::checkForCategory()` chiamato dopo
-  `expenses/create` e `expenses/update`; il JSON envelope espone
-  `data.budget_warning` `{name, amount, spent, progress_pct, exceeded,
-  near_limit}`. Frontend mostra `toast.warning` a >=80% e `toast.error` a
-  >100%.
-- **Report annuale** (`/reports`): selettore anno + 4 KPI (spese tot /
-  entrate tot / bilancio anno / media mensile), Chart.js bar+line (spese
-  rosse + entrate verdi + linea bilancio blu), doughnut categorie anno,
-  heatmap top-5 categorie x 12 mesi (alpha proporzionale al massimo),
-  top-10 spese singole.
-- **Allegati spese**: tabella `expense_attachments`; storage filesystem in
-  `{root}/uploads/expenses/{user_id}/{stored_name}` (uploads/ ha .htaccess
-  `deny from all`, file gitignored, accessibili solo via endpoint
-  `/attachments/download?id=N` con auth + ownership check). Whitelist mime:
-  jpg/png/gif/webp/pdf, max 8 MB. Bottone clip in ogni riga di `/expenses`
-  apre modal con upload + lista + view/download/delete.
-- **Multi-conto** (`/accounts`): tabella `accounts` + colonna `account_id`
-  su expenses/incomes/recurring (FK SET NULL). Saldo live = opening + entrate
-  - spese (calcolato a runtime in `Account::withBalances()`). Tipi: checking/
-  card/cash/savings/other. Archivio invece di delete per preservare la
-  history. Filtro Conto in `/expenses`.
-- **Saved filters**: tabella `saved_filters` (user, scope, name, payload JSON).
-  Dropdown in toolbar `/expenses`: salva combinazione filtri corrente come
-  preset, applica con un click, elimina.
-- **Splitting**: colonne `shared_with` (string informale) + `share_amount`
-  (DECIMAL) su `expenses`. Se `share_amount` è impostato è la tua quota
-  effettiva; `amount` resta il totale dello scontrino. Badge `<i bi-people>`
-  nelle righe.
-- **Dark mode**: toggle in navbar (light/dark/auto) con persistenza via
-  `localStorage[mx-theme]`. Bootstrap 5.3 `data-bs-theme`. Inline script in
-  `<head>` previene FOUC. `js/theme.js` reagisce a system change quando in
-  modalità auto.
-- **PWA**: `public/manifest.webmanifest` + `public/sw.js` (cache-first per
-  asset CDN, network-first per HTML/JSON, fallback offline). Service worker
-  registrato da `layout.php`. Installable via Chrome/Edge/Safari "Install".
-- **Backup ZIP** (`GET /backup/download`): icona cloud-download in navbar.
-  `App\BackupService` produce `dump.sql` con INSERT statements scoped per
-  user_id su tutte le 11 tabelle + cartella `uploads/{user_id}/` zippata
-  via `ZipArchive`. Fallback `.sql` only se l'estensione manca.
-- **OCR scontrini**: `js/ocr.js` lazy-load Tesseract.js da CDN (ita+eng).
-  Bottone "Scansiona scontrino" nel create form di `/expenses` apre file
-  picker (con `capture=environment` su mobile per camera). Estrae importo
-  più grande (regex `\d+[.,]\d{2}`) e data (DD/MM/YYYY o YYYY-MM-DD),
-  pre-popola i campi.
-- **Reset DB** (`/settings` → "Zona pericolosa", `POST /db/reset`):
-  cancellazione scoped sull'utente loggato (`App\DatabaseReset`) in 3 ambiti:
-  `movements` (spese, entrate, expense_tags, expense_attachments + file su
-  disco), `movements_recurring` (come sopra + reset `last_generated_date`
-  sulle ricorrenti), `all` (tabula rasa di tutte le 10 tabelle user-scoped
-  tranne `users`). Protetto da: 1) backup ZIP scaricato in tab nuova
-  (gating client-side), 2) frase letterale `ELIMINA TUTTO`, 3)
-  re-inserimento password (`Auth::verifyPassword`). Tutte le DELETE in
-  un'unica transazione con `FOREIGN_KEY_CHECKS=0`; pulizia filesystem
-  best-effort dopo il commit.
-- **Import estratto conto bancario** (`POST /import/bank-statement`,
-  modal "Estratto conto" su `/expenses`): parser per CSV Banca Sella /
-  Patavina (`App\BankStatementImporter`). Encoding Windows-1252 auto-rilevato
-  e convertito in UTF-8. Trova header
-  `Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate`
-  saltando metadata account. Per riga: `Uscite` → Expense (categoria via
-  Tipologia + MCC code), `Entrate` → Income (source = "Stipendio" /
-  "Bonifico da NOME" / "P2P" / ecc.). Le righe `RICARICA/RIMBORSO CARTA/E
-  PREPAGATA/E` generano **partita doppia** (opzionale, default ON):
-  expense sul conto sorgente + income su account "Carta Prepagata"
-  (auto-creato se mancante). Account selector obbligatorio nella modal.
-  Migration `011_bank_import.sql` aggiunge colonne `value_date` (data
-  valuta della banca, distinta da `expense_date` che resta data operazione)
-  e `import_hash` (SHA-256 con UNIQUE su `(user_id, hash)`) su
-  expenses/incomes — re-import dello stesso file è idempotente, le righe
-  duplicate vengono saltate e contate come `skipped_duplicate`. Mapping MCC
-  → categoria in `BankStatementImporter::MCC_MAP` (5411=Spesa,
-  5812/5814=Ristorazione, 5912=Farmacia, 5541/5542=Carburante, 7941=Sport,
-  ecc.). Le commissioni 1€ delle ricariche restano spese normali categoria
-  "Commissioni bancarie".
+Copre: spese ed entrate (con filtri, tag, allegati, quote condivise,
+rateizzazione), budget mensili per categoria, spese ricorrenti, multi-conto con
+saldi e riconciliazioni, trasferimenti fra conti, anagrafiche fornitori/clienti,
+investimenti (strumenti, transazioni, holdings) e piani di accumulo, report
+annuali, import da CSV e da estratto conto Banca Sella/Patavina, backup ZIP,
+OCR degli scontrini lato browser.
 
-**Conventions**:
+## Dove sta andando
 
-- Auth areas use `FetchRequest` + JSON envelope (`{ok: true, data: {...}}` /
-  `{ok: false, error: {code, message}}`); `setup`/`login`/`logout` stay form-POST
-  (pre-auth, no JS).
-- DB changes: structure → numbered migration in `database/migrations/` **and**
-  cumulative update of `database/schema.sql`; data → seed in `database/seeds/`.
-- After every change: deploy to `C:\xampp\htdocs\my-expense\` (robocopy with
-  exclusions: `.git`, `.claude`, `node_modules`, `CLAUDE.md`, `.gitignore`) and
-  create a git commit.
+È in corso il passaggio da app web servita da XAMPP a **applicazione desktop
+Electron installabile**. Il piano completo, con le fasi e il perché di ogni
+scelta, sta in
+`C:\Users\perso\.claude\plans\prendi-in-mano-my-expense-noble-prism.md`.
 
-The application runs **locally on XAMPP** (Apache + MySQL/MariaDB + PHP).
-There is no separate `php -S` or Docker workflow.
+Fatto finora: via Apache e MySQL, database SQLite, doppioni del refactor MVC
+eliminati.
+
+Da fare: sostituire PHP con Node un dominio alla volta (strangler: un server
+`node:http` davanti che serve gli endpoint già migrati e inoltra gli altri a
+`php -S`), poi impacchettare con `electron-builder`.
+
+**Il frontend non va toccato.** `public/js/` (9.000 righe) parla col backend via
+`fetch()` su un envelope JSON stabile: finché URL ed envelope restano quelli, il
+passaggio a Node non richiede di riscriverlo. È la ragione per cui il server
+HTTP locale resta anche dentro Electron, invece di passare a IPC.
+
+## Comandi
+
+```powershell
+avvia.cmd                      # avvia l'app e apre la finestra
+php vendor/bin/phpunit         # test PHP
+npm test                       # test JS (node --test, zero dipendenze)
+composer install               # dipendenze (l'autoload serve al front controller)
+```
+
+L'app parte con il web server integrato di PHP:
+`php -S 127.0.0.1:8080 -t public public/router.php`. Niente XAMPP, niente
+Apache, niente MySQL.
 
 ## Stack
 
-- **PHP + Composer**, MVC plain-PHP custom (no framework). Architettura
-  Controllers + Services + Repository + Entity + View introdotta nel
-  branch `refactor/mvc-architecture` (commit C1-C15).
-- **MySQL / MariaDB** via XAMPP — schema in `database/schema.sql`,
-  history in `database/migrations/`, fixtures in `database/seeds/`
-- **Hybrid frontend** — server-rendered PHP templates in
-  `src/Views/templates/`, progressively enhanced con vanilla JS in
-  `public/js/` che chiama endpoint JSON registrati in `routes/api.php`.
+- **PHP 8.3**, MVC scritto a mano, nessun framework, **zero dipendenze Composer**
+  a runtime.
+- **SQLite** — un solo file, `data/my-expense.sqlite` (gitignored: contiene dati
+  personali). Il backup è copiarlo.
+- **Frontend server-rendered** con miglioramento progressivo: template PHP in
+  `src/Views/templates/`, un modulo ES per pagina in `public/js/pages/`, librerie
+  da CDN (Bootstrap, Chart.js, Tesseract.js). Nessun bundler.
+- **Node 24** disponibile, con `node:sqlite` nella stdlib — è il motivo per cui
+  la migrazione non avrà dipendenze native.
 
-## Directory layout
+## Com'è organizzato
 
-| Path | Role |
+| Path | Ruolo |
 |------|------|
-| `public/index.php` | Front controller — ~13 LOC, delega a `App\Http\Kernel` |
-| `public/js/` | Vanilla JS che chiama gli endpoint (FetchRequest + JSON envelope) |
-| `public/css/` | Stili pastel + transitions |
-| `public/sw.js`, `public/manifest.webmanifest` | PWA |
-| `routes/web.php` | Route HTML (page) |
-| `routes/api.php` | Route JSON (endpoint API) |
-| `src/Http/` | Kernel, Router, Request, Response, HttpException, Middleware |
-| `src/Http/Middleware/` | Auth, Csrf, SetupGate, JsonResponse |
-| `src/Controllers/` | Un controller per dominio (action methods) |
-| `src/Services/` | Business logic, transazioni cross-entity |
-| `src/Models/Entities/` | POPO immutabili (BaseEntity + Expense, Income, Category, ecc.) |
-| `src/Models/Repositories/` | Persistenza pura via PDO (BaseRepository + per-domain) |
-| `src/Validation/` | Validator rule-based + Requests/ |
-| `src/Views/View.php` | Template engine (extends/section/yield/include/asset/csrfField) |
-| `src/Views/templates/layouts/app.php` | Layout master |
-| `src/Views/templates/partials/flash.php` | Banner messaggi flash |
-| `src/Views/templates/{domain}/` | Template per dominio |
-| `src/class/` | Infrastruttura legacy (Auth, Csrf, Config, Database, Session, Json) e classi domain non ancora migrate a Repo+Service |
-| `config/` | App config — DB credentials, environment |
-| `database/schema.sql` | Authoritative MySQL schema |
-| `database/migrations/` | Schema change history |
-| `database/seeds/` | Test / development fixtures |
-| `logs/` | Runtime application log output |
-| `vendor/` | Composer dependencies |
+| `public/index.php` | Front controller, delega a `App\Http\Kernel` |
+| `public/router.php` | Router per `php -S`: sostituisce le RewriteRule di Apache |
+| `routes/web.php`, `routes/api.php` | Route HTML e route JSON |
+| `src/Http/` | Kernel, Router, Request, Response, Middleware |
+| `src/Controllers/` | Un controller per dominio |
+| `src/Services/` | Logica di business, transazioni fra entità |
+| `src/Models/Repositories/` | Persistenza via PDO |
+| `src/Models/Entities/` | POPO immutabili (`toArray()` per il JSON) |
+| `src/Validation/` | Validator a regole + Request per dominio |
+| `src/Views/` | Motore di template minimale + template per dominio |
+| `src/class/` | Infrastruttura (Auth, Csrf, Config, Database, Session, Json) e domini non ancora migrati a Repository |
+| `database/schema.sql` | Schema SQLite completo — l'unica fonte |
+| `config/config.php` | Configurazione locale, gitignored |
 
-## Architecture flow
+Il flusso: browser → `public/index.php` → `Kernel::handle()` → bootstrap
+(config, sessione, CSRF) → `Router::dispatch()` → catena di middleware
+(SetupGate → Auth → Csrf) → Controller → Service → Repository → Entity →
+`Response`.
 
-Browser → `public/index.php` → `App\Http\Kernel::handle()`:
+## Cose da sapere prima di toccare il codice
 
-1. Bootstrap: `Config::load`, `Session::start`, `Csrf::token` (sincronizza
-   cookie CSRF prima di qualsiasi output), `View::setProjectRoot`.
-2. Carica `routes/web.php` + `routes/api.php` nel `Router`.
-3. Costruisce `Request` da superglobals.
-4. `Router::dispatch(Request)` matcha la route e costruisce la middleware
-   chain via `array_reduce` (SetupGate → Auth → Csrf → action).
-5. Il Controller invoca `Service` → `Repository` (PDO) → `Entity`.
-6. Restituisce `Response::json()` / `Response::view(...)` / `Response::redirect()`.
-7. `Response::send()` emette status + headers + body.
+**Le foreign key di SQLite sono spente di default.** `Database::pdo()` esegue
+`PRAGMA foreign_keys = ON` a ogni connessione: senza quella riga tutti i vincoli
+dello schema smettono di valere in silenzio. Lo stesso pragma è un **no-op se
+invocato a transazione aperta**, quindi in `DatabaseReset` e nel backup va
+chiamato prima di `beginTransaction()`.
 
-Errori: `HttpException` catturate dal Router → JSON envelope (route API)
-o HTML (route web). `Throwable` generici → log + 500 generico.
+**Gli importi sono float.** SQLite non ha un tipo decimale, i `DECIMAL(12,2)`
+sono diventati `NUMERIC`. Ogni aggregazione va arrotondata
+(`ROUND(SUM(...), 2)`). Se servisse precisione esatta la strada è memorizzare i
+centesimi come `INTEGER`, non cambiare database.
 
-Il JSON envelope mantiene gli stessi codici stringa di `App\Json`
-(`validation_error`, `unauthenticated`, `csrf`, `forbidden`, `not_found`,
-`conflict`, `server_error`) per compatibilità con
-`public/js/componentBase.js::normalizeApiResponse`.
+**`src/class/Expense.php` e `Income.php` esistono solo come percorso di scrittura
+dell'import.** La loro `validate()` **non** coincide con
+`ExpenseService::normalizeAndValidate()`, che pretende un conto cassa per i
+pagamenti in contanti — regola che la legacy non ha. Unificarle senza tenerne
+conto spezza l'import da estratto conto.
 
-## Local dev (XAMPP)
+**Il JS legge chiavi precise dall'envelope.** `showBudgetWarning()` in
+`public/js/pages/expenses.js` usa `exceeded` e `near_limit`: se un `toArray()`
+smette di produrle, l'avviso sparisce senza errori. L'envelope è un contratto
+col frontend.
 
-The repo lives outside `htdocs/`, so configure Apache to serve `public/`
-as the docroot:
+**Le soglie si confrontano sui valori grezzi.** `Budget::nearLimit()` non usa
+`progressPct()`, che è arrotondato a un decimale e farebbe scattare l'avviso già
+a 79,95%.
 
-- Add a vhost in `xampp\apache\conf\extra\httpd-vhosts.conf`, or alias
-  `c:\Users\perso\OneDrive\Sviluppo Programmi\my-expense\public` from
-  `htdocs`.
-- Start Apache + MySQL via the XAMPP control panel.
-- Bootstrap the database: import `database/schema.sql` via phpMyAdmin
-  or `mysql -u root <db_name> < database/schema.sql` (once the file
-  has content).
-- Application logs land in `logs/`; XAMPP's own Apache + PHP error logs
-  sit under the XAMPP install directory.
+## Convenzioni
 
-## Commands
-
-- **Install dependencies:** `composer install` (autoload is generated
-  from `composer.json` — needed before the front controller works)
-- **Import schema:** import `database/schema.sql` once via phpMyAdmin or
-  `mysql -u root my_expense < database/schema.sql`. The front controller
-  shows a friendly error page until the DB is initialised.
-- **First run:** with the DB empty, any URL redirects to `/setup` for
-  one-time user registration. After that the page is disabled forever.
-- **Tests:** no test runner is wired up yet — ask the user before
-  introducing PHPUnit / Pest.
-- **Lint:** none configured.
-
-## Workflow expectations
-
-The user has set two recurring rules for this project:
-
-1. **After every change, deploy to production.** The production target
-   is not yet defined — ask the user the first time a change requires
-   deploy, then record the answer as a project memory.
-2. **After every change, create a git commit** with a meaningful message
-   summarizing what changed.
-
-A change is not considered complete until both steps have run, or the
-user has explicitly deferred them.
+- Codice e identificatori in inglese, commenti e testi dell'interfaccia in
+  italiano. Adeguarsi al file in cui si sta scrivendo.
+- Le aree autenticate usano `FetchRequest` + envelope JSON
+  (`{ok: true, data}` / `{ok: false, error: {code, message}}`); `setup`, `login`
+  e `logout` restano form POST perché precedono l'autenticazione.
+- Modifiche allo schema: si aggiorna `database/schema.sql`. Un runner di
+  migration idempotente arriverà col pacchetto Electron, dove serve davvero.
+- Test dove la logica non è banale; sui percorsi che toccano denaro la
+  correttezza viene prima della brevità.
+- Ogni pezzo di lavoro finito e verificato va committato su `main`.
