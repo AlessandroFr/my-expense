@@ -3,16 +3,16 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Budget;
-use App\Expense;
 use App\Http\Request;
 use App\Http\Response;
-use App\Income;
+use App\Models\Repositories\ExpenseRepository;
 use App\Models\Repositories\HoldingsRepository;
+use App\Models\Repositories\IncomeRepository;
 use App\Models\Repositories\PacContributionRepository;
 use App\Models\Repositories\PacFundRepository;
 use App\Models\Repositories\PacPlanRepository;
 use App\RecurringExpense;
+use App\Services\BudgetService;
 use App\Services\PacService;
 use Throwable;
 
@@ -64,20 +64,23 @@ final class DashboardController extends BaseController
         $prevFrom = date('Y-m-d', (int) strtotime($prevTo . ' -' . ($daysInRange - 1) . ' days'));
         $currentMonth = date('Y-m');
 
-        $totalCurrent  = Expense::totalForRange($userId, $from, $to);
-        $totalPrevious = Expense::totalForRange($userId, $prevFrom, $prevTo);
+        $expenses = new ExpenseRepository();
+        $incomes  = new IncomeRepository();
+
+        $totalCurrent  = $expenses->totalForRange($userId, $from, $to);
+        $totalPrevious = $expenses->totalForRange($userId, $prevFrom, $prevTo);
         $deltaPct      = $totalPrevious > 0
             ? (($totalCurrent - $totalPrevious) / $totalPrevious) * 100.0
             : null;
 
-        $incomeCurrent  = Income::totalForRange($userId, $from, $to);
-        $incomePrevious = Income::totalForRange($userId, $prevFrom, $prevTo);
+        $incomeCurrent  = $incomes->totalForRange($userId, $from, $to);
+        $incomePrevious = $incomes->totalForRange($userId, $prevFrom, $prevTo);
         $netCurrent     = $incomeCurrent - $totalCurrent;
 
-        $byCategory     = Expense::totalsByCategoryForRange($userId, $from, $to);
-        $byMonth        = Expense::totalsByMonth($userId, 6);
-        $incomeByMonth  = Income::totalsByMonth($userId, 6);
-        $budgetProgress = Budget::progressForMonth($userId, $currentMonth);
+        $byCategory     = $expenses->totalsByCategoryForRange($userId, $from, $to);
+        $byMonth        = $expenses->totalsByMonth($userId, 6);
+        $incomeByMonth  = $incomes->totalsByMonth($userId, 6);
+        $budgetProgress = (new BudgetService())->progressForMonth($userId, $currentMonth);
 
         $investments = $this->buildInvestmentsKpi($userId);
 
