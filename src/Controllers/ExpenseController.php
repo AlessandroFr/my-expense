@@ -4,13 +4,14 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Account;
-use App\Category;
 use App\Contact;
 use App\CsvService;
 use App\Http\HttpException;
 use App\Http\Request;
 use App\Http\Response;
+use App\Models\Entities\Category;
 use App\Models\Entities\Expense;
+use App\Models\Repositories\CategoryRepository;
 use App\Services\ExpenseService;
 use App\Validation\Requests\CreateExpenseRequest;
 use App\Validation\Requests\UpdateExpenseRequest;
@@ -20,9 +21,9 @@ use Throwable;
  * Controller delle Spese. Sostituisce i 6 file in public/endpoints/expenses_*.php
  * + la pagina public/pages/expenses.php (rimossi al cleanup C15).
  *
- * Le dipendenze legacy (Category::allForUser, Account::allForUser, Contact::allForUser,
+ * Le dipendenze legacy rimaste (Account::allForUser, Contact::allForUser,
  * Account::defaultCashFor, CsvService) restano in uso finche' i rispettivi domini
- * non vengono migrati nei commit successivi (C7, C11, C13, C14).
+ * non vengono migrati: sono classi senza Repository equivalente, non doppioni.
  */
 final class ExpenseController extends BaseController
 {
@@ -37,7 +38,10 @@ final class ExpenseController extends BaseController
     public function index(Request $request): Response
     {
         $userId      = $this->userId();
-        $categories  = Category::allForUser($userId);
+        $categories  = array_map(
+            static fn(Category $c): array => $c->toArray(),
+            (new CategoryRepository())->listForUser($userId),
+        );
         $accounts    = Account::allForUser($userId, false);
         $defaultCash = Account::defaultCashFor($userId);
         $contacts    = Contact::allForUser($userId, false, 'supplier');
