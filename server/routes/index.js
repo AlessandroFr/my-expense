@@ -3,7 +3,11 @@
 // di app da PHP a Node.
 
 import { categoryRoutes } from './categories.js';
+import { filterRoutes } from './filters.js';
+import { tagRoutes } from './tags.js';
 
 export const routes = new Map(Object.entries({
   ...categoryRoutes,
+  ...tagRoutes,
+  ...filterRoutes,
 }));
