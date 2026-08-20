@@ -19,6 +19,7 @@ import { recurringRoutes } from './recurring.js';
 import { reportRoutes } from './reports.js';
 import { securitiesRoutes } from './securities.js';
 import { tagRoutes } from './tags.js';
+import { transferBackfillRoutes } from './transfers-backfill.js';
 import { transferRoutes } from './transfers.js';
 
 export const routes = new Map(Object.entries({
@@ -40,4 +41,5 @@ export const routes = new Map(Object.entries({
   ...reconciliationRoutes,
   ...csvRoutes,
   ...bankImportRoutes,
+  ...transferBackfillRoutes,
 }));
