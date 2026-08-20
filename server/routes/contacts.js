@@ -6,6 +6,7 @@
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
+import { roundLikePhp } from '../amount.js';
 
 const TYPES = ['supplier', 'customer', 'both'];
 
@@ -16,7 +17,7 @@ const LIST_COLUMNS = `id, name, name_norm, type, vat_number, iban, email, notes,
 const DETAIL_COLUMNS = `id, user_id, name, name_norm, type, vat_number, iban, email, notes,
                         color, archived, created_at, updated_at`;
 
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const round2 = (n) => roundLikePhp(n, 2);
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 /** Nome normalizzato per il confronto: minuscolo, spazi collassati. */

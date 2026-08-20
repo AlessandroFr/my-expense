@@ -4,7 +4,7 @@
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
+import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 
 const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other'];
 const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
@@ -28,7 +28,7 @@ const findForUser = (id, userId) => one(
   id, userId,
 );
 
-const round2 = (n) => Math.round(n * 100) / 100;
+const round2 = (n) => roundLikePhp(n, 2);
 
 /** Saldo = apertura + entrate − spese, calcolato al volo come in PHP. */
 export function withBalances(userId, includeArchived = false) {

@@ -7,7 +7,7 @@
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
+import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 
 const KINDS = ['BUY', 'SELL', 'DIVIDEND', 'FEE', 'SPLIT'];
 
@@ -20,10 +20,7 @@ const DEFAULT_ASSET_CLASSES = [
 ];
 
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-const round = (n, d) => {
-  const f = 10 ** d;
-  return Math.round(n * f) / f;
-};
+const round = (n, d) => roundLikePhp(n, d);
 const dec2 = (v) => Number(v).toFixed(2);
 const dec6 = (v) => Number(v).toFixed(6);
 const nullableInt = (raw) => {

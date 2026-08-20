@@ -2,7 +2,7 @@
 
 import { all, one, run, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
+import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { listForUser as listCategories } from './categories.js';
 
 const isYearMonth = (ym) => /^\d{4}-(0[1-9]|1[0-2])$/.test(ym);
@@ -26,7 +26,7 @@ function nextMonthStart(ym) {
 export function toPublic(row) {
   const amount = Number(row.amount);
   const spent = Number(row.spent);
-  const round2 = (n) => Math.round(n * 100) / 100;
+  const round2 = (n) => roundLikePhp(n, 2);
   // La soglia si confronta sulla percentuale grezza: progress_pct e' arrotondato
   // a un decimale e farebbe scattare l'avviso gia' a 79,95%.
   const rawPct = amount > 0 ? (spent / amount) * 100 : 0;
@@ -41,7 +41,7 @@ export function toPublic(row) {
     amount: round2(amount),
     spent: round2(spent),
     remaining: round2(amount - spent),
-    progress_pct: amount > 0 ? Math.round(rawPct * 10) / 10 : 0,
+    progress_pct: amount > 0 ? roundLikePhp(rawPct, 1) : 0,
     exceeded: spent > amount,
     near_limit: amount > 0 && rawPct >= 80 && spent <= amount,
   };

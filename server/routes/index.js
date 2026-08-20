@@ -13,6 +13,7 @@ import { filterRoutes } from './filters.js';
 import { incomeRoutes } from './incomes.js';
 import { pacRoutes } from './pac.js';
 import { recurringRoutes } from './recurring.js';
+import { reportRoutes } from './reports.js';
 import { securitiesRoutes } from './securities.js';
 import { tagRoutes } from './tags.js';
 import { transferRoutes } from './transfers.js';
@@ -32,4 +33,5 @@ export const routes = new Map(Object.entries({
   ...backupRoutes,
   ...securitiesRoutes,
   ...pacRoutes,
+  ...reportRoutes,
 }));
