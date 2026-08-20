@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Budget;
 use App\Contact;
 use App\Database;
 use App\Http\HttpException;
@@ -21,9 +20,8 @@ use InvalidArgumentException;
  * Le regole "shape" (tipi, formati, range) sono nelle Request classes
  * (Create/Update/Delete/List ExpenseRequest).
  *
- * Dipendenze legacy (saranno migrate in commit successivi):
- *  - App\Contact::findOrCreate    (C13)
- *  - App\Budget::checkForCategory (C8)
+ * Dipendenze legacy rimaste:
+ *  - App\Contact::findOrCreate (dominio senza Repository, non ancora migrato)
  */
 final class ExpenseService extends BaseService
 {
@@ -69,7 +67,7 @@ final class ExpenseService extends BaseService
             ]);
             $entity  = $this->expenses->findById($id, $userId);
             $ym      = substr((string) $row['expense_date'], 0, 7);
-            $warning = Budget::checkForCategory($userId, $row['category_id'], $ym);
+            $warning = (new BudgetService())->checkForCategory($userId, $row['category_id'], $ym);
             return ['expense' => $entity, 'budget_warning' => $warning];
         });
     }
@@ -128,7 +126,7 @@ final class ExpenseService extends BaseService
             }
             $head    = $this->expenses->findById($ids[0], $userId);
             $ym      = substr((string) $row['expense_date'], 0, 7);
-            $warning = Budget::checkForCategory($userId, $row['category_id'], $ym);
+            $warning = (new BudgetService())->checkForCategory($userId, $row['category_id'], $ym);
             return [
                 'expense'        => $head,
                 'budget_warning' => $warning,
@@ -203,7 +201,7 @@ final class ExpenseService extends BaseService
             ]);
             $entity  = $this->expenses->findById($id, $userId);
             $ym      = substr((string) $row['expense_date'], 0, 7);
-            $warning = Budget::checkForCategory($userId, $row['category_id'], $ym);
+            $warning = (new BudgetService())->checkForCategory($userId, $row['category_id'], $ym);
             return ['expense' => $entity, 'budget_warning' => $warning];
         });
     }
