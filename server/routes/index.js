@@ -5,7 +5,9 @@
 import { accountRoutes } from './accounts.js';
 import { budgetRoutes } from './budgets.js';
 import { categoryRoutes } from './categories.js';
+import { expenseRoutes } from './expenses.js';
 import { filterRoutes } from './filters.js';
+import { incomeRoutes } from './incomes.js';
 import { tagRoutes } from './tags.js';
 
 export const routes = new Map(Object.entries({
@@ -14,4 +16,6 @@ export const routes = new Map(Object.entries({
   ...filterRoutes,
   ...budgetRoutes,
   ...accountRoutes,
+  ...expenseRoutes,
+  ...incomeRoutes,
 }));
