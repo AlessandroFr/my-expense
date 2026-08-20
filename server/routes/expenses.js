@@ -7,6 +7,7 @@ import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
 import { checkForCategory } from './budgets.js';
+import { findOrCreate as findOrCreateContact } from './contacts.js';
 
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 
@@ -225,16 +226,14 @@ function normalizeAndValidate(userId, data) {
 }
 
 /**
- * Se arriva contact_name senza contact_id la creazione dell'anagrafica resta a
- * PHP (Contact::findOrCreate): finche' quel dominio non e' migrato, qui si
- * accetta solo un contact_id gia' esistente.
+ * Il form permette di scrivere il nome di un fornitore che non e' ancora in
+ * rubrica: in quel caso l'anagrafica viene creata al volo, come fa
+ * ExpenseService::resolveContact.
  */
-function assertNoPendingContactName(data) {
-  if (!nullableInt(data.contact_id) && str(data.contact_name) !== '') {
-    throw HttpError.badRequest(
-      'Seleziona un fornitore esistente: la creazione al volo non e\' ancora disponibile da questo percorso.',
-    );
-  }
+function resolveContact(userId, data) {
+  if (nullableInt(data.contact_id)) return data;
+  const nome = str(data.contact_name);
+  return { ...data, contact_id: nome === '' ? null : findOrCreateContact(userId, nome) };
 }
 
 async function list(req, res) {
@@ -287,13 +286,12 @@ async function create(req, res) {
   assertCsrf(req, body);
   const userId = currentUserId();
 
-  assertNoPendingContactName(body);
   // La rateizzazione resta a PHP finche' InstallmentCalculator non e' migrato.
   if (int(body.installment_count) > 1 || (body.installment && int(body.installment.count) > 1)) {
     throw HttpError.badRequest('La rateizzazione non e\' ancora disponibile da questo percorso.');
   }
 
-  const row = normalizeAndValidate(userId, body);
+  const row = normalizeAndValidate(userId, resolveContact(userId, body));
 
   const id = transaction(() => {
     const result = run(
@@ -321,8 +319,7 @@ async function update(req, res) {
   const id = int(body.id);
   if (id <= 0 || !ownedExists(userId, 'expenses', id)) throw HttpError.notFound('Spesa non trovata.');
 
-  assertNoPendingContactName(body);
-  const row = normalizeAndValidate(userId, body);
+  const row = normalizeAndValidate(userId, resolveContact(userId, body));
 
   transaction(() => {
     run(

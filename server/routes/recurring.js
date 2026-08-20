@@ -7,6 +7,7 @@
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
+import { findOrCreate as findOrCreateContact } from './contacts.js';
 
 const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
@@ -53,6 +54,13 @@ const nullableInt = (raw) => {
 
 const ownedExists = (userId, table, id) =>
   Boolean(one(`SELECT 1 AS x FROM ${table} WHERE id = ? AND user_id = ? LIMIT 1`, id, userId));
+
+/** Un fornitore scritto a mano e non ancora in rubrica viene creato al volo. */
+function resolveContact(userId, data) {
+  if (nullableInt(data.contact_id)) return data;
+  const nome = str(data.contact_name);
+  return { ...data, contact_id: nome === '' ? null : findOrCreateContact(userId, nome) };
+}
 
 /** Traduce RecurringExpense::validate. */
 function validate(userId, data) {
@@ -154,13 +162,7 @@ async function create(req, res) {
   assertCsrf(req, body);
   const userId = currentUserId();
 
-  if (!nullableInt(body.contact_id) && str(body.contact_name) !== '') {
-    throw HttpError.badRequest(
-      'Seleziona un fornitore esistente: la creazione al volo non e\' ancora disponibile da questo percorso.',
-    );
-  }
-
-  const row = validate(userId, body);
+  const row = validate(userId, resolveContact(userId, body));
   const result = run(
     `INSERT INTO recurring_expenses
        (user_id, category_id, contact_id, amount, description, payment_method,
@@ -181,7 +183,7 @@ async function update(req, res) {
   if (id <= 0) throw HttpError.badRequest('ID ricorrenza mancante.');
   if (!findForUser(id, userId)) throw HttpError.notFound('Ricorrenza non trovata.');
 
-  const row = validate(userId, body);
+  const row = validate(userId, resolveContact(userId, body));
   run(
     `UPDATE recurring_expenses
      SET category_id = ?, contact_id = ?, amount = ?, description = ?, payment_method = ?,

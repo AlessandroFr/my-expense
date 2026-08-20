@@ -5,6 +5,7 @@
 import { accountRoutes } from './accounts.js';
 import { budgetRoutes } from './budgets.js';
 import { categoryRoutes } from './categories.js';
+import { contactRoutes } from './contacts.js';
 import { expenseRoutes } from './expenses.js';
 import { filterRoutes } from './filters.js';
 import { incomeRoutes } from './incomes.js';
@@ -22,4 +23,5 @@ export const routes = new Map(Object.entries({
   ...incomeRoutes,
   ...transferRoutes,
   ...recurringRoutes,
+  ...contactRoutes,
 }));

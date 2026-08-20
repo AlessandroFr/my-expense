@@ -3,6 +3,7 @@
 import { all, one, run, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
+import { findOrCreate as findOrCreateContact } from './contacts.js';
 
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 const money = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));
@@ -109,13 +110,11 @@ function normalize(userId, data) {
   };
 }
 
-/** Come per le spese, la creazione al volo dell'anagrafica resta a PHP. */
-function assertNoPendingContactName(data) {
-  if (!nullableInt(data.contact_id) && str(data.contact_name) !== '') {
-    throw HttpError.badRequest(
-      'Seleziona un cliente esistente: la creazione al volo non e\' ancora disponibile da questo percorso.',
-    );
-  }
+/** Come per le spese: un cliente scritto a mano e non ancora in rubrica viene creato. */
+function resolveContact(userId, data) {
+  if (nullableInt(data.contact_id)) return data;
+  const nome = str(data.contact_name);
+  return { ...data, contact_id: nome === '' ? null : findOrCreateContact(userId, nome) };
 }
 
 async function list(req, res) {
@@ -157,8 +156,7 @@ async function create(req, res) {
   assertCsrf(req, body);
   const userId = currentUserId();
 
-  assertNoPendingContactName(body);
-  const row = normalize(userId, body);
+  const row = normalize(userId, resolveContact(userId, body));
 
   const result = run(
     `INSERT INTO incomes (user_id, account_id, contact_id, source, description, amount, income_date)
@@ -176,8 +174,7 @@ async function update(req, res) {
   const id = int(body.id);
   if (id <= 0 || !ownedExists(userId, 'incomes', id)) throw HttpError.notFound('Entrata non trovata.');
 
-  assertNoPendingContactName(body);
-  const row = normalize(userId, body);
+  const row = normalize(userId, resolveContact(userId, body));
 
   run(
     `UPDATE incomes

@@ -31,6 +31,10 @@ const CASI = [
   ['expenses', 'limit=500', { limit: 500 }, ['expenses', 'total']],
   ['incomes', 'limit=50', { limit: 50 }, ['incomes', 'total', 'sources']],
   ['transfers', 'limit=100', { limit: 100 }, ['transfers', 'total']],
+  ['contacts', 'page=1&page_size=25', { page: 1, page_size: 25 }, ['contacts', 'total']],
+  ['contacts', 'page=2&page_size=25', { page: 2, page_size: 25 }, ['contacts', 'total']],
+  ['contacts', 'page=1&page_size=25&search=amazon', { page: 1, page_size: 25, search: 'amazon' }, ['contacts', 'total']],
+  ['contacts-balance', 'from=2020-01-01&to=2030-12-31', { from: '2020-01-01', to: '2030-12-31' }, ['summary']],
   ['transfers', 'limit=20&account_id=3', { limit: 20, account_id: 3 }, ['transfers', 'total']],
   ['incomes', 'limit=20&search=bonifico', { limit: 20, search: 'bonifico' }, ['incomes', 'total']],
   ['incomes', 'limit=500', { limit: 500 }, ['incomes', 'total', 'sources']],
@@ -40,8 +44,13 @@ const daPhp = (dominio, filtri) =>
   JSON.parse(execFileSync('php', [join(root, 'tests/parity/php-query.php'), dominio, JSON.stringify(filtri)],
     { encoding: 'utf8', cwd: root }));
 
+/** I domini con un trattino puntano a un endpoint diverso da /list. */
+const percorso = (dominio) => (dominio.includes('-')
+  ? `/${dominio.split('-')[0]}/${dominio.split('-').slice(1).join('-')}`
+  : `/${dominio}/list`);
+
 const daNode = async (dominio, query) => {
-  const res = await fetch(`http://127.0.0.1:${PORT}/${dominio}/list${query ? `?${query}` : ''}`);
+  const res = await fetch(`http://127.0.0.1:${PORT}${percorso(dominio)}${query ? `?${query}` : ''}`);
   const body = await res.json();
   if (!body.ok) throw new Error(`${dominio}: ${body.error?.message}`);
   return body.data;
