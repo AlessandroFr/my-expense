@@ -98,8 +98,9 @@ final class BackupService
              . " - dump.sql        INSERT statements scoped sul tuo user.\n"
              . " - uploads/        Tutti gli allegati delle tue spese.\n\n"
              . "Per ripristinare:\n"
-             . " 1. Importa dump.sql nel DB my_expense via phpMyAdmin o:\n"
-             . "    mysql -u root my_expense < dump.sql\n"
+             . " 1. Usa «Ripristina backup» dalle Impostazioni dell'app.\n"
+             . "    In alternativa, da riga di comando:\n"
+             . "    sqlite3 data/my-expense.sqlite < dump.sql\n"
              . " 2. Copia la cartella uploads/ in {project_root}/uploads/expenses/{user_id}/\n";
     }
 
@@ -107,7 +108,7 @@ final class BackupService
     {
         $pdo = Database::pdo();
         $out = "-- my-expense backup user_id={$userId} generated " . date('c') . "\n";
-        $out .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+        $out .= "PRAGMA foreign_keys = OFF;\n\n";
 
         foreach (self::TABLES_USER_SCOPED as $table => $cfg) {
             $out .= "-- Table: {$table}\n";
@@ -125,7 +126,7 @@ final class BackupService
             $out .= "\n";
         }
 
-        $out .= "SET FOREIGN_KEY_CHECKS=1;\n";
+        $out .= "PRAGMA foreign_keys = ON;\n";
         return $out;
     }
 

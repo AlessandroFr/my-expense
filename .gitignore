@@ -1,6 +1,9 @@
 # Composer
 /vendor/
 
+# Il database e i suoi file WAL: dati personali, mai in git
+/data/
+
 # Local config (real DB credentials — never commit)
 /config/config.php
 

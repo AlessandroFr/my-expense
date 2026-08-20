@@ -16,13 +16,10 @@ return [
         'debug'    => true,
     ],
 
+    // Il database e' un singolo file SQLite. Per farne il backup basta
+    // copiarlo (chiudendo prima l'app). Path relativo = dalla root del progetto.
     'db' => [
-        'host'     => '127.0.0.1',
-        'port'     => 3306,
-        'database' => 'my_expense',
-        'username' => 'root',
-        'password' => '',
-        'charset'  => 'utf8mb4',
+        'path' => 'data/my-expense.sqlite',
     ],
 
     'session' => [

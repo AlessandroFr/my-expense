@@ -207,16 +207,19 @@ final class ExpenseRepository extends BaseRepository
     public function totalsByMonth(int $userId, int $monthsBack = 6): array
     {
         $monthsBack = max(1, min(36, $monthsBack));
+        // La data di partenza si calcola qui e non nella query: SQLite non accetta
+        // un placeholder dentro un modificatore di date().
+        $from = date('Y-m-01', (int) strtotime('-' . ($monthsBack - 1) . ' months', (int) strtotime(date('Y-m-01'))));
         $rows = $this->fetchAll(
-            "SELECT DATE_FORMAT(expense_date, '%Y-%m') AS month,
-                    SUM(amount) AS total
+            "SELECT strftime('%Y-%m', expense_date) AS month,
+                    ROUND(SUM(amount), 2) AS total
              FROM expenses
              WHERE user_id = ?
-               AND expense_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
+               AND expense_date >= ?
                AND is_transfer = 0
              GROUP BY month
              ORDER BY month ASC",
-            [$userId, $monthsBack - 1],
+            [$userId, $from],
         );
         return array_map(
             static fn(array $r): array => ['month' => (string) $r['month'], 'total' => (float) $r['total']],

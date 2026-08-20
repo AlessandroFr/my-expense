@@ -54,7 +54,7 @@ final class Auth
         Session::set('username', (string) $row['username']);
 
         Database::pdo()
-            ->prepare('UPDATE users SET last_login_at = NOW() WHERE id = ?')
+            ->prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?")
             ->execute([$row['id']]);
 
         return true;

@@ -688,7 +688,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
         <li>Digitare la frase letterale <code>ELIMINA TUTTO</code> in maiuscolo.</li>
         <li>Reinserire la tua password.</li>
     </ol>
-    <div class="wiki-warn"><i class="bi bi-exclamation-octagon"></i><div><strong>Operazione non annullabile.</strong> La cancellazione è in una singola transazione con <code>FOREIGN_KEY_CHECKS=0</code>; gli allegati su disco vengono rimossi best-effort dopo il commit. Senza backup, i dati sono persi per sempre.</div></div>
+    <div class="wiki-warn"><i class="bi bi-exclamation-octagon"></i><div><strong>Operazione non annullabile.</strong> La cancellazione è in una singola transazione con <code>PRAGMA foreign_keys = OFF</code>; gli allegati su disco vengono rimossi best-effort dopo il commit. Senza backup, i dati sono persi per sempre.</div></div>
 </section>
 
 <!-- ──────────────────────────────────────────────────────────── PWA ───────── -->

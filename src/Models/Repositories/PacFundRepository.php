@@ -89,7 +89,7 @@ final class PacFundRepository extends BaseRepository
         $this->exec(
             'INSERT INTO pac_fund_navs (fund_id, nav_date, nav)
              VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE nav = VALUES(nav)',
+             ON CONFLICT(fund_id, nav_date) DO UPDATE SET nav = excluded.nav',
             [$fundId, $navDate, $nav],
         );
     }

@@ -15,7 +15,7 @@ use Throwable;
  *  - 'movements_recurring' → come 'movements' + azzera last_generated_date sui template ricorrenti
  *  - 'all'                 → tabula rasa di tutte le 11 tabelle user-scoped (l'utente NON viene mai cancellato)
  *
- * Le delete passano per una transazione singola con FOREIGN_KEY_CHECKS=0
+ * Le delete passano per una transazione singola con le foreign key spente
  * per essere indipendenti dall'ordine FK; la pulizia del filesystem
  * (uploads/expenses/{user_id}/) è best-effort dopo il commit.
  */
@@ -73,7 +73,7 @@ final class DatabaseReset
             'attachment_files_deleted'     => 0,
         ];
 
-        $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+        $pdo->exec('PRAGMA foreign_keys = OFF');
         $pdo->beginTransaction();
 
         try {
@@ -89,17 +89,18 @@ final class DatabaseReset
                 $counters['asset_classes_deleted']    = self::deleteByUser($pdo, 'asset_classes',           $userId);
                 $counters['transfers_deleted']        = self::deleteByUser($pdo, 'transfers',               $userId);
                 $pdo->commit();
-                $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+                $pdo->exec('PRAGMA foreign_keys = ON');
                 return $counters;
             }
 
             // ── Movimenti (in tutti gli scope tranne investments) ────────
             $counters['expense_attachments_deleted'] = self::deleteByUser($pdo, 'expense_attachments', $userId);
 
+            // SQLite non ha la DELETE multi-tabella con JOIN di MySQL:
+            // stessa semantica con una subquery.
             $stmt = $pdo->prepare(
-                'DELETE et FROM expense_tags et
-                 INNER JOIN expenses e ON e.id = et.expense_id
-                 WHERE e.user_id = ?'
+                'DELETE FROM expense_tags
+                 WHERE expense_id IN (SELECT id FROM expenses WHERE user_id = ?)'
             );
             $stmt->execute([$userId]);
             $counters['expense_tags_deleted'] = $stmt->rowCount();
@@ -140,11 +141,11 @@ final class DatabaseReset
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+            $pdo->exec('PRAGMA foreign_keys = ON');
             throw $e;
         }
 
-        $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+        $pdo->exec('PRAGMA foreign_keys = ON');
 
         // ── Filesystem: uploads/expenses/{user_id}/ ──────────────────────
         // Best-effort: i record DB sono già spariti, eventuali file orfani

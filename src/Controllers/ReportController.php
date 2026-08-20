@@ -47,7 +47,7 @@ final class ReportController extends BaseController
         }
 
         $stmt = $pdo->prepare(
-            "SELECT MONTH(expense_date) AS m, SUM(amount) AS total
+            "SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(amount) AS total
              FROM expenses
              WHERE user_id = ? AND expense_date >= ? AND expense_date < ?
                AND is_transfer = 0
@@ -59,7 +59,7 @@ final class ReportController extends BaseController
         }
 
         $stmt = $pdo->prepare(
-            "SELECT MONTH(income_date) AS m, SUM(amount) AS total
+            "SELECT CAST(strftime('%m', income_date) AS INTEGER) AS m, SUM(amount) AS total
              FROM incomes
              WHERE user_id = ? AND income_date >= ? AND income_date < ?
                AND is_transfer = 0
@@ -139,7 +139,7 @@ final class ReportController extends BaseController
             ];
             if ($tc['category_id'] !== null) {
                 $stmt = $pdo->prepare(
-                    "SELECT MONTH(expense_date) AS m, SUM(amount) AS total
+                    "SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(amount) AS total
                      FROM expenses
                      WHERE user_id = ? AND category_id = ? AND expense_date >= ? AND expense_date < ?
                        AND is_transfer = 0
@@ -148,7 +148,7 @@ final class ReportController extends BaseController
                 $stmt->execute([$userId, $tc['category_id'], $start, $end]);
             } else {
                 $stmt = $pdo->prepare(
-                    "SELECT MONTH(expense_date) AS m, SUM(amount) AS total
+                    "SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(amount) AS total
                      FROM expenses
                      WHERE user_id = ? AND category_id IS NULL AND expense_date >= ? AND expense_date < ?
                        AND is_transfer = 0
@@ -303,7 +303,7 @@ final class ReportController extends BaseController
         // Dividendi mensili dell'anno
         $pdo  = Database::pdo();
         $stmt = $pdo->prepare(
-            "SELECT MONTH(trade_date) AS m, SUM(net_amount) AS total
+            "SELECT CAST(strftime('%m', trade_date) AS INTEGER) AS m, SUM(net_amount) AS total
              FROM securities_transactions
              WHERE user_id = ? AND kind = 'DIVIDEND' AND trade_date >= ? AND trade_date < ?
              GROUP BY m"

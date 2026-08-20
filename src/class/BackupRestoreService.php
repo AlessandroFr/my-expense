@@ -21,7 +21,7 @@ use ZipArchive;
  *  3) Parse del dump line-by-line, skip della tabella `users`, riscrittura
  *     della colonna `user_id` con l'ID dell'utente loggato (consente import
  *     da altra installazione), execute in singola transazione con
- *     FOREIGN_KEY_CHECKS=0. Rollback completo su qualsiasi eccezione.
+ *     foreign key spente. Rollback completo su qualsiasi eccezione.
  *  4) Post-commit, estrazione degli allegati dallo ZIP nella directory
  *     uploads/expenses/{user_id}/ (best-effort, errori loggati).
  */
@@ -181,7 +181,7 @@ final class BackupRestoreService
         $rows    = array_fill_keys(self::ALLOWED_TABLES, 0);
         $skipped = 0;
 
-        $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+        $pdo->exec('PRAGMA foreign_keys = OFF');
         $pdo->beginTransaction();
 
         try {
@@ -193,7 +193,7 @@ final class BackupRestoreService
             foreach ($lines as $line) {
                 $line = trim($line);
                 if ($line === '' || str_starts_with($line, '--')) continue;
-                if (stripos($line, 'SET FOREIGN_KEY_CHECKS') === 0) continue;
+                if (stripos($line, 'PRAGMA foreign_keys') === 0) continue;
                 if (stripos($line, 'INSERT INTO') !== 0) continue;
 
                 if (!preg_match(
@@ -247,11 +247,11 @@ final class BackupRestoreService
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+            $pdo->exec('PRAGMA foreign_keys = ON');
             throw $e;
         }
 
-        $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+        $pdo->exec('PRAGMA foreign_keys = ON');
 
         return ['rows_per_table' => $rows, 'skipped' => $skipped];
     }

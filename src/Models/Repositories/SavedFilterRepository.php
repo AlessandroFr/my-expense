@@ -35,7 +35,7 @@ final class SavedFilterRepository extends BaseRepository
         $this->exec(
             'INSERT INTO saved_filters (user_id, scope, name, payload)
              VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE payload = VALUES(payload)',
+             ON CONFLICT(user_id, scope, name) DO UPDATE SET payload = excluded.payload',
             [$userId, $scope, $name, $payloadJson],
         );
         return (int) $this->pdo()->lastInsertId();

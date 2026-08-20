@@ -97,7 +97,7 @@ final class TagRepository extends BaseRepository
             if ($clean !== []) {
                 $find = $pdo->prepare('SELECT id FROM tags WHERE user_id = ? AND name = ? LIMIT 1');
                 $ins  = $pdo->prepare('INSERT INTO tags (user_id, name) VALUES (?, ?)');
-                $link = $pdo->prepare('INSERT IGNORE INTO expense_tags (expense_id, tag_id) VALUES (?, ?)');
+                $link = $pdo->prepare('INSERT OR IGNORE INTO expense_tags (expense_id, tag_id) VALUES (?, ?)');
                 foreach ($clean as $name) {
                     $find->execute([$userId, $name]);
                     $tagId = $find->fetchColumn();

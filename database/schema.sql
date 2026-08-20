@@ -1,549 +1,553 @@
--- ─── my-expense — schema cumulativo ──────────────────────────────────────────
--- Importa con: mysql -u root my_expense < database/schema.sql
--- Oppure da phpMyAdmin: Crea il DB `my_expense`, poi Import → seleziona questo file.
+-- ─── my-expense — schema SQLite ─────────────────────────────────────────────
 --
--- Questo file rappresenta lo STATO FINALE dello schema (tutte le tabelle dopo
--- aver applicato tutte le migration in database/migrations/). Mantienilo in sync
--- ogni volta che aggiungi una migration.
+-- Generato dallo stato reale del database (schema.sql MySQL non includeva le
+-- colonne aggiunte dalle migration). Applicare con:
+--   sqlite3 data/my-expense.sqlite < database/schema.sql
+--
+-- Note sulla traduzione:
+--  · DECIMAL -> NUMERIC: SQLite non ha un tipo decimale. Gli importi sono
+--    float, quindi ogni aggregato va arrotondato (ROUND(SUM(...), 2)).
+--    Per precisione esatta servirebbero centesimi come INTEGER.
+--  · ENUM -> TEXT + CHECK, stessi valori ammessi.
+--  · ON UPDATE CURRENT_TIMESTAMP -> trigger AFTER UPDATE in fondo al file.
+--  · Le FK valgono solo con PRAGMA foreign_keys = ON a ogni connessione:
+--    in SQLite e' OFF di default (vedi src/class/Database.php).
 
-CREATE DATABASE IF NOT EXISTS `my_expense`
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_unicode_ci;
+PRAGMA foreign_keys = ON;
 
-USE `my_expense`;
-
--- ── Utenti (singolo utente per ora; schema pronto per multi se in futuro) ────
--- Migration: 023_password_reset.sql aggiunge reset_token_hash/expires_at per
--- il flusso di recovery file-based su /password/forgot.
 CREATE TABLE IF NOT EXISTS `users` (
-    `id`                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `username`               VARCHAR(64)  NOT NULL,
-    `password_hash`          VARCHAR(255) NOT NULL,
-    `created_at`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `last_login_at`          DATETIME     NULL,
-    `reset_token_hash`       CHAR(64)     NULL,
-    `reset_token_expires_at` DATETIME     NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_users_username` (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `username`               TEXT NOT NULL,
+    `password_hash`          TEXT NOT NULL,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `last_login_at`          TEXT,
+    `reset_token_hash`       TEXT,
+    `reset_token_expires_at` TEXT,
+    CONSTRAINT `uq_users_username` UNIQUE (`username`)
+);
 
--- ── Categorie spese (per-utente, con colore + icona + ordine) ────────────────
--- Migration: 001_categories.sql
-CREATE TABLE IF NOT EXISTS `categories` (
-    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id`    INT UNSIGNED NOT NULL,
-    `name`       VARCHAR(64)  NOT NULL,
-    `color`      VARCHAR(7)   NOT NULL DEFAULT '#6c757d',
-    `icon`       VARCHAR(32)  NULL,
-    `sort_order` INT          NOT NULL DEFAULT 0,
-    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_categories_user_name` (`user_id`, `name`),
-    KEY `ix_categories_user_sort` (`user_id`, `sort_order`),
-    CONSTRAINT `fk_categories_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Voci di spesa ────────────────────────────────────────────────────────────
--- Migration: 002_expenses.sql
-CREATE TABLE IF NOT EXISTS `expenses` (
-    `id`             INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`        INT UNSIGNED   NOT NULL,
-    `category_id`    INT UNSIGNED   NULL,
-    `amount`         DECIMAL(12,2)  NOT NULL,
-    `description`    TEXT           NULL,
-    `payment_method` ENUM('cash','card','transfer','other') NOT NULL DEFAULT 'card',
-    `expense_date`   DATE           NOT NULL,
-    `created_at`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_expenses_user_date`     (`user_id`, `expense_date` DESC),
-    KEY `ix_expenses_user_cat`      (`user_id`, `category_id`),
-    KEY `ix_expenses_user_date_cat` (`user_id`, `expense_date`, `category_id`),
-    CONSTRAINT `fk_expenses_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_expenses_category`
-        FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Budget mensili per categoria ─────────────────────────────────────────────
--- Migration: 003_budgets.sql
-CREATE TABLE IF NOT EXISTS `budgets` (
-    `id`          INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`     INT UNSIGNED   NOT NULL,
-    `category_id` INT UNSIGNED   NOT NULL,
-    `year_month`  CHAR(7)        NOT NULL,
-    `amount`      DECIMAL(12,2)  NOT NULL,
-    `created_at`  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_budgets_user_cat_month` (`user_id`, `category_id`, `year_month`),
-    KEY `ix_budgets_user_month` (`user_id`, `year_month`),
-    CONSTRAINT `fk_budgets_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_budgets_category`
-        FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Entrate (income) ─────────────────────────────────────────────────────────
--- Migration: 004_incomes.sql
-CREATE TABLE IF NOT EXISTS `incomes` (
-    `id`          INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`     INT UNSIGNED   NOT NULL,
-    `source`         VARCHAR(64)    NOT NULL,
-    `description`    TEXT           NULL,
-    `amount`         DECIMAL(12,2)  NOT NULL,
-    `payment_method` ENUM('cash','card','transfer','other') NOT NULL DEFAULT 'transfer',
-    `income_date`    DATE           NOT NULL,
-    `created_at`  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_incomes_user_date`   (`user_id`, `income_date` DESC),
-    KEY `ix_incomes_user_source` (`user_id`, `source`),
-    CONSTRAINT `fk_incomes_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Spese ricorrenti ─────────────────────────────────────────────────────────
--- Migration: 005_recurring_expenses.sql
-CREATE TABLE IF NOT EXISTS `recurring_expenses` (
-    `id`                  INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`             INT UNSIGNED   NOT NULL,
-    `category_id`         INT UNSIGNED   NULL,
-    `amount`              DECIMAL(12,2)  NOT NULL,
-    `description`         TEXT           NULL,
-    `payment_method`      ENUM('cash','card','transfer','other') NOT NULL DEFAULT 'card',
-    `frequency`           ENUM('weekly','monthly','yearly')      NOT NULL DEFAULT 'monthly',
-    `start_date`          DATE           NOT NULL,
-    `end_date`            DATE           NULL,
-    `last_generated_date` DATE           NULL,
-    `active`              TINYINT(1)     NOT NULL DEFAULT 1,
-    `created_at`          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_recurring_user_active` (`user_id`, `active`),
-    CONSTRAINT `fk_recurring_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_recurring_category`
-        FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Tag liberi per spese ─────────────────────────────────────────────────────
--- Migration: 006_tags.sql
-CREATE TABLE IF NOT EXISTS `tags` (
-    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id`    INT UNSIGNED NOT NULL,
-    `name`       VARCHAR(48)  NOT NULL,
-    `color`      VARCHAR(7)   NOT NULL DEFAULT '#6c757d',
-    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_tags_user_name` (`user_id`, `name`),
-    CONSTRAINT `fk_tags_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `expense_tags` (
-    `expense_id` INT UNSIGNED NOT NULL,
-    `tag_id`     INT UNSIGNED NOT NULL,
-    PRIMARY KEY (`expense_id`, `tag_id`),
-    KEY `ix_expense_tags_tag` (`tag_id`),
-    CONSTRAINT `fk_expense_tags_expense`
-        FOREIGN KEY (`expense_id`) REFERENCES `expenses` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_expense_tags_tag`
-        FOREIGN KEY (`tag_id`)     REFERENCES `tags`     (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Allegati per spese (foto scontrini, PDF) ─────────────────────────────────
--- Migration: 007_attachments.sql
-CREATE TABLE IF NOT EXISTS `expense_attachments` (
-    `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `expense_id`    INT UNSIGNED NOT NULL,
-    `user_id`       INT UNSIGNED NOT NULL,
-    `original_name` VARCHAR(255) NOT NULL,
-    `stored_name`   VARCHAR(96)  NOT NULL,
-    `mime_type`     VARCHAR(96)  NOT NULL,
-    `size_bytes`    INT UNSIGNED NOT NULL,
-    `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_attachments_expense` (`expense_id`),
-    KEY `ix_attachments_user`    (`user_id`),
-    CONSTRAINT `fk_attachments_expense`
-        FOREIGN KEY (`expense_id`) REFERENCES `expenses` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_attachments_user`
-        FOREIGN KEY (`user_id`)    REFERENCES `users`    (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Multi-conto ──────────────────────────────────────────────────────────────
--- Migration: 008_accounts.sql (+ ALTER su expenses/incomes/recurring per account_id)
--- Migration: 012_accounts_bank_details.sql (IBAN/BIC/banca/intestatario + tipo investment)
--- Migration: 015_cash_account.sql (flag is_default_cash per il conto cassa
---   "In tasca": riceve i pagamenti contanti e i prelievi bancomat in
---   partita doppia. Vincoli applicativi nel codice PHP: max 1 default per
---   user, valido solo se type='cash'.)
--- Migration: 019_account_types_and_transfers.sql (tipi `deposit` e `pac`
---   per conto deposito titoli e Piano di Accumulo Capitale; per questi
---   tipi i campi `iban`/`bank_name` ospitano IBAN e nome del broker.)
 CREATE TABLE IF NOT EXISTS `accounts` (
-    `id`              INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`         INT UNSIGNED   NOT NULL,
-    `name`            VARCHAR(64)    NOT NULL,
-    `type`            ENUM('checking','card','cash','savings','investment','deposit','pac','other') NOT NULL DEFAULT 'checking',
-    `color`           VARCHAR(7)     NOT NULL DEFAULT '#6c757d',
-    `icon`            VARCHAR(32)    NULL,
-    `opening_balance` DECIMAL(12,2)  NOT NULL DEFAULT 0,
-    `iban`            VARCHAR(34)    NULL,
-    `bic`             VARCHAR(11)    NULL,
-    `bank_name`       VARCHAR(128)   NULL,
-    `account_holder`  VARCHAR(128)   NULL,
-    `account_number`  VARCHAR(64)    NULL,
-    `notes`           VARCHAR(255)   NULL,
-    `archived`        TINYINT(1)     NOT NULL DEFAULT 0,
-    `is_default_cash` TINYINT(1)     NOT NULL DEFAULT 0,
-    `sort_order`      INT            NOT NULL DEFAULT 0,
-    `created_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_accounts_user_name` (`user_id`, `name`),
-    KEY `ix_accounts_user_sort` (`user_id`, `sort_order`),
-    CONSTRAINT `fk_accounts_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- NOTA: per gli ALTER TABLE che aggiungono `account_id` a expenses/incomes/recurring_expenses
---       vedere database/migrations/008_accounts.sql.
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `name`                   TEXT NOT NULL,
+    `type`                   TEXT NOT NULL DEFAULT 'checking' CHECK (`type` IN ('checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other')),
+    `color`                  TEXT NOT NULL DEFAULT '#6c757d',
+    `icon`                   TEXT,
+    `opening_balance`        NUMERIC NOT NULL DEFAULT 0.00,
+    `iban`                   TEXT,
+    `bic`                    TEXT,
+    `bank_name`              TEXT,
+    `account_holder`         TEXT,
+    `account_number`         TEXT,
+    `notes`                  TEXT,
+    `archived`               INTEGER NOT NULL DEFAULT 0,
+    `is_default_cash`        INTEGER NOT NULL DEFAULT 0,
+    `sort_order`             INTEGER NOT NULL DEFAULT 0,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_accounts_user_name` UNIQUE (`user_id`, `name`),
+    CONSTRAINT `fk_accounts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
 
--- ── Saved filters ────────────────────────────────────────────────────────────
--- Migration: 009_saved_filters.sql
--- Splitting (Migration: 010_expense_split.sql)
--- ALTER TABLE expenses ADD COLUMN shared_with VARCHAR(255) NULL AFTER description;
--- ALTER TABLE expenses ADD COLUMN share_amount DECIMAL(12,2) NULL AFTER shared_with;
--- (gestiti via migration; non duplicati qui per evitare rebuild da zero invasivo)
---
--- Bank import (Migration: 011_bank_import.sql)
--- ALTER TABLE expenses ADD COLUMN value_date  DATE     NULL AFTER expense_date;
--- ALTER TABLE expenses ADD COLUMN import_hash CHAR(64) NULL AFTER updated_at;
--- ALTER TABLE expenses ADD UNIQUE KEY uq_expenses_user_imphash (user_id, import_hash);
--- ALTER TABLE incomes  ADD COLUMN value_date  DATE     NULL AFTER income_date;
--- ALTER TABLE incomes  ADD COLUMN import_hash CHAR(64) NULL AFTER updated_at;
--- ALTER TABLE incomes  ADD UNIQUE KEY uq_incomes_user_imphash  (user_id, import_hash);
---
--- Rateizzazione (Migration: 022_expense_installments.sql)
--- ALTER TABLE expenses ADD COLUMN parent_expense_id INT UNSIGNED NULL AFTER import_hash;
--- ALTER TABLE expenses ADD COLUMN installment_seq   INT UNSIGNED NULL AFTER parent_expense_id;
--- ALTER TABLE expenses ADD COLUMN installment_total INT UNSIGNED NULL AFTER installment_seq;
--- ALTER TABLE expenses ADD KEY ix_expenses_parent (parent_expense_id);
--- ALTER TABLE expenses ADD CONSTRAINT fk_expenses_parent
---     FOREIGN KEY (parent_expense_id) REFERENCES expenses(id) ON DELETE SET NULL;
--- (rata #1: parent_expense_id NULL + installment_seq=1; rate #2..N puntano alla #1.
---  ON DELETE SET NULL preserva le rate residue se la #1 viene cancellata.)
+CREATE INDEX IF NOT EXISTS `ix_accounts_user_sort` ON `accounts` (`user_id`, `sort_order`);
 
-CREATE TABLE IF NOT EXISTS `saved_filters` (
-    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id`    INT UNSIGNED NOT NULL,
-    `scope`      VARCHAR(32)  NOT NULL DEFAULT 'expenses',
-    `name`       VARCHAR(64)  NOT NULL,
-    `payload`    JSON         NOT NULL,
-    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_saved_filters_user_scope_name` (`user_id`, `scope`, `name`),
-    CONSTRAINT `fk_saved_filters_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Anagrafiche fornitori/clienti ────────────────────────────────────────────
--- Migration: 017_contacts.sql (+ ALTER su expenses/incomes/recurring per contact_id)
--- name_norm e' il nome normalizzato (lower + trim + spazi collassati) usato
--- per il matching case-insensitive in import bank statement.
-CREATE TABLE IF NOT EXISTS `contacts` (
-    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id`    INT UNSIGNED NOT NULL,
-    `name`       VARCHAR(120) NOT NULL,
-    `name_norm`  VARCHAR(120) NOT NULL,
-    `type`       ENUM('supplier','customer','both') NOT NULL DEFAULT 'both',
-    `vat_number` VARCHAR(32)  NULL,
-    `iban`       VARCHAR(34)  NULL,
-    `email`      VARCHAR(120) NULL,
-    `notes`      TEXT         NULL,
-    `color`      VARCHAR(7)   NOT NULL DEFAULT '#6c757d',
-    `archived`   TINYINT(1)   NOT NULL DEFAULT 0,
-    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_contacts_user_namenorm` (`user_id`, `name_norm`),
-    KEY `ix_contacts_user_archived` (`user_id`, `archived`),
-    CONSTRAINT `fk_contacts_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- NOTA: per gli ALTER TABLE che aggiungono `contact_id` a expenses/incomes/recurring_expenses
---       vedere database/migrations/017_contacts.sql.
-
--- ── Riconciliazioni conti ────────────────────────────────────────────────────
--- Migration: 018_account_reconciliations.sql
--- L'utente dichiara il saldo reale di un conto a una data; il sistema
--- calcola la differenza rispetto a opening_balance + entrate − spese e
--- genera un movimento di rettifica (Expense o Income, categoria/source
--- "Rettifica"). Lo storico tiene traccia anche delle riconciliazioni
--- senza differenza (verifiche OK).
-CREATE TABLE IF NOT EXISTS `account_reconciliations` (
-    `id`                    INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-    `user_id`               INT UNSIGNED  NOT NULL,
-    `account_id`            INT UNSIGNED  NOT NULL,
-    `reconciled_at`         DATE          NOT NULL,
-    `declared_balance`      DECIMAL(12,2) NOT NULL,
-    `calculated_balance`    DECIMAL(12,2) NOT NULL,
-    `difference`            DECIMAL(12,2) NOT NULL,
-    `adjustment_type`       ENUM('expense','income','none') NOT NULL DEFAULT 'none',
-    `adjustment_expense_id` INT UNSIGNED  NULL,
-    `adjustment_income_id`  INT UNSIGNED  NULL,
-    `notes`                 VARCHAR(255)  NULL,
-    `created_at`            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_recon_user_account` (`user_id`, `account_id`, `reconciled_at`),
-    CONSTRAINT `fk_recon_user`
-        FOREIGN KEY (`user_id`)    REFERENCES `users`    (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_recon_account`
-        FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_recon_expense`
-        FOREIGN KEY (`adjustment_expense_id`) REFERENCES `expenses` (`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_recon_income`
-        FOREIGN KEY (`adjustment_income_id`)  REFERENCES `incomes`  (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ── Trasferimenti atomici fra conti ──────────────────────────────────────────
--- Migration: 019_account_types_and_transfers.sql
--- Un Transfer rappresenta un bonifico fra due conti dell'utente. In una
--- transazione DB unica vengono create:
---   • una `expenses` row sul conto sorgente con `is_transfer=1` e
---     `transfer_id` settato (uscita reale dal conto);
---   • una `incomes`  row sul conto destinazione con `is_transfer=1` e
---     `transfer_id` settato (entrata reale sul conto).
--- Saldo conto = include i transfer (sono uscite/entrate vere). KPI mensili
--- dashboard/reports filtrano `is_transfer=0` per non gonfiare i totali.
--- ON DELETE CASCADE su `transfer_id` rimuove le due scritture quando il
--- transfer viene eliminato.
-CREATE TABLE IF NOT EXISTS `transfers` (
-    `id`                       INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`                  INT UNSIGNED   NOT NULL,
-    `source_account_id`        INT UNSIGNED   NOT NULL,
-    `destination_account_id`   INT UNSIGNED   NOT NULL,
-    `amount`                   DECIMAL(12,2)  NOT NULL,
-    `transfer_date`            DATE           NOT NULL,
-    `description`              VARCHAR(255)   NULL,
-    `notes`                    VARCHAR(255)   NULL,
-    `created_at`               DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`               DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_transfers_user_date` (`user_id`, `transfer_date` DESC),
-    KEY `ix_transfers_user_src`  (`user_id`, `source_account_id`),
-    KEY `ix_transfers_user_dst`  (`user_id`, `destination_account_id`),
-    CONSTRAINT `fk_transfers_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_transfers_source`
-        FOREIGN KEY (`source_account_id`)      REFERENCES `accounts` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_transfers_destination`
-        FOREIGN KEY (`destination_account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- NOTA: per gli ALTER TABLE che aggiungono `transfer_id` UNIQUE FK + flag
---       `is_transfer` a expenses/incomes vedere
---       database/migrations/019_account_types_and_transfers.sql.
-
--- ── Investimenti: asset class, strumenti, prezzi, transazioni ─────────────────
--- Migration: 020_securities.sql
--- Schema completo per il dominio investimenti su conto deposito titoli.
--- Le holdings (qty, prezzo medio carico, mark-to-market) sono derivate via
--- aggregation in HoldingsRepository, NON salvate. La cancellazione di una
--- transazione mantiene la coerenza senza logica extra.
--- Le righe `expenses` create da BUY/FEE sono flaggate `is_investment=1`
--- (vedi ALTER expenses sotto).
 CREATE TABLE IF NOT EXISTS `asset_classes` (
-    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id`    INT UNSIGNED NOT NULL,
-    `name`       VARCHAR(48)  NOT NULL,
-    `color`      VARCHAR(7)   NOT NULL DEFAULT '#6c757d',
-    `icon`       VARCHAR(32)  NULL,
-    `sort_order` INT          NOT NULL DEFAULT 0,
-    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_asset_classes_user_name` (`user_id`, `name`),
-    KEY `ix_asset_classes_user_sort` (`user_id`, `sort_order`),
-    CONSTRAINT `fk_asset_classes_user`
-        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `name`                   TEXT NOT NULL,
+    `color`                  TEXT NOT NULL DEFAULT '#6c757d',
+    `icon`                   TEXT,
+    `sort_order`             INTEGER NOT NULL DEFAULT 0,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_asset_classes_user_name` UNIQUE (`user_id`, `name`),
+    CONSTRAINT `fk_asset_classes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
 
-CREATE TABLE IF NOT EXISTS `securities_instruments` (
-    `id`              INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`         INT UNSIGNED   NOT NULL,
-    `account_id`      INT UNSIGNED   NULL,
-    `asset_class_id`  INT UNSIGNED   NULL,
-    `isin`            CHAR(12)       NULL,
-    `ticker`          VARCHAR(16)    NULL,
-    `name`            VARCHAR(128)   NOT NULL,
-    `currency`        CHAR(3)        NOT NULL DEFAULT 'EUR',
-    `notes`           TEXT           NULL,
-    `archived`        TINYINT(1)     NOT NULL DEFAULT 0,
-    `created_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_securities_user_isin`   (`user_id`, `isin`),
-    UNIQUE KEY `uq_securities_user_ticker` (`user_id`, `ticker`),
-    KEY `ix_securities_user_account` (`user_id`, `account_id`),
-    KEY `ix_securities_user_class`   (`user_id`, `asset_class_id`),
-    CONSTRAINT `fk_securities_user`
-        FOREIGN KEY (`user_id`)         REFERENCES `users`         (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_securities_account`
-        FOREIGN KEY (`account_id`)      REFERENCES `accounts`      (`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_securities_class`
-        FOREIGN KEY (`asset_class_id`)  REFERENCES `asset_classes` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX IF NOT EXISTS `ix_asset_classes_user_sort` ON `asset_classes` (`user_id`, `sort_order`);
 
-CREATE TABLE IF NOT EXISTS `securities_prices` (
-    `id`            INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `instrument_id` INT UNSIGNED   NOT NULL,
-    `price_date`    DATE           NOT NULL,
-    `price`         DECIMAL(18,6)  NOT NULL,
-    `source`        ENUM('manual','external') NOT NULL DEFAULT 'manual',
-    `created_at`    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_prices_instr_date` (`instrument_id`, `price_date`),
-    CONSTRAINT `fk_prices_instr`
-        FOREIGN KEY (`instrument_id`) REFERENCES `securities_instruments` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `categories` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `name`                   TEXT NOT NULL,
+    `color`                  TEXT NOT NULL DEFAULT '#6c757d',
+    `icon`                   TEXT,
+    `sort_order`             INTEGER NOT NULL DEFAULT 0,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_categories_user_name` UNIQUE (`user_id`, `name`),
+    CONSTRAINT `fk_categories_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
 
-CREATE TABLE IF NOT EXISTS `securities_transactions` (
-    `id`              INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`         INT UNSIGNED   NOT NULL,
-    `account_id`      INT UNSIGNED   NOT NULL,
-    `instrument_id`   INT UNSIGNED   NOT NULL,
-    `kind`            ENUM('BUY','SELL','DIVIDEND','FEE','SPLIT') NOT NULL,
-    `trade_date`      DATE           NOT NULL,
-    `settlement_date` DATE           NULL,
-    `quantity`        DECIMAL(18,6)  NOT NULL DEFAULT 0,
-    `price`           DECIMAL(18,6)  NOT NULL DEFAULT 0,
-    `fee`             DECIMAL(12,2)  NOT NULL DEFAULT 0,
-    `gross_amount`    DECIMAL(14,2)  NOT NULL DEFAULT 0,
-    `net_amount`      DECIMAL(14,2)  NOT NULL DEFAULT 0,
-    `tax_withheld`    DECIMAL(12,2)  NOT NULL DEFAULT 0,
-    `expense_id`      INT UNSIGNED   NULL,
-    `income_id`       INT UNSIGNED   NULL,
-    `notes`           TEXT           NULL,
-    `created_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_sectx_expense` (`expense_id`),
-    UNIQUE KEY `uq_sectx_income`  (`income_id`),
-    KEY `ix_sectx_user_account_date` (`user_id`, `account_id`, `trade_date` DESC),
-    KEY `ix_sectx_instrument_date`   (`instrument_id`, `trade_date` DESC),
-    KEY `ix_sectx_user_kind_date`    (`user_id`, `kind`, `trade_date` DESC),
-    CONSTRAINT `fk_sectx_user`
-        FOREIGN KEY (`user_id`)        REFERENCES `users`                  (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_sectx_account`
-        FOREIGN KEY (`account_id`)     REFERENCES `accounts`               (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_sectx_instrument`
-        FOREIGN KEY (`instrument_id`)  REFERENCES `securities_instruments` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_sectx_expense`
-        FOREIGN KEY (`expense_id`)     REFERENCES `expenses`               (`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_sectx_income`
-        FOREIGN KEY (`income_id`)      REFERENCES `incomes`                (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- NOTA: per ALTER expenses ADD COLUMN `is_investment` TINYINT NOT NULL DEFAULT 0
---       vedere database/migrations/020_securities.sql.
+CREATE INDEX IF NOT EXISTS `ix_categories_user_sort` ON `categories` (`user_id`, `sort_order`);
 
--- ── Piano di Accumulo Capitale (PAC) ─────────────────────────────────────────
--- Migration: 021_pac.sql
--- pac_funds = catalogo fondi/ETF, pac_fund_navs = storico NAV manuale,
--- pac_plans = piani periodici (importo + frequenza + IBAN/keyword per
--- riconoscimento bank import), pac_contributions = versamenti idempotenti
--- generati da PacService o riconosciuti dall'estratto conto.
--- Ogni contribuzione produce un Transfer atomico (CC -> conto PAC) via FK.
+CREATE TABLE IF NOT EXISTS `contacts` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `name`                   TEXT NOT NULL,
+    `name_norm`              TEXT NOT NULL,
+    `type`                   TEXT NOT NULL DEFAULT 'both' CHECK (`type` IN ('supplier', 'customer', 'both')),
+    `vat_number`             TEXT,
+    `iban`                   TEXT,
+    `email`                  TEXT,
+    `notes`                  TEXT,
+    `color`                  TEXT NOT NULL DEFAULT '#6c757d',
+    `archived`               INTEGER NOT NULL DEFAULT 0,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_contacts_user_namenorm` UNIQUE (`user_id`, `name_norm`),
+    CONSTRAINT `fk_contacts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `ix_contacts_user_archived` ON `contacts` (`user_id`, `archived`);
+
 CREATE TABLE IF NOT EXISTS `pac_funds` (
-    `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id`         INT UNSIGNED NOT NULL,
-    `asset_class_id`  INT UNSIGNED NULL,
-    `name`            VARCHAR(128) NOT NULL,
-    `isin`            CHAR(12)     NULL,
-    `fund_type`       ENUM('etf','mutual','index','other') NOT NULL DEFAULT 'etf',
-    `currency`        CHAR(3)      NOT NULL DEFAULT 'EUR',
-    `notes`           TEXT         NULL,
-    `archived`        TINYINT(1)   NOT NULL DEFAULT 0,
-    `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_pac_funds_user_name` (`user_id`, `name`),
-    UNIQUE KEY `uq_pac_funds_user_isin` (`user_id`, `isin`),
-    KEY `ix_pac_funds_user_class` (`user_id`, `asset_class_id`),
-    CONSTRAINT `fk_pac_funds_user`
-        FOREIGN KEY (`user_id`)        REFERENCES `users`         (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_pac_funds_class`
-        FOREIGN KEY (`asset_class_id`) REFERENCES `asset_classes` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `asset_class_id`         INTEGER,
+    `name`                   TEXT NOT NULL,
+    `isin`                   TEXT,
+    `fund_type`              TEXT NOT NULL DEFAULT 'etf' CHECK (`fund_type` IN ('etf', 'mutual', 'index', 'other')),
+    `currency`               TEXT NOT NULL DEFAULT 'EUR',
+    `notes`                  TEXT,
+    `archived`               INTEGER NOT NULL DEFAULT 0,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_pac_funds_user_isin` UNIQUE (`user_id`, `isin`),
+    CONSTRAINT `uq_pac_funds_user_name` UNIQUE (`user_id`, `name`),
+    CONSTRAINT `fk_pac_funds_class` FOREIGN KEY (`asset_class_id`) REFERENCES `asset_classes` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_pac_funds_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
 
-CREATE TABLE IF NOT EXISTS `pac_fund_navs` (
-    `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-    `fund_id`    INT UNSIGNED  NOT NULL,
-    `nav_date`   DATE          NOT NULL,
-    `nav`        DECIMAL(18,6) NOT NULL,
-    `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_pac_navs_fund_date` (`fund_id`, `nav_date`),
-    CONSTRAINT `fk_pac_navs_fund`
-        FOREIGN KEY (`fund_id`) REFERENCES `pac_funds` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX IF NOT EXISTS `fk_pac_funds_class` ON `pac_funds` (`asset_class_id`);
+CREATE INDEX IF NOT EXISTS `ix_pac_funds_user_class` ON `pac_funds` (`user_id`, `asset_class_id`);
 
 CREATE TABLE IF NOT EXISTS `pac_plans` (
-    `id`                  INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`             INT UNSIGNED   NOT NULL,
-    `account_id`          INT UNSIGNED   NOT NULL,
-    `source_account_id`   INT UNSIGNED   NULL,
-    `fund_id`             INT UNSIGNED   NOT NULL,
-    `name`                VARCHAR(96)    NOT NULL,
-    `frequency`           ENUM('weekly','monthly','quarterly','yearly') NOT NULL DEFAULT 'monthly',
-    `amount`              DECIMAL(12,2)  NOT NULL,
-    `start_date`          DATE           NOT NULL,
-    `end_date`            DATE           NULL,
-    `last_generated_date` DATE           NULL,
-    `beneficiary_iban`    CHAR(34)       NULL,
-    `beneficiary_keyword` VARCHAR(64)    NULL,
-    `active`              TINYINT(1)     NOT NULL DEFAULT 1,
-    `notes`               VARCHAR(255)   NULL,
-    `created_at`          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `ix_pac_plans_user_active`  (`user_id`, `active`),
-    KEY `ix_pac_plans_user_account` (`user_id`, `account_id`),
-    KEY `ix_pac_plans_user_fund`    (`user_id`, `fund_id`),
-    KEY `ix_pac_plans_keyword`      (`user_id`, `beneficiary_keyword`),
-    CONSTRAINT `fk_pac_plans_user`
-        FOREIGN KEY (`user_id`)            REFERENCES `users`     (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_pac_plans_account`
-        FOREIGN KEY (`account_id`)         REFERENCES `accounts`  (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_pac_plans_source`
-        FOREIGN KEY (`source_account_id`)  REFERENCES `accounts`  (`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_pac_plans_fund`
-        FOREIGN KEY (`fund_id`)            REFERENCES `pac_funds` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `account_id`             INTEGER NOT NULL,
+    `source_account_id`      INTEGER,
+    `fund_id`                INTEGER NOT NULL,
+    `name`                   TEXT NOT NULL,
+    `frequency`              TEXT NOT NULL DEFAULT 'monthly' CHECK (`frequency` IN ('weekly', 'monthly', 'quarterly', 'yearly')),
+    `amount`                 NUMERIC NOT NULL,
+    `start_date`             TEXT NOT NULL,
+    `end_date`               TEXT,
+    `last_generated_date`    TEXT,
+    `beneficiary_iban`       TEXT,
+    `beneficiary_keyword`    TEXT,
+    `active`                 INTEGER NOT NULL DEFAULT 1,
+    `notes`                  TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_pac_plans_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_pac_plans_fund` FOREIGN KEY (`fund_id`) REFERENCES `pac_funds` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_pac_plans_source` FOREIGN KEY (`source_account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_pac_plans_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_pac_plans_account` ON `pac_plans` (`account_id`);
+CREATE INDEX IF NOT EXISTS `fk_pac_plans_fund` ON `pac_plans` (`fund_id`);
+CREATE INDEX IF NOT EXISTS `fk_pac_plans_source` ON `pac_plans` (`source_account_id`);
+CREATE INDEX IF NOT EXISTS `ix_pac_plans_keyword` ON `pac_plans` (`user_id`, `beneficiary_keyword`);
+CREATE INDEX IF NOT EXISTS `ix_pac_plans_user_account` ON `pac_plans` (`user_id`, `account_id`);
+CREATE INDEX IF NOT EXISTS `ix_pac_plans_user_active` ON `pac_plans` (`user_id`, `active`);
+CREATE INDEX IF NOT EXISTS `ix_pac_plans_user_fund` ON `pac_plans` (`user_id`, `fund_id`);
+
+CREATE TABLE IF NOT EXISTS `recurring_expenses` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `category_id`            INTEGER,
+    `contact_id`             INTEGER,
+    `account_id`             INTEGER,
+    `amount`                 NUMERIC NOT NULL,
+    `description`            TEXT,
+    `payment_method`         TEXT NOT NULL DEFAULT 'card' CHECK (`payment_method` IN ('cash', 'card', 'transfer', 'other')),
+    `frequency`              TEXT NOT NULL DEFAULT 'monthly' CHECK (`frequency` IN ('weekly', 'monthly', 'yearly')),
+    `start_date`             TEXT NOT NULL,
+    `end_date`               TEXT,
+    `last_generated_date`    TEXT,
+    `active`                 INTEGER NOT NULL DEFAULT 1,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_recurring_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_recurring_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_recurring_contact` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_recurring_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_recurring_account` ON `recurring_expenses` (`account_id`);
+CREATE INDEX IF NOT EXISTS `fk_recurring_category` ON `recurring_expenses` (`category_id`);
+CREATE INDEX IF NOT EXISTS `fk_recurring_contact` ON `recurring_expenses` (`contact_id`);
+CREATE INDEX IF NOT EXISTS `ix_recurring_user_account` ON `recurring_expenses` (`user_id`, `account_id`);
+CREATE INDEX IF NOT EXISTS `ix_recurring_user_active` ON `recurring_expenses` (`user_id`, `active`);
+CREATE INDEX IF NOT EXISTS `ix_recurring_user_contact` ON `recurring_expenses` (`user_id`, `contact_id`);
+
+CREATE TABLE IF NOT EXISTS `saved_filters` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `scope`                  TEXT NOT NULL DEFAULT 'expenses',
+    `name`                   TEXT NOT NULL,
+    `payload`                TEXT NOT NULL,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_saved_filters_user_scope_name` UNIQUE (`user_id`, `scope`, `name`),
+    CONSTRAINT `fk_saved_filters_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `securities_instruments` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `account_id`             INTEGER,
+    `asset_class_id`         INTEGER,
+    `isin`                   TEXT,
+    `ticker`                 TEXT,
+    `name`                   TEXT NOT NULL,
+    `currency`               TEXT NOT NULL DEFAULT 'EUR',
+    `notes`                  TEXT,
+    `archived`               INTEGER NOT NULL DEFAULT 0,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_securities_user_isin` UNIQUE (`user_id`, `isin`),
+    CONSTRAINT `uq_securities_user_ticker` UNIQUE (`user_id`, `ticker`),
+    CONSTRAINT `fk_securities_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_securities_class` FOREIGN KEY (`asset_class_id`) REFERENCES `asset_classes` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_securities_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_securities_account` ON `securities_instruments` (`account_id`);
+CREATE INDEX IF NOT EXISTS `fk_securities_class` ON `securities_instruments` (`asset_class_id`);
+CREATE INDEX IF NOT EXISTS `ix_securities_user_account` ON `securities_instruments` (`user_id`, `account_id`);
+CREATE INDEX IF NOT EXISTS `ix_securities_user_class` ON `securities_instruments` (`user_id`, `asset_class_id`);
+
+CREATE TABLE IF NOT EXISTS `securities_prices` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `instrument_id`          INTEGER NOT NULL,
+    `price_date`             TEXT NOT NULL,
+    `price`                  NUMERIC NOT NULL,
+    `source`                 TEXT NOT NULL DEFAULT 'manual' CHECK (`source` IN ('manual', 'external')),
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_prices_instr_date` UNIQUE (`instrument_id`, `price_date`),
+    CONSTRAINT `fk_prices_instr` FOREIGN KEY (`instrument_id`) REFERENCES `securities_instruments` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `tags` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `name`                   TEXT NOT NULL,
+    `color`                  TEXT NOT NULL DEFAULT '#6c757d',
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_tags_user_name` UNIQUE (`user_id`, `name`),
+    CONSTRAINT `fk_tags_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `transfers` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `source_account_id`      INTEGER NOT NULL,
+    `destination_account_id` INTEGER NOT NULL,
+    `amount`                 NUMERIC NOT NULL,
+    `transfer_date`          TEXT NOT NULL,
+    `description`            TEXT,
+    `notes`                  TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_transfers_destination` FOREIGN KEY (`destination_account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_transfers_source` FOREIGN KEY (`source_account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_transfers_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_transfers_destination` ON `transfers` (`destination_account_id`);
+CREATE INDEX IF NOT EXISTS `fk_transfers_source` ON `transfers` (`source_account_id`);
+CREATE INDEX IF NOT EXISTS `ix_transfers_user_date` ON `transfers` (`user_id`, `transfer_date`);
+CREATE INDEX IF NOT EXISTS `ix_transfers_user_dst` ON `transfers` (`user_id`, `destination_account_id`);
+CREATE INDEX IF NOT EXISTS `ix_transfers_user_src` ON `transfers` (`user_id`, `source_account_id`);
+
+CREATE TABLE IF NOT EXISTS `budgets` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `category_id`            INTEGER NOT NULL,
+    `year_month`             TEXT NOT NULL,
+    `amount`                 NUMERIC NOT NULL,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_budgets_user_cat_month` UNIQUE (`user_id`, `category_id`, `year_month`),
+    CONSTRAINT `fk_budgets_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_budgets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_budgets_category` ON `budgets` (`category_id`);
+CREATE INDEX IF NOT EXISTS `ix_budgets_user_month` ON `budgets` (`user_id`, `year_month`);
+
+CREATE TABLE IF NOT EXISTS `expenses` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `category_id`            INTEGER,
+    `contact_id`             INTEGER,
+    `account_id`             INTEGER,
+    `amount`                 NUMERIC NOT NULL,
+    `description`            TEXT,
+    `shared_with`            TEXT,
+    `share_amount`           NUMERIC,
+    `payment_method`         TEXT NOT NULL DEFAULT 'card' CHECK (`payment_method` IN ('cash', 'card', 'transfer', 'other')),
+    `expense_date`           TEXT NOT NULL,
+    `value_date`             TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `import_hash`            TEXT,
+    `parent_expense_id`      INTEGER,
+    `installment_seq`        INTEGER,
+    `installment_total`      INTEGER,
+    `transfer_id`            INTEGER,
+    `is_transfer`            INTEGER NOT NULL DEFAULT 0,
+    `is_investment`          INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT `uq_expenses_transfer` UNIQUE (`transfer_id`),
+    CONSTRAINT `uq_expenses_user_imphash` UNIQUE (`user_id`, `import_hash`),
+    CONSTRAINT `fk_expenses_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_expenses_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_expenses_contact` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_expenses_parent` FOREIGN KEY (`parent_expense_id`) REFERENCES `expenses` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_expenses_transfer` FOREIGN KEY (`transfer_id`) REFERENCES `transfers` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_expenses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_expenses_account` ON `expenses` (`account_id`);
+CREATE INDEX IF NOT EXISTS `fk_expenses_category` ON `expenses` (`category_id`);
+CREATE INDEX IF NOT EXISTS `fk_expenses_contact` ON `expenses` (`contact_id`);
+CREATE INDEX IF NOT EXISTS `ix_expenses_parent` ON `expenses` (`parent_expense_id`);
+CREATE INDEX IF NOT EXISTS `ix_expenses_user_account` ON `expenses` (`user_id`, `account_id`);
+CREATE INDEX IF NOT EXISTS `ix_expenses_user_cat` ON `expenses` (`user_id`, `category_id`);
+CREATE INDEX IF NOT EXISTS `ix_expenses_user_contact` ON `expenses` (`user_id`, `contact_id`);
+CREATE INDEX IF NOT EXISTS `ix_expenses_user_date` ON `expenses` (`user_id`, `expense_date`);
+CREATE INDEX IF NOT EXISTS `ix_expenses_user_date_cat` ON `expenses` (`user_id`, `expense_date`, `category_id`);
+
+CREATE TABLE IF NOT EXISTS `incomes` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `contact_id`             INTEGER,
+    `account_id`             INTEGER,
+    `source`                 TEXT NOT NULL,
+    `description`            TEXT,
+    `amount`                 NUMERIC NOT NULL,
+    `payment_method`         TEXT NOT NULL DEFAULT 'transfer' CHECK (`payment_method` IN ('cash', 'card', 'transfer', 'other')),
+    `income_date`            TEXT NOT NULL,
+    `value_date`             TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `import_hash`            TEXT,
+    `transfer_id`            INTEGER,
+    `is_transfer`            INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT `uq_incomes_transfer` UNIQUE (`transfer_id`),
+    CONSTRAINT `uq_incomes_user_imphash` UNIQUE (`user_id`, `import_hash`),
+    CONSTRAINT `fk_incomes_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_incomes_contact` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_incomes_transfer` FOREIGN KEY (`transfer_id`) REFERENCES `transfers` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_incomes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_incomes_account` ON `incomes` (`account_id`);
+CREATE INDEX IF NOT EXISTS `fk_incomes_contact` ON `incomes` (`contact_id`);
+CREATE INDEX IF NOT EXISTS `ix_incomes_user_account` ON `incomes` (`user_id`, `account_id`);
+CREATE INDEX IF NOT EXISTS `ix_incomes_user_contact` ON `incomes` (`user_id`, `contact_id`);
+CREATE INDEX IF NOT EXISTS `ix_incomes_user_date` ON `incomes` (`user_id`, `income_date`);
+CREATE INDEX IF NOT EXISTS `ix_incomes_user_source` ON `incomes` (`user_id`, `source`);
 
 CREATE TABLE IF NOT EXISTS `pac_contributions` (
-    `id`                INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `user_id`           INT UNSIGNED   NOT NULL,
-    `plan_id`           INT UNSIGNED   NOT NULL,
-    `contribution_date` DATE           NOT NULL,
-    `amount`            DECIMAL(12,2)  NOT NULL,
-    `nav`               DECIMAL(18,6)  NULL,
-    `units`             DECIMAL(18,6)  NULL,
-    `transfer_id`       INT UNSIGNED   NULL,
-    `source`            ENUM('auto','manual','import') NOT NULL DEFAULT 'manual',
-    `notes`             VARCHAR(255)   NULL,
-    `created_at`        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_pac_contrib_plan_date` (`plan_id`, `contribution_date`),
-    KEY `ix_pac_contrib_user_date` (`user_id`, `contribution_date` DESC),
-    KEY `ix_pac_contrib_transfer`  (`transfer_id`),
-    CONSTRAINT `fk_pac_contrib_user`
-        FOREIGN KEY (`user_id`)     REFERENCES `users`     (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_pac_contrib_plan`
-        FOREIGN KEY (`plan_id`)     REFERENCES `pac_plans` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_pac_contrib_transfer`
-        FOREIGN KEY (`transfer_id`) REFERENCES `transfers` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `plan_id`                INTEGER NOT NULL,
+    `contribution_date`      TEXT NOT NULL,
+    `amount`                 NUMERIC NOT NULL,
+    `nav`                    NUMERIC,
+    `units`                  NUMERIC,
+    `transfer_id`            INTEGER,
+    `source`                 TEXT NOT NULL DEFAULT 'manual' CHECK (`source` IN ('auto', 'manual', 'import')),
+    `notes`                  TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_pac_contrib_plan_date` UNIQUE (`plan_id`, `contribution_date`),
+    CONSTRAINT `fk_pac_contrib_plan` FOREIGN KEY (`plan_id`) REFERENCES `pac_plans` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_pac_contrib_transfer` FOREIGN KEY (`transfer_id`) REFERENCES `transfers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_pac_contrib_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `ix_pac_contrib_transfer` ON `pac_contributions` (`transfer_id`);
+CREATE INDEX IF NOT EXISTS `ix_pac_contrib_user_date` ON `pac_contributions` (`user_id`, `contribution_date`);
+
+CREATE TABLE IF NOT EXISTS `pac_fund_navs` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `fund_id`                INTEGER NOT NULL,
+    `nav_date`               TEXT NOT NULL,
+    `nav`                    NUMERIC NOT NULL,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_pac_navs_fund_date` UNIQUE (`fund_id`, `nav_date`),
+    CONSTRAINT `fk_pac_navs_fund` FOREIGN KEY (`fund_id`) REFERENCES `pac_funds` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `securities_transactions` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `account_id`             INTEGER NOT NULL,
+    `instrument_id`          INTEGER NOT NULL,
+    `kind`                   TEXT NOT NULL CHECK (`kind` IN ('BUY', 'SELL', 'DIVIDEND', 'FEE', 'SPLIT')),
+    `trade_date`             TEXT NOT NULL,
+    `settlement_date`        TEXT,
+    `quantity`               NUMERIC NOT NULL DEFAULT 0.000000,
+    `price`                  NUMERIC NOT NULL DEFAULT 0.000000,
+    `fee`                    NUMERIC NOT NULL DEFAULT 0.00,
+    `gross_amount`           NUMERIC NOT NULL DEFAULT 0.00,
+    `net_amount`             NUMERIC NOT NULL DEFAULT 0.00,
+    `tax_withheld`           NUMERIC NOT NULL DEFAULT 0.00,
+    `expense_id`             INTEGER,
+    `income_id`              INTEGER,
+    `notes`                  TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_sectx_expense` UNIQUE (`expense_id`),
+    CONSTRAINT `uq_sectx_income` UNIQUE (`income_id`),
+    CONSTRAINT `fk_sectx_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_sectx_expense` FOREIGN KEY (`expense_id`) REFERENCES `expenses` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_sectx_income` FOREIGN KEY (`income_id`) REFERENCES `incomes` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_sectx_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `securities_instruments` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_sectx_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_sectx_account` ON `securities_transactions` (`account_id`);
+CREATE INDEX IF NOT EXISTS `ix_sectx_instrument_date` ON `securities_transactions` (`instrument_id`, `trade_date`);
+CREATE INDEX IF NOT EXISTS `ix_sectx_user_account_date` ON `securities_transactions` (`user_id`, `account_id`, `trade_date`);
+CREATE INDEX IF NOT EXISTS `ix_sectx_user_kind_date` ON `securities_transactions` (`user_id`, `kind`, `trade_date`);
+
+CREATE TABLE IF NOT EXISTS `account_reconciliations` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `account_id`             INTEGER NOT NULL,
+    `reconciled_at`          TEXT NOT NULL,
+    `declared_balance`       NUMERIC NOT NULL,
+    `calculated_balance`     NUMERIC NOT NULL,
+    `difference`             NUMERIC NOT NULL,
+    `adjustment_type`        TEXT NOT NULL DEFAULT 'none' CHECK (`adjustment_type` IN ('expense', 'income', 'none')),
+    `adjustment_expense_id`  INTEGER,
+    `adjustment_income_id`   INTEGER,
+    `notes`                  TEXT,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_recon_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_recon_expense` FOREIGN KEY (`adjustment_expense_id`) REFERENCES `expenses` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_recon_income` FOREIGN KEY (`adjustment_income_id`) REFERENCES `incomes` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_recon_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `fk_recon_account` ON `account_reconciliations` (`account_id`);
+CREATE INDEX IF NOT EXISTS `fk_recon_expense` ON `account_reconciliations` (`adjustment_expense_id`);
+CREATE INDEX IF NOT EXISTS `fk_recon_income` ON `account_reconciliations` (`adjustment_income_id`);
+CREATE INDEX IF NOT EXISTS `ix_recon_user_account` ON `account_reconciliations` (`user_id`, `account_id`, `reconciled_at`);
+
+CREATE TABLE IF NOT EXISTS `expense_attachments` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `expense_id`             INTEGER NOT NULL,
+    `user_id`                INTEGER NOT NULL,
+    `original_name`          TEXT NOT NULL,
+    `stored_name`            TEXT NOT NULL,
+    `mime_type`              TEXT NOT NULL,
+    `size_bytes`             INTEGER NOT NULL,
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_attachments_expense` FOREIGN KEY (`expense_id`) REFERENCES `expenses` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_attachments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `ix_attachments_expense` ON `expense_attachments` (`expense_id`);
+CREATE INDEX IF NOT EXISTS `ix_attachments_user` ON `expense_attachments` (`user_id`);
+
+CREATE TABLE IF NOT EXISTS `expense_tags` (
+    `expense_id`             INTEGER NOT NULL,
+    `tag_id`                 INTEGER NOT NULL,
+    PRIMARY KEY (`expense_id`, `tag_id`),
+    CONSTRAINT `fk_expense_tags_expense` FOREIGN KEY (`expense_id`) REFERENCES `expenses` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_expense_tags_tag` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS `ix_expense_tags_tag` ON `expense_tags` (`tag_id`);
+
+-- ── updated_at: in MySQL era ON UPDATE CURRENT_TIMESTAMP ────────────────────
+
+CREATE TRIGGER IF NOT EXISTS `tr_users_updated_at`
+AFTER UPDATE ON `users` FOR EACH ROW
+BEGIN
+    UPDATE `users` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_accounts_updated_at`
+AFTER UPDATE ON `accounts` FOR EACH ROW
+BEGIN
+    UPDATE `accounts` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_asset_classes_updated_at`
+AFTER UPDATE ON `asset_classes` FOR EACH ROW
+BEGIN
+    UPDATE `asset_classes` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_categories_updated_at`
+AFTER UPDATE ON `categories` FOR EACH ROW
+BEGIN
+    UPDATE `categories` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_contacts_updated_at`
+AFTER UPDATE ON `contacts` FOR EACH ROW
+BEGIN
+    UPDATE `contacts` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_pac_funds_updated_at`
+AFTER UPDATE ON `pac_funds` FOR EACH ROW
+BEGIN
+    UPDATE `pac_funds` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_pac_plans_updated_at`
+AFTER UPDATE ON `pac_plans` FOR EACH ROW
+BEGIN
+    UPDATE `pac_plans` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_recurring_expenses_updated_at`
+AFTER UPDATE ON `recurring_expenses` FOR EACH ROW
+BEGIN
+    UPDATE `recurring_expenses` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_securities_instruments_updated_at`
+AFTER UPDATE ON `securities_instruments` FOR EACH ROW
+BEGIN
+    UPDATE `securities_instruments` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_transfers_updated_at`
+AFTER UPDATE ON `transfers` FOR EACH ROW
+BEGIN
+    UPDATE `transfers` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_budgets_updated_at`
+AFTER UPDATE ON `budgets` FOR EACH ROW
+BEGIN
+    UPDATE `budgets` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_expenses_updated_at`
+AFTER UPDATE ON `expenses` FOR EACH ROW
+BEGIN
+    UPDATE `expenses` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_incomes_updated_at`
+AFTER UPDATE ON `incomes` FOR EACH ROW
+BEGIN
+    UPDATE `incomes` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+CREATE TRIGGER IF NOT EXISTS `tr_securities_transactions_updated_at`
+AFTER UPDATE ON `securities_transactions` FOR EACH ROW
+BEGIN
+    UPDATE `securities_transactions` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;

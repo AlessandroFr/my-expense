@@ -78,7 +78,7 @@ final class BudgetRepository extends BaseRepository
         $this->exec(
             'INSERT INTO budgets (user_id, category_id, year_month, amount)
              VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE amount = VALUES(amount)',
+             ON CONFLICT(user_id, category_id, year_month) DO UPDATE SET amount = excluded.amount',
             [$userId, $categoryId, $yearMonth, $amount],
         );
     }

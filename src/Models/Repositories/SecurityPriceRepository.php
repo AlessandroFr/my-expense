@@ -8,7 +8,7 @@ use App\Models\Entities\SecurityPrice;
 /**
  * Repository per lo storico quotazioni (securities_prices).
  *
- * upsert() usa ON DUPLICATE KEY UPDATE su UNIQUE(instrument_id, price_date)
+ * upsert() usa ON CONFLICT DO UPDATE su UNIQUE(instrument_id, price_date)
  * per non duplicare la stessa data.
  */
 final class SecurityPriceRepository extends BaseRepository
@@ -38,7 +38,7 @@ final class SecurityPriceRepository extends BaseRepository
         $this->exec(
             'INSERT INTO securities_prices (instrument_id, price_date, price, source)
              VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE price = VALUES(price), source = VALUES(source)',
+             ON CONFLICT(instrument_id, price_date) DO UPDATE SET price = excluded.price, source = excluded.source',
             [$instrumentId, $priceDate, $price, $source],
         );
     }
