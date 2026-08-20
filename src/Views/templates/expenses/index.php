@@ -266,6 +266,38 @@ $paymentLabels  = $this->paymentLabels ?? [
                         <label class="form-label small">Tua quota €</label>
                         <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
                     </div>
+                    <div class="col-12">
+                        <details class="mt-1" data-installment-section>
+                            <summary class="text-secondary small"><i class="bi bi-card-list me-1"></i>Rateizza questa spesa</summary>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12 form-check ms-2 mb-1">
+                                    <input class="form-check-input" type="checkbox" name="installment_enabled" id="installmentEnabled" value="1">
+                                    <label class="form-check-label small" for="installmentEnabled">
+                                        Dividi l'importo in pi&ugrave; rate (l'importo digitato &egrave; il <strong>totale</strong>)
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small mb-1">N&deg; rate</label>
+                                    <input type="number" min="2" max="60" class="form-control form-control-sm" name="installment_count" placeholder="6" disabled>
+                                </div>
+                                <div class="col-5">
+                                    <label class="form-label small mb-1">Frequenza</label>
+                                    <select name="installment_frequency" class="form-select form-select-sm" disabled>
+                                        <option value="monthly" selected>Mensile</option>
+                                        <option value="weekly">Settimanale</option>
+                                        <option value="custom">Personalizzata</option>
+                                    </select>
+                                </div>
+                                <div class="col-3 d-none" data-installment-custom>
+                                    <label class="form-label small mb-1">Giorni</label>
+                                    <input type="number" min="1" max="365" class="form-control form-control-sm" name="installment_custom_days" placeholder="30" disabled>
+                                </div>
+                                <div class="col-12">
+                                    <small class="text-muted" data-installment-preview></small>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
                     <div class="col-12 d-grid">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiungi spesa</button>
                     </div>
@@ -405,6 +437,55 @@ $paymentLabels  = $this->paymentLabels ?? [
     </div>
 </div>
 </section>
+</div>
+
+<!-- Modal: rateizza riga di import bancario -->
+<div class="modal fade" id="bank-installment-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-card-list me-1"></i>Rateizza riga</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">
+                    L'importo della riga verr&agrave; <strong>diviso</strong> in N rate.
+                    La rata #1 mantiene la data dell'estratto conto e l'<code>import_hash</code>
+                    originale (idempotenza re-import); le rate successive sono pianificate sui
+                    mesi/settimane successivi.
+                </p>
+                <input type="hidden" id="bank-installment-row-idx" value="">
+                <div class="row g-2 mb-2">
+                    <div class="col-4">
+                        <label class="form-label small">N&deg; rate</label>
+                        <input type="number" min="2" max="60" id="bank-installment-count" class="form-control form-control-sm" placeholder="6">
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label small">Frequenza</label>
+                        <select id="bank-installment-frequency" class="form-select form-select-sm">
+                            <option value="monthly" selected>Mensile</option>
+                            <option value="weekly">Settimanale</option>
+                            <option value="custom">Personalizzata</option>
+                        </select>
+                    </div>
+                    <div class="col-3 d-none" id="bank-installment-custom-wrap">
+                        <label class="form-label small">Giorni</label>
+                        <input type="number" min="1" max="365" id="bank-installment-custom-days" class="form-control form-control-sm" placeholder="30">
+                    </div>
+                </div>
+                <div id="bank-installment-preview" class="small text-muted"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto text-danger" id="bank-installment-clear">
+                    <i class="bi bi-x-lg me-1"></i>Rimuovi rateizzazione
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="bank-installment-apply">
+                    <i class="bi bi-check-lg me-1"></i>Applica
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal: edit spesa -->

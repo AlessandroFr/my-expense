@@ -256,6 +256,93 @@ final class Contact
     }
 
     /**
+     * Fonde 2+ anagrafiche in una sola: per ogni "perdente" sposta
+     * tutti i riferimenti (expenses.contact_id, incomes.contact_id,
+     * recurring_expenses.contact_id) sul "vincitore" e poi cancella
+     * il record del perdente. Tutto in UNA sola transazione.
+     *
+     * @param array<int> $loserIds
+     * @return array{
+     *     merged:int,
+     *     reassigned:array{expenses:int,incomes:int,recurring:int},
+     *     winner_id:int,
+     *     winner_name:string
+     * }
+     */
+    public static function merge(int $userId, int $winnerId, array $loserIds): array
+    {
+        if ($winnerId <= 0) {
+            throw new InvalidArgumentException('Anagrafica vincitrice non valida.');
+        }
+        // Dedup + filter losers (numeric, > 0, != winner).
+        $losers = [];
+        foreach ($loserIds as $lid) {
+            $i = (int) $lid;
+            if ($i > 0 && $i !== $winnerId) $losers[$i] = true;
+        }
+        $losers = array_keys($losers);
+        if ($losers === []) {
+            throw new InvalidArgumentException('Nessuna anagrafica da fondere selezionata.');
+        }
+        if (count($losers) > 100) {
+            throw new InvalidArgumentException('Troppe anagrafiche in una sola fusione (max 100).');
+        }
+
+        $pdo = Database::pdo();
+
+        // Verifica ownership di tutti gli id in un colpo.
+        $allIds  = array_merge([$winnerId], $losers);
+        $in      = implode(',', array_fill(0, count($allIds), '?'));
+        $stmt    = $pdo->prepare(
+            "SELECT id, name FROM contacts WHERE user_id = ? AND id IN ({$in})"
+        );
+        $stmt->execute([$userId, ...$allIds]);
+        $found = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $found[(int) $r['id']] = (string) $r['name'];
+        }
+        if (!isset($found[$winnerId])) {
+            throw new InvalidArgumentException('Anagrafica vincitrice non trovata.');
+        }
+        foreach ($losers as $lid) {
+            if (!isset($found[$lid])) {
+                throw new InvalidArgumentException('Una delle anagrafiche da fondere non e\' stata trovata.');
+            }
+        }
+
+        $stats   = ['expenses' => 0, 'incomes' => 0, 'recurring' => 0];
+        $merged  = 0;
+
+        $alreadyInTx = $pdo->inTransaction();
+        if (!$alreadyInTx) $pdo->beginTransaction();
+        try {
+            $upExp = $pdo->prepare('UPDATE expenses           SET contact_id = ? WHERE user_id = ? AND contact_id = ?');
+            $upInc = $pdo->prepare('UPDATE incomes            SET contact_id = ? WHERE user_id = ? AND contact_id = ?');
+            $upRec = $pdo->prepare('UPDATE recurring_expenses SET contact_id = ? WHERE user_id = ? AND contact_id = ?');
+            $del   = $pdo->prepare('DELETE FROM contacts WHERE id = ? AND user_id = ?');
+
+            foreach ($losers as $lid) {
+                $upExp->execute([$winnerId, $userId, $lid]); $stats['expenses']  += $upExp->rowCount();
+                $upInc->execute([$winnerId, $userId, $lid]); $stats['incomes']   += $upInc->rowCount();
+                $upRec->execute([$winnerId, $userId, $lid]); $stats['recurring'] += $upRec->rowCount();
+                $del->execute([$lid, $userId]);              $merged             += $del->rowCount();
+            }
+
+            if (!$alreadyInTx) $pdo->commit();
+        } catch (\Throwable $e) {
+            if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+
+        return [
+            'merged'      => $merged,
+            'reassigned'  => $stats,
+            'winner_id'   => $winnerId,
+            'winner_name' => $found[$winnerId],
+        ];
+    }
+
+    /**
      * Lista unificata dei movimenti (spese + entrate + ricorrenti) collegati
      * a un'anagrafica, ordinata per data DESC. Usata dal modal di
      * riassegnazione su /contacts/detail.

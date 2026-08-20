@@ -28,9 +28,11 @@ use App\Controllers\TransferController;
 
 return [
     // Auth
-    ['POST', '/setup',                   [AuthController::class,    'setup'],  []],
-    ['POST', '/login',                   [AuthController::class,    'login'],  []],
-    ['POST', '/logout',                  [AuthController::class,    'logout'], ['auth']],
+    ['POST', '/setup',                   [AuthController::class,    'setup'],   []],
+    ['POST', '/login',                   [AuthController::class,    'login'],   []],
+    ['POST', '/logout',                  [AuthController::class,    'logout'],  ['auth']],
+    ['POST', '/password/forgot',         [AuthController::class,    'forgot'],  []],
+    ['POST', '/password/reset',          [AuthController::class,    'reset'],   []],
 
     // Dashboard
     ['GET',  '/dashboard/data',          [DashboardController::class,'data'],  ['auth']],
@@ -81,9 +83,11 @@ return [
     ['POST', '/accounts/reconciliation/delete', [AccountController::class, 'reconciliationDelete'], ['auth', 'csrf']],
 
     // Transfers (atomic between-accounts movement)
-    ['GET',  '/transfers/list',          [TransferController::class, 'list'],   ['auth']],
-    ['POST', '/transfers/create',        [TransferController::class, 'create'], ['auth', 'csrf']],
-    ['POST', '/transfers/delete',        [TransferController::class, 'delete'], ['auth', 'csrf']],
+    ['GET',  '/transfers/list',                [TransferController::class, 'list'],             ['auth']],
+    ['POST', '/transfers/create',              [TransferController::class, 'create'],           ['auth', 'csrf']],
+    ['POST', '/transfers/update',              [TransferController::class, 'update'],           ['auth', 'csrf']],
+    ['POST', '/transfers/delete',              [TransferController::class, 'delete'],           ['auth', 'csrf']],
+    ['POST', '/transfers/backfill-imported',   [TransferController::class, 'backfillImported'], ['auth', 'csrf']],
 
     // Securities (instruments + transactions + prices + asset classes + holdings)
     ['GET',  '/securities/list',                 [SecuritiesController::class, 'listInstruments'],   ['auth']],
@@ -140,6 +144,7 @@ return [
     ['POST', '/contacts/archive',        [ContactController::class, 'archive'],     ['auth', 'csrf']],
     ['POST', '/contacts/delete',         [ContactController::class, 'delete'],      ['auth', 'csrf']],
     ['POST', '/contacts/reassign',       [ContactController::class, 'reassign'],    ['auth', 'csrf']],
+    ['POST', '/contacts/merge',          [ContactController::class, 'merge'],       ['auth', 'csrf']],
 
     // Reports
     ['GET',  '/reports/year',            [ReportController::class, 'year'], ['auth']],

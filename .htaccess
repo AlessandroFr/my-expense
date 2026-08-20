@@ -5,12 +5,18 @@
 
 Options -Indexes
 
+# La PWA ha start_url "./" che risolve come /my-expense/. Senza questa
+# direttiva Apache vede la directory reale, non trova un indice valido e
+# (con -Indexes attivo) restituisce 403. Con DirectoryIndex public/index.php
+# le richieste alla root del progetto vengono servite dal front controller.
+DirectoryIndex public/index.php index.php
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Lascia passare i file/dir reali a livello root
-    RewriteCond %{REQUEST_FILENAME} -f [OR]
-    RewriteCond %{REQUEST_FILENAME} -d
+    # Lascia passare solo i FILE reali (le directory devono passare al rewrite
+    # qui sotto cosi' che /my-expense/qualcosa/ venga riscritta in public/...).
+    RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 
     # Tutto il resto -> public/

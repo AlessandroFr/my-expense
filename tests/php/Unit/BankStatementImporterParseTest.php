@@ -59,6 +59,82 @@ final class BankStatementImporterParseTest extends TestCase
         self::assertNotSame($a, $b);
     }
 
+    public function testExtractCounterpartySepaIstantaneoIncoming(): void
+    {
+        $desc = 'BONIFICO - SEPA ISTANTANEO GALLO MATTIA VAL. ACCREDITO: 12/12/25 '
+              . 'COD.ID.ORD: IT24 M030 6234 2100 0000 2662 775 '
+              . 'CRO: 249829FA0B4B42198DFEACBD6501AC96 '
+              . 'GALLO MATTIA A 30035 MIRANO B '
+              . 'GLLMTT04T31F241H20251212249829FA0B4B4219';
+        self::assertSame(
+            'Gallo Mattia',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'income')
+        );
+    }
+
+    public function testExtractCounterpartySepaOrdinarioOutgoing(): void
+    {
+        $desc = 'BONIFICO - SEPA ORDINARIO MARIO ROSSI VAL. DISP: 03/05/26 '
+              . 'CRO: ABC123 NOTE: pagamento fattura 42';
+        self::assertSame(
+            'Mario Rossi',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'expense')
+        );
+    }
+
+    public function testExtractCounterpartySepaPicksFirstOccurrenceBeforeVal(): void
+    {
+        $desc = 'BONIFICO - SEPA ISTANTANEO GALLO MATTIA VAL. ACCREDITO: 12/12/25 '
+              . 'CRO: 249829FA0B4B4219 GALLO MATTIA A 30035 MIRANO B';
+        self::assertSame(
+            'Gallo Mattia',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'income')
+        );
+    }
+
+    public function testExtractCounterpartyClassicIncomingPrefixStillWorks(): void
+    {
+        $desc = 'BONIFICO DA MARIO ROSSI VAL. ACCREDITO: 01/03/26 CRO: 999';
+        self::assertSame(
+            'Mario Rossi',
+            BankStatementImporter::extractCounterparty('Bonifici', $desc, 'income')
+        );
+    }
+
+    public function testExtractCounterpartyForeignAtmWithdrawalReturnsNull(): void
+    {
+        // Prelievo ATM in formato "PRELIEVI PAESI UE": il "C/O CA ITALIA STRA"
+        // e' il nome operativo dell'ATM, non un fornitore vero. La guard deve
+        // restituire null per evitare di creare un contatto fasullo.
+        $desc = 'PRELIEVI PAESI UE CARTA N. 000 DEL 20/12/25 VALUTA EUR PAESE ITALIA '
+              . 'C/O CA ITALIA STRA CARTA N. 537572******5048 - CIRCUITO MASTERCARD '
+              . 'COD. MCC 6011 000010420581';
+        self::assertNull(
+            BankStatementImporter::extractCounterparty('Prelievo carta', $desc, 'expense')
+        );
+    }
+
+    public function testExtractCounterpartyMcc6011ReturnsNull(): void
+    {
+        // Anche senza il prefisso testuale, MCC 6011 = ATM cash disbursement.
+        $desc = 'OPERAZIONE GENERICA C/O FOO BANK COD. MCC 6011 RIF: 12345';
+        self::assertNull(
+            BankStatementImporter::extractCounterparty('Pagamenti', $desc, 'expense')
+        );
+    }
+
+    public function testIsAtmWithdrawalDescriptionMatchesAllFormats(): void
+    {
+        $invoke = fn (string $desc): bool => $this->invoke('isAtmWithdrawalDescription', [$desc]);
+
+        self::assertTrue($invoke('PRELIEVO DI CONTANTE C/O ATM ROMA'));
+        self::assertTrue($invoke('PRELIEVI PAESI UE CARTA N. 000 DEL 20/12/25 ...'));
+        self::assertTrue($invoke('PRELIEVI PAESI EXTRA UE CARTA N. 000 ...'));
+        self::assertTrue($invoke('Lorem ipsum COD. MCC 6011 fine'));
+        self::assertFalse($invoke('PAGAMENTO POS C/O ESSELUNGA COD. MCC 5411'));
+        self::assertFalse($invoke('BONIFICO DA MARIO ROSSI VAL. 01/03/26'));
+    }
+
     /**
      * @param  array<int,mixed> $args
      * @return mixed

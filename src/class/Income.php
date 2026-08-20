@@ -117,7 +117,8 @@ final class Income
         ?string $valueDate,
         string $importHash,
         ?string $paymentMethod = 'transfer',
-        ?int $contactId = null
+        ?int $contactId = null,
+        ?int $transferId = null
     ): ?int {
         $row = self::validate($source, $description, $amount, $incomeDate);
         $payment = self::normalizePayment($paymentMethod);
@@ -130,12 +131,15 @@ final class Income
         try {
             $stmt = Database::pdo()->prepare(
                 'INSERT INTO incomes (user_id, account_id, contact_id, source, description, amount,
-                                      payment_method, income_date, value_date, import_hash)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                                      payment_method, income_date, value_date, import_hash,
+                                      is_transfer, transfer_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $userId, $accountId, $contactId, $row['source'], $row['description'], $row['amount'],
                 $payment, $row['income_date'], $valueDate, $importHash,
+                $transferId !== null ? 1 : 0,
+                $transferId,
             ]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000' && (int) ($e->errorInfo[1] ?? 0) === 1062) {
@@ -290,7 +294,7 @@ final class Income
      */
     private static function buildWhere(int $userId, array $filters): array
     {
-        $clauses = ['i.user_id = ?'];
+        $clauses = ['i.user_id = ?', 'i.is_transfer = 0'];
         $params  = [$userId];
 
         if (!empty($filters['date_from']) && self::isValidDate((string) $filters['date_from'])) {

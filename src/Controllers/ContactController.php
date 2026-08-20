@@ -294,6 +294,31 @@ final class ContactController extends BaseController
         return $this->json(['result' => $result]);
     }
 
+    /** POST /contacts/merge */
+    public function merge(Request $request): Response
+    {
+        $userId    = $this->userId();
+        $winnerId  = (int) ($request->input('winner_id') ?? 0);
+        $losersRaw = (string) ($request->input('loser_ids') ?? '');
+
+        if ($winnerId <= 0) {
+            throw HttpException::badRequest('ID anagrafica vincitrice mancante.');
+        }
+        $losers = json_decode($losersRaw, true);
+        if (!is_array($losers) || $losers === []) {
+            throw HttpException::badRequest('Nessuna anagrafica da fondere selezionata.');
+        }
+
+        try {
+            $result = LegacyContact::merge($userId, $winnerId, $losers);
+        } catch (InvalidArgumentException $e) {
+            throw HttpException::badRequest($e->getMessage());
+        } catch (RuntimeException $e) {
+            throw HttpException::conflict($e->getMessage());
+        }
+        return $this->json(['result' => $result]);
+    }
+
     /** @return array<string,string> */
     private function extractDetails(Request $request): array
     {

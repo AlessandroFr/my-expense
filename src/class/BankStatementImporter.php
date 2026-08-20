@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Models\Repositories\ExpenseRepository;
+use App\Models\Repositories\TransferRepository;
+use App\Services\InstallmentCalculator;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -144,6 +147,32 @@ final class BankStatementImporter
 
         $existingHashes = self::loadExistingHashes($userId);
 
+        // Lista conti dell'utente + suggerimenti default per le partite doppie.
+        // Vengono spedite in preview cosi' il frontend puo' presentare un
+        // <select> "Conto destinazione" inline su ogni riga pair.
+        $allAccounts = Account::allForUser($userId, false);
+        $accountsOut = [];
+        foreach ($allAccounts as $a) {
+            $accountsOut[] = [
+                'id'   => (int) $a['id'],
+                'name' => (string) $a['name'],
+                'type' => (string) $a['type'],
+            ];
+        }
+        $suggestPrepaidId = null;
+        foreach ($allAccounts as $a) {
+            if (mb_strtolower((string) $a['name']) === 'carta prepagata') {
+                $suggestPrepaidId = (int) $a['id'];
+                break;
+            }
+        }
+        $defaultCash       = Account::defaultCashFor($userId);
+        $suggestCashId     = $defaultCash !== null ? (int) $defaultCash['id'] : null;
+        // Se i suggerimenti coincidono col conto sorgente non hanno senso
+        // (non si trasferisce a se stessi): null forza la scelta esplicita.
+        if ($suggestPrepaidId === $accountId) $suggestPrepaidId = null;
+        if ($suggestCashId    === $accountId) $suggestCashId    = null;
+
         $rows         = [];
         $emptyCnt     = 0;
         $parseErrors  = [];
@@ -188,7 +217,7 @@ final class BankStatementImporter
                     && stripos($descrizione, 'RICARICA/RIMBORSO') !== false;
 
                 $isAtmWithdrawal = $isExpense
-                    && stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false;
+                    && self::isAtmWithdrawalDescription($descrizione);
 
                 if ($isPrepaidRecharge && $autoPairRicariche) {
                     $kind = self::KIND_TRANSFER_PAIR;
@@ -216,7 +245,14 @@ final class BankStatementImporter
                     'category_suggested' => null,
                     'source'             => null,
                     'payment_method'     => null,
+                    'dest_account_id'    => null,
                 ];
+
+                if ($kind === self::KIND_TRANSFER_PAIR) {
+                    $row['dest_account_id'] = $suggestPrepaidId;
+                } elseif ($kind === self::KIND_ATM_PAIR) {
+                    $row['dest_account_id'] = $suggestCashId;
+                }
 
                 if ($kind === self::KIND_EXPENSE || $kind === self::KIND_TRANSFER_PAIR || $kind === self::KIND_ATM_PAIR) {
                     if ($kind === self::KIND_TRANSFER_PAIR) {
@@ -326,6 +362,11 @@ final class BankStatementImporter
             ],
             'account_iban_detected' => $iban,
             'categories'            => $categories,
+            'accounts'              => $accountsOut,
+            'dest_suggestions'      => [
+                'transfer_pair' => $suggestPrepaidId,
+                'atm_pair'      => $suggestCashId,
+            ],
             'skipped_empty'         => $emptyCnt,
             'parse_errors'          => $parseErrors,
             'rows'                  => $rows,
@@ -337,12 +378,18 @@ final class BankStatementImporter
      * Scrive su DB le righe (potenzialmente editate dall'utente).
      *
      * @param array<int, array<string,mixed>> $rows
+     * @param array<int, array{count:int, frequency:string, custom_days:?int}> $installmentsMap
+     *        indicizzato per row_idx; per ogni entry la riga viene esplosa
+     *        in N rate (solo se kind === expense). La rata #1 mantiene
+     *        l'import_hash originale, le rate #2..N hanno hash NULL e
+     *        parent_expense_id = id(rata #1).
      * @return array{
      *   imported_expenses: int,
      *   imported_incomes:  int,
      *   transfers_paired:  int,
      *   skipped_duplicate: int,
      *   skipped_user:      int,
+     *   installments_exploded: int,
      *   errors: array<int, array{idx:int, message:string}>,
      * }
      */
@@ -350,7 +397,8 @@ final class BankStatementImporter
         int $userId,
         int $accountId,
         array $rows,
-        string $prepaidAccountName = 'Carta Prepagata'
+        string $prepaidAccountName = 'Carta Prepagata',
+        array $installmentsMap = []
     ): array {
         $sourceAccount = Account::findForUser($accountId, $userId);
         if ($sourceAccount === null) {
@@ -360,15 +408,27 @@ final class BankStatementImporter
             $prepaidAccountName = 'Carta Prepagata';
         }
 
-        $importedExp = 0;
-        $importedInc = 0;
-        $pairedCnt   = 0;
-        $dupCnt      = 0;
-        $skipUser    = 0;
-        $errors      = [];
+        $importedExp     = 0;
+        $importedInc     = 0;
+        $pairedCnt       = 0;
+        $dupCnt          = 0;
+        $skipUser        = 0;
+        $installmentsExp = 0;
+        $errors          = [];
 
         $prepaidAccountId = null;
         $cashAccountId    = null;
+        // Cache delle Account::findForUser quando l'utente sceglie un dest
+        // diverso dai default. Riduce le query in import con tante righe pair.
+        $destCache = [];
+        // Pre-load degli import_hash gia' presenti: la pair-creation richiede
+        // di sapere upfront se la coppia esiste prima di inserire la testata
+        // `transfers` (altrimenti lasceremmo orfani di transfers se l'expense
+        // o l'income falliscono come duplicati).
+        $existingHashes  = self::loadExistingHashes($userId);
+        $transferRepo    = new TransferRepository();
+        $expenseRepo     = new ExpenseRepository();
+        $pdo             = Database::pdo();
 
         foreach ($rows as $rowIn) {
             $idx = (int) ($rowIn['idx'] ?? -1);
@@ -388,13 +448,25 @@ final class BankStatementImporter
                 }
 
                 if ($kind === self::KIND_TRANSFER_PAIR) {
-                    if ($prepaidAccountId === null) {
-                        $prepaidAccountId = self::resolvePrepaidAccount($userId, $prepaidAccountName);
-                    }
-                    if ($prepaidAccountId === $accountId) {
-                        throw new InvalidArgumentException(
-                            "Il conto sorgente coincide con '{$prepaidAccountName}': impossibile fare partita doppia."
-                        );
+                    // Conto destinazione: prima la scelta esplicita per riga
+                    // (campo `dest_account_id` editato dall'utente in preview),
+                    // poi fallback al default "Carta Prepagata" globale (creato
+                    // al volo se mancante, per retro-compatibilita').
+                    $rowDestId = self::resolveRowDestAccount($rowIn, $userId, $accountId, $destCache);
+                    if ($rowDestId !== null) {
+                        $usedId   = $rowDestId;
+                        $usedName = (string) ($destCache[$rowDestId]['name'] ?? $prepaidAccountName);
+                    } else {
+                        if ($prepaidAccountId === null) {
+                            $prepaidAccountId = self::resolvePrepaidAccount($userId, $prepaidAccountName);
+                        }
+                        if ($prepaidAccountId === $accountId) {
+                            throw new InvalidArgumentException(
+                                "Il conto sorgente coincide con '{$prepaidAccountName}': impossibile fare partita doppia."
+                            );
+                        }
+                        $usedId   = $prepaidAccountId;
+                        $usedName = $prepaidAccountName;
                     }
                     $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
                         ? (int) $rowIn['category_id']
@@ -402,66 +474,135 @@ final class BankStatementImporter
 
                     $signed   = -$amount;
                     $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
+                    // Nota: import_hash e' CHAR(64), quindi i suffissi `:exp`/`:inc`
+                    // vengono comunque troncati a livello DB. Per il pre-check ci
+                    // basta verificare il baseHash (sia la riga expense sia la riga
+                    // income gemella vi convergono in storage).
                     $expHash  = $baseHash . ':exp';
                     $incHash  = $baseHash . ':inc';
 
-                    $expId = Expense::createImported(
-                        $userId, $catId, (string) $amount,
-                        'Ricarica → ' . $prepaidAccountName,
-                        'transfer', $opDate, $accountId, $valueDate, $expHash
-                    );
-                    $incId = Income::createImported(
-                        $userId, 'Trasferimento da conto',
-                        'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $prepaidAccountId, $valueDate, $incHash, 'transfer'
-                    );
-                    if ($expId === null && $incId === null) {
+                    if (isset($existingHashes[$baseHash])) {
                         $dupCnt++;
-                    } else {
+                        continue;
+                    }
+
+                    $alreadyInTx = $pdo->inTransaction();
+                    if (!$alreadyInTx) $pdo->beginTransaction();
+                    try {
+                        $transferId = $transferRepo->create([
+                            'user_id'                => $userId,
+                            'source_account_id'      => $accountId,
+                            'destination_account_id' => $usedId,
+                            'amount'                 => number_format($amount, 2, '.', ''),
+                            'transfer_date'          => $opDate,
+                            'description'            => $description !== '' ? mb_substr($description, 0, 255) : ('Ricarica → ' . $usedName),
+                            'notes'                  => null,
+                        ]);
+                        $expId = Expense::createImported(
+                            $userId, $catId, (string) $amount,
+                            'Ricarica → ' . $usedName,
+                            'transfer', $opDate, $accountId, $valueDate, $expHash,
+                            null, $transferId
+                        );
+                        $incId = Income::createImported(
+                            $userId, 'Trasferimento da conto',
+                            'Ricarica da ' . (string) ($sourceAccount['name'] ?? 'conto'),
+                            (string) $amount, $opDate, $usedId, $valueDate, $incHash, 'transfer',
+                            null, $transferId
+                        );
+                        if ($expId === null || $incId === null) {
+                            // Race: hash apparso fra il pre-check e l'insert.
+                            // Rollback per non lasciare un transfers orfano.
+                            if (!$alreadyInTx) $pdo->rollBack();
+                            $dupCnt++;
+                            continue;
+                        }
+                        if (!$alreadyInTx) $pdo->commit();
+                        $existingHashes[$baseHash] = true;
                         $pairedCnt++;
-                        $importedExp += ($expId !== null ? 1 : 0);
-                        $importedInc += ($incId !== null ? 1 : 0);
+                        $importedExp++;
+                        $importedInc++;
+                    } catch (\Throwable $e) {
+                        if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+                        throw $e;
                     }
                     continue;
                 }
 
                 if ($kind === self::KIND_ATM_PAIR) {
-                    if ($cashAccountId === null) {
-                        $cashAccountId = Account::ensureDefaultCash($userId);
-                    }
-                    if ($cashAccountId === $accountId) {
-                        throw new InvalidArgumentException(
-                            'Il conto sorgente coincide con la cassa contanti: impossibile fare partita doppia.'
-                        );
+                    // Conto cassa: la scelta esplicita per riga vince sul
+                    // default; il default "In tasca" viene creato al volo
+                    // solo se il dest non e' stato impostato dall'utente.
+                    $rowDestId = self::resolveRowDestAccount($rowIn, $userId, $accountId, $destCache);
+                    if ($rowDestId !== null) {
+                        $usedCashId   = $rowDestId;
+                        $usedCashName = (string) ($destCache[$rowDestId]['name'] ?? 'In tasca');
+                    } else {
+                        if ($cashAccountId === null) {
+                            $cashAccountId = Account::ensureDefaultCash($userId);
+                        }
+                        if ($cashAccountId === $accountId) {
+                            throw new InvalidArgumentException(
+                                'Il conto sorgente coincide con la cassa contanti: impossibile fare partita doppia.'
+                            );
+                        }
+                        $cashAccount  = Account::findForUser($cashAccountId, $userId);
+                        $usedCashId   = $cashAccountId;
+                        $usedCashName = (string) ($cashAccount['name'] ?? 'In tasca');
                     }
                     $catId = isset($rowIn['category_id']) && $rowIn['category_id'] !== ''
                         ? (int) $rowIn['category_id']
                         : null;
 
-                    $cashAccount = Account::findForUser($cashAccountId, $userId);
-                    $cashName    = (string) ($cashAccount['name'] ?? 'In tasca');
-
                     $signed   = -$amount;
                     $baseHash = self::computeImportHash($accountId, $opDate, $signed, $description);
+                    // Vedi nota nel ramo TRANSFER_PAIR: import_hash CHAR(64) tronca
+                    // i suffissi, quindi pre-check sul baseHash.
                     $expHash  = $baseHash . ':exp-atm';
                     $incHash  = $baseHash . ':inc-atm';
 
-                    $expId = Expense::createImported(
-                        $userId, $catId, (string) $amount,
-                        'Prelievo ATM → ' . $cashName,
-                        'transfer', $opDate, $accountId, $valueDate, $expHash
-                    );
-                    $incId = Income::createImported(
-                        $userId, 'Prelievo ATM',
-                        'Prelievo da ' . (string) ($sourceAccount['name'] ?? 'conto'),
-                        (string) $amount, $opDate, $cashAccountId, $valueDate, $incHash, 'cash'
-                    );
-                    if ($expId === null && $incId === null) {
+                    if (isset($existingHashes[$baseHash])) {
                         $dupCnt++;
-                    } else {
+                        continue;
+                    }
+
+                    $alreadyInTx = $pdo->inTransaction();
+                    if (!$alreadyInTx) $pdo->beginTransaction();
+                    try {
+                        $transferId = $transferRepo->create([
+                            'user_id'                => $userId,
+                            'source_account_id'      => $accountId,
+                            'destination_account_id' => $usedCashId,
+                            'amount'                 => number_format($amount, 2, '.', ''),
+                            'transfer_date'          => $opDate,
+                            'description'            => $description !== '' ? mb_substr($description, 0, 255) : ('Prelievo ATM → ' . $usedCashName),
+                            'notes'                  => null,
+                        ]);
+                        $expId = Expense::createImported(
+                            $userId, $catId, (string) $amount,
+                            'Prelievo ATM → ' . $usedCashName,
+                            'transfer', $opDate, $accountId, $valueDate, $expHash,
+                            null, $transferId
+                        );
+                        $incId = Income::createImported(
+                            $userId, 'Prelievo ATM',
+                            'Prelievo da ' . (string) ($sourceAccount['name'] ?? 'conto'),
+                            (string) $amount, $opDate, $usedCashId, $valueDate, $incHash, 'cash',
+                            null, $transferId
+                        );
+                        if ($expId === null || $incId === null) {
+                            if (!$alreadyInTx) $pdo->rollBack();
+                            $dupCnt++;
+                            continue;
+                        }
+                        if (!$alreadyInTx) $pdo->commit();
+                        $existingHashes[$baseHash] = true;
                         $pairedCnt++;
-                        $importedExp += ($expId !== null ? 1 : 0);
-                        $importedInc += ($incId !== null ? 1 : 0);
+                        $importedExp++;
+                        $importedInc++;
+                    } catch (\Throwable $e) {
+                        if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+                        throw $e;
                     }
                     continue;
                 }
@@ -474,6 +615,40 @@ final class BankStatementImporter
                     $payment = (string) ($rowIn['payment_method'] ?? 'card');
                     $signed  = -$amount;
                     $hash    = self::computeImportHash($accountId, $opDate, $signed, $description);
+
+                    // Rateizzazione: se l'utente ha richiesto di esplodere
+                    // questa riga in N rate, la riga originale del CSV viene
+                    // sostituita da N spese (rata #1 mantiene l'import_hash
+                    // originale per idempotenza re-import; rate #2..N hash NULL).
+                    $instSpec = $installmentsMap[$idx] ?? null;
+                    if ($instSpec !== null) {
+                        try {
+                            $r = self::insertExpenseInstallments(
+                                $expenseRepo,
+                                $existingHashes,
+                                $userId,
+                                $accountId,
+                                $catId,
+                                $contactId,
+                                $payment,
+                                $description,
+                                $valueDate,
+                                $hash,
+                                (string) $amount,
+                                $opDate,
+                                $instSpec,
+                            );
+                            if ($r['skipped_duplicate']) {
+                                $dupCnt++;
+                            } else {
+                                $importedExp     += $r['inserted'];
+                                $installmentsExp += $r['inserted'];
+                            }
+                        } catch (\Throwable $e) {
+                            $errors[] = ['idx' => $idx, 'message' => 'Rate: ' . $e->getMessage()];
+                        }
+                        continue;
+                    }
 
                     $id = Expense::createImported(
                         $userId, $catId, (string) $amount, $description,
@@ -499,13 +674,101 @@ final class BankStatementImporter
         }
 
         return [
-            'imported_expenses' => $importedExp,
-            'imported_incomes'  => $importedInc,
-            'transfers_paired'  => $pairedCnt,
-            'skipped_duplicate' => $dupCnt,
-            'skipped_user'      => $skipUser,
-            'errors'            => $errors,
+            'imported_expenses'     => $importedExp,
+            'imported_incomes'      => $importedInc,
+            'transfers_paired'      => $pairedCnt,
+            'skipped_duplicate'     => $dupCnt,
+            'skipped_user'          => $skipUser,
+            'installments_exploded' => $installmentsExp,
+            'errors'                => $errors,
         ];
+    }
+
+    /**
+     * Esplode una riga di import in N rate. La rata #1 ha import_hash =
+     * $hash originale (idempotenza re-import); rate #2..N hash NULL e
+     * parent_expense_id = id(rata #1).
+     *
+     * Tutto in una transazione locale (o nel contesto della transaction
+     * esterna se il chiamante l'ha gia' aperta).
+     *
+     * @param array<string,true> &$existingHashes  cache hashes (mutata)
+     * @param array{count:int, frequency:string, custom_days:?int} $spec
+     * @return array{inserted:int, skipped_duplicate:bool}
+     */
+    private static function insertExpenseInstallments(
+        ExpenseRepository $repo,
+        array &$existingHashes,
+        int $userId,
+        int $accountId,
+        ?int $categoryId,
+        ?int $contactId,
+        string $payment,
+        string $description,
+        ?string $valueDate,
+        string $hash,
+        string $amount,
+        string $opDate,
+        array $spec
+    ): array {
+        if (isset($existingHashes[$hash])) {
+            return ['inserted' => 0, 'skipped_duplicate' => true];
+        }
+        $clean = InstallmentCalculator::validate($spec);
+        $rates = InstallmentCalculator::explode(
+            $amount,
+            $clean['count'],
+            $opDate,
+            $clean['frequency'],
+            $clean['custom_days'],
+        );
+
+        $pdo         = Database::pdo();
+        $alreadyInTx = $pdo->inTransaction();
+        if (!$alreadyInTx) $pdo->beginTransaction();
+
+        try {
+            $count = $clean['count'];
+            $ids   = [];
+            foreach ($rates as $r) {
+                $isFirst = $r['seq'] === 1;
+                $payload = [
+                    'user_id'           => $userId,
+                    'category_id'       => $categoryId,
+                    'contact_id'        => $contactId,
+                    'account_id'        => $accountId,
+                    'amount'            => $r['amount'],
+                    'description'       => $description !== '' ? $description : null,
+                    'payment_method'    => $payment,
+                    'expense_date'      => $r['date'],
+                    'value_date'        => $isFirst ? $valueDate : null,
+                    'import_hash'       => $isFirst ? $hash : null,
+                    'is_transfer'       => 0,
+                    'installment_seq'   => $r['seq'],
+                    'installment_total' => $count,
+                ];
+                if (!$isFirst) {
+                    $payload['parent_expense_id'] = $ids[0];
+                }
+                if ($isFirst) {
+                    $id = $repo->createImported($payload);
+                    if ($id === null) {
+                        // Race con duplicato apparso fra pre-check e insert.
+                        if (!$alreadyInTx) $pdo->rollBack();
+                        return ['inserted' => 0, 'skipped_duplicate' => true];
+                    }
+                } else {
+                    $id = $repo->create($payload);
+                }
+                $ids[] = $id;
+            }
+            if (!$alreadyInTx) $pdo->commit();
+            $existingHashes[$hash] = true;
+            return ['inserted' => $count, 'skipped_duplicate' => false];
+        } catch (\Throwable $e) {
+            if (!$alreadyInTx && $pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -647,6 +910,23 @@ final class BankStatementImporter
         return hash('sha256', $key);
     }
 
+    /**
+     * Riconosce le righe di prelievo ATM in tutti i formati osservati
+     * (Banca Sella):
+     *   - "PRELIEVO DI CONTANTE ..."         (sportello/ATM domestico)
+     *   - "PRELIEVI PAESI UE CARTA ..."      (ATM UE / EXTRA UE)
+     *   - "PRELIEVI PAESI EXTRA UE CARTA ..."
+     *   - qualsiasi descrizione con "COD. MCC 6011" (ATM cash disbursement
+     *     code ISO 8583, anche se il prefisso testuale e' diverso)
+     */
+    private static function isAtmWithdrawalDescription(string $desc): bool
+    {
+        if (stripos($desc, 'PRELIEVO DI CONTANTE') !== false) return true;
+        if (stripos($desc, 'PRELIEVI PAESI') !== false) return true;
+        if (preg_match('/\bCOD\.\s*MCC\s*6011\b/i', $desc) === 1) return true;
+        return false;
+    }
+
     /** @return array{category: string} */
     private static function classifyExpense(string $tipologia, string $descrizione): array
     {
@@ -668,7 +948,7 @@ final class BankStatementImporter
                 return ['category' => self::MCC_MAP[$mcc]];
             }
         }
-        if (stripos($descrizione, 'PRELIEVO DI CONTANTE') !== false) {
+        if (self::isAtmWithdrawalDescription($descrizione)) {
             return ['category' => 'Prelievo contante'];
         }
         return ['category' => 'Pagamenti'];
@@ -711,6 +991,20 @@ final class BankStatementImporter
             return self::cleanupCounterpartyName($m[1]);
         }
 
+        // Bonifici SEPA istantanei/ordinari (Banca Sella):
+        //   "BONIFICO - SEPA ISTANTANEO GALLO MATTIA VAL. ACCREDITO: ..."
+        //                                → "Gallo Mattia"
+        //   "BONIFICO - SEPA ORDINARIO MARIO ROSSI VAL. DISP: ..."
+        //                                → "Mario Rossi"
+        // Kind-agnostic: la struttura "SEPA <flavor> NAME VAL." e' specifica
+        // abbastanza da non collidere ne' con accrediti ne' con disposizioni.
+        if (preg_match(
+            '/\bSEPA\s+(?:ISTANTANEO|ORDINARIO)\s+([A-Z][A-Z\s\.\']+?)\s+VAL\./u',
+            $desc, $m
+        )) {
+            return self::cleanupCounterpartyName($m[1]);
+        }
+
         if ($kind === 'income') {
             // Pattern dei bonifici ricevuti — il nome del cliente / pagatore
             // viene preceduto da uno di questi prefissi verbatim:
@@ -732,6 +1026,15 @@ final class BankStatementImporter
 
         // ── Expense ────────────────────────────────────────────────────────
         $tlow = mb_strtolower($tipologia);
+
+        // Short-circuit: prelievi ATM (in tutti i formati: "PRELIEVO DI
+        // CONTANTE", "PRELIEVI PAESI UE/EXTRA UE", o qualsiasi descrizione
+        // con MCC 6011). Il "C/O ..." in queste righe e' il nome operativo
+        // dell'ATM, non un fornitore. Va short-circuitato PRIMA del pattern
+        // C/O sotto, altrimenti l'ATM operator finisce come contatto fasullo.
+        if (self::isAtmWithdrawalDescription($desc)) {
+            return null;
+        }
 
         // Bonifici in uscita: "BONIFICO A NOME ..."
         if (str_contains($tlow, 'bonifici')) {
@@ -788,9 +1091,6 @@ final class BankStatementImporter
 
         // Ricariche/rimborsi prepagata e similari sono trasferimenti interni → no contact.
         if (stripos($desc, 'RICARICA') !== false || stripos($desc, 'RIMBORSO CARTA') !== false) {
-            return null;
-        }
-        if (stripos($desc, 'PRELIEVO DI CONTANTE') !== false) {
             return null;
         }
         if (stripos($desc, 'COMMISSIONE') !== false || stripos($desc, 'IMPOSTA DI BOLLO') !== false) {
@@ -869,5 +1169,33 @@ final class BankStatementImporter
     private static function resolvePrepaidAccount(int $userId, string $name): int
     {
         return Account::findOrCreateByName($userId, $name, 'card', '#9c27b0', 'credit-card', 100);
+    }
+
+    /**
+     * Risolve il conto destinazione di una riga pair (transfer_pair / atm_pair):
+     *  - legge `dest_account_id` dalla riga (impostabile dall'utente in preview)
+     *  - verifica che esista, sia di proprieta' dell'utente, e diverso dal sorgente
+     *  - cache-a la riga `findForUser` in `$destCache` per ridurre query
+     *  - ritorna null se non c'e' una scelta esplicita (chiamante usera' il default globale)
+     *
+     * @param array<string,mixed> $rowIn
+     * @param array<int, array<string,mixed>|null> $destCache
+     */
+    private static function resolveRowDestAccount(array $rowIn, int $userId, int $sourceAccountId, array &$destCache): ?int
+    {
+        $raw = $rowIn['dest_account_id'] ?? null;
+        if ($raw === null || $raw === '' || $raw === 0 || $raw === '0') return null;
+        $destId = (int) $raw;
+        if ($destId <= 0) return null;
+        if ($destId === $sourceAccountId) {
+            throw new InvalidArgumentException('Conto destinazione coincide con quello sorgente.');
+        }
+        if (!array_key_exists($destId, $destCache)) {
+            $destCache[$destId] = Account::findForUser($destId, $userId);
+        }
+        if ($destCache[$destId] === null) {
+            throw new InvalidArgumentException("Conto destinazione id={$destId} non trovato.");
+        }
+        return $destId;
     }
 }

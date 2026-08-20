@@ -71,6 +71,9 @@ $this->section('content');
     <div class="card-body">
         <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
             <h2 class="h6 mb-0 flex-grow-1"><i class="bi bi-clock-history me-1"></i>Storico</h2>
+            <button type="button" id="transfers-backfill-btn" class="btn btn-sm btn-outline-secondary" title="Ricostruisce i trasferimenti dalle vecchie coppie expense+income importate dall'estratto conto">
+                <i class="bi bi-arrow-repeat me-1"></i>Migra trasferimenti importati
+            </button>
             <input type="date" id="transfers-filter-date-from" class="form-control form-control-sm" style="max-width:150px" title="Da">
             <input type="date" id="transfers-filter-date-to"   class="form-control form-control-sm" style="max-width:150px" title="A">
         </div>
@@ -79,9 +82,65 @@ $this->section('content');
                 <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…
             </div>
         </div>
+        <div id="transfers-pager" class="mt-2"></div>
     </div>
 </div>
 </section>
+</div>
+
+<!-- Modal: edit trasferimento -->
+<div class="modal fade" id="transfer-edit-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Modifica trasferimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <form id="transfer-edit-form">
+                <?= $this->csrfField() ?>
+                <input type="hidden" name="id" id="transfer-edit-id" value="">
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Conto sorgente</label>
+                            <select name="source_account_id" class="form-select" required data-role="source">
+                                <option value="">Seleziona…</option>
+                            </select>
+                        </div>
+                        <div class="col-12 text-center text-muted small py-1">
+                            <i class="bi bi-arrow-down"></i>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Conto destinazione</label>
+                            <select name="destination_account_id" class="form-select" required data-role="destination">
+                                <option value="">Seleziona…</option>
+                            </select>
+                        </div>
+                        <div class="col-7">
+                            <label class="form-label small mb-1">Importo (EUR)</label>
+                            <input type="text" name="amount" class="form-control" inputmode="decimal" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small mb-1">Data</label>
+                            <input type="date" name="transfer_date" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Descrizione</label>
+                            <input type="text" name="description" class="form-control" maxlength="255">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Note</label>
+                            <input type="text" name="notes" class="form-control" maxlength="255">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Salva</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script type="module" src="<?= $this->asset('js/pages/transfers.js') ?>"></script>

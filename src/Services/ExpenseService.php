@@ -41,12 +41,18 @@ final class ExpenseService extends BaseService
 
     /**
      * @param array<string, mixed> $data  campi validati + contact_name opzionale
-     * @return array{expense: ?Expense, budget_warning: array<string,mixed>|null}
+     *                                    + installment opzionale {count, frequency, custom_days?}
+     * @return array{expense: ?Expense, budget_warning: array<string,mixed>|null, installments?: list<int>}
      */
     public function create(int $userId, array $data): array
     {
-        $resolved = $this->resolveContact($userId, $data);
-        $row      = $this->normalizeAndValidate($userId, $resolved);
+        $resolved    = $this->resolveContact($userId, $data);
+        $row         = $this->normalizeAndValidate($userId, $resolved);
+        $installment = $this->extractInstallmentSpec($data);
+
+        if ($installment !== null) {
+            return $this->createInstallmentSeries($userId, $row, $installment);
+        }
 
         return $this->transactional(function () use ($userId, $row) {
             $id = $this->expenses->create([
@@ -66,6 +72,108 @@ final class ExpenseService extends BaseService
             $warning = Budget::checkForCategory($userId, $row['category_id'], $ym);
             return ['expense' => $entity, 'budget_warning' => $warning];
         });
+    }
+
+    /**
+     * Inserisce N rate in transazione. La #1 ha parent_expense_id NULL e
+     * installment_seq=1; le successive puntano a id($1).
+     *
+     * @param array<string, mixed> $row          dati gia' normalizzati
+     * @param array{count:int, frequency:string, custom_days:?int} $installment
+     * @return array{expense: ?Expense, budget_warning: array<string,mixed>|null, installments: list<int>}
+     */
+    private function createInstallmentSeries(int $userId, array $row, array $installment): array
+    {
+        try {
+            $spec  = InstallmentCalculator::validate($installment);
+            $rates = InstallmentCalculator::explode(
+                (string) $row['amount'],
+                $spec['count'],
+                (string) $row['expense_date'],
+                $spec['frequency'],
+                $spec['custom_days'],
+            );
+        } catch (InvalidArgumentException $e) {
+            throw HttpException::badRequest($e->getMessage());
+        }
+
+        $count = $spec['count'];
+
+        // share_amount: se l'utente l'ha indicato si applica solo come quota
+        // della rata #1 (rappresenta la sua porzione del totale dichiarato);
+        // ripeterlo sulle rate successive sarebbe semanticamente errato.
+        // shared_with (testo libero "Marco, Luca") si replica su tutte.
+        return $this->transactional(function () use ($userId, $row, $rates, $count) {
+            $ids = [];
+            foreach ($rates as $r) {
+                $isFirst = $r['seq'] === 1;
+                $payload = [
+                    'user_id'           => $userId,
+                    'category_id'       => $row['category_id'],
+                    'contact_id'        => $row['contact_id'],
+                    'account_id'        => $row['account_id'],
+                    'amount'            => $r['amount'],
+                    'description'       => $row['description'],
+                    'shared_with'       => $row['shared_with'],
+                    'share_amount'      => $isFirst ? $row['share_amount'] : null,
+                    'payment_method'    => $row['payment_method'],
+                    'expense_date'      => $r['date'],
+                    'installment_seq'   => $r['seq'],
+                    'installment_total' => $count,
+                ];
+                if (!$isFirst) {
+                    $payload['parent_expense_id'] = $ids[0];
+                }
+                $ids[] = $this->expenses->create($payload);
+            }
+            $head    = $this->expenses->findById($ids[0], $userId);
+            $ym      = substr((string) $row['expense_date'], 0, 7);
+            $warning = Budget::checkForCategory($userId, $row['category_id'], $ym);
+            return [
+                'expense'        => $head,
+                'budget_warning' => $warning,
+                'installments'   => $ids,
+            ];
+        });
+    }
+
+    /**
+     * Estrae lo spec rateizzazione dal payload se presente e attivo.
+     * Accetta sia formato nested ($data['installment']) sia flat
+     * ($data['installment_count']/'installment_frequency'/'installment_custom_days')
+     * con flag $data['installment_enabled']. Se count<2 o spec assente, ritorna null.
+     *
+     * @param array<string, mixed> $data
+     * @return array{count:int, frequency:string, custom_days:?int}|null
+     */
+    private function extractInstallmentSpec(array $data): ?array
+    {
+        if (isset($data['installment']) && is_array($data['installment'])) {
+            $spec = $data['installment'];
+        } else {
+            $enabled = (string) ($data['installment_enabled'] ?? '');
+            if ($enabled === '' || $enabled === '0') {
+                return null;
+            }
+            $spec = [
+                'count'       => (int) ($data['installment_count']       ?? 0),
+                'frequency'   => (string) ($data['installment_frequency'] ?? 'monthly'),
+                'custom_days' => isset($data['installment_custom_days']) && $data['installment_custom_days'] !== ''
+                    ? (int) $data['installment_custom_days']
+                    : null,
+            ];
+        }
+        $count = (int) ($spec['count'] ?? 0);
+        if ($count < 2) {
+            return null;
+        }
+        return [
+            'count'       => $count,
+            'frequency'   => (string) ($spec['frequency'] ?? 'monthly'),
+            'custom_days' => isset($spec['custom_days']) && $spec['custom_days'] !== ''
+                ? (int) $spec['custom_days']
+                : null,
+        ];
     }
 
     /**

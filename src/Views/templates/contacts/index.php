@@ -14,8 +14,11 @@ $this->section('content');
             <h1 class="h3 mb-0"><i class="bi bi-person-rolodex me-2"></i>Anagrafiche</h1>
             <div class="text-muted small">Fornitori e clienti -- chi paga, chi ricevi.</div>
         </div>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             <span id="contacts-count" class="badge bg-secondary">—</span>
+            <button type="button" id="contacts-merge-btn" class="btn btn-warning btn-sm d-none" data-action="merge-open">
+                <i class="bi bi-bezier2 me-1"></i>Fondi <span data-merge-count>0</span>
+            </button>
             <button type="button" class="btn btn-primary btn-sm" data-action="new">
                 <i class="bi bi-plus-circle me-1"></i>Nuova anagrafica
             </button>
@@ -46,6 +49,9 @@ $this->section('content');
             <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
+                        <th style="width:1%">
+                            <input type="checkbox" id="contacts-select-all" class="form-check-input" title="Seleziona / deseleziona tutta la pagina">
+                        </th>
                         <th style="width:1%"></th>
                         <th>Nome</th>
                         <th class="text-end">Spese (anno)</th>
@@ -56,7 +62,7 @@ $this->section('content');
                     </tr>
                 </thead>
                 <tbody id="contacts-tbody">
-                    <tr><td colspan="7" class="text-center text-muted py-4">
+                    <tr><td colspan="8" class="text-center text-muted py-4">
                         <div class="spinner-border spinner-border-sm me-2"></div>Caricamento…
                     </td></tr>
                 </tbody>
@@ -122,6 +128,47 @@ $this->section('content');
                         <i class="bi bi-check-circle me-1"></i>Salva
                     </button>
                 </div>
+            </div>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="merge-modal" class="border-0 rounded-3 shadow p-0" style="max-width:680px; width:95%">
+    <form id="merge-form" method="dialog" class="m-0">
+        <?= $this->csrfField() ?>
+        <div class="modal-content border-0">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bezier2 me-2"></i>Fondi anagrafiche</h5>
+                <button type="button" class="btn-close" data-action="merge-close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">
+                    Tutte le spese, entrate e ricorrenti collegate alle anagrafiche
+                    <strong>perdenti</strong> verranno spostate sulla <strong>vincitrice</strong> selezionata.
+                    Le perdenti vengono poi cancellate. L'operazione e' transazionale.
+                </p>
+                <div class="alert alert-warning small mb-2">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Operazione irreversibile. I movimenti restano (cambia solo il riferimento contatto).
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:1%">Vincitore</th>
+                                <th>Nome</th>
+                                <th class="text-end">Movimenti</th>
+                            </tr>
+                        </thead>
+                        <tbody id="merge-candidates"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-action="merge-close">Annulla</button>
+                <button type="submit" class="btn btn-warning" data-action="merge-submit" disabled>
+                    <i class="bi bi-bezier2 me-1"></i>Fondi
+                </button>
             </div>
         </div>
     </form>

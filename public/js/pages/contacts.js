@@ -28,6 +28,12 @@ function storePageSize(n) {
 let PAGE_SIZE  = loadStoredPageSize();
 let pageOffset = 0;
 let cache = { contactsById: new Map(), balances: new Map() };
+// Set di id selezionati per la fusione. Persiste al cambio pagina/filtro
+// (l'utente potrebbe voler unire due duplicati che sono in pagine diverse).
+// Tutti i nomi/usage delle anagrafiche selezionate li teniamo in
+// `mergeMeta` cosi' il modal mostra anche i record fuori pagina.
+const mergeSelection = new Set();
+const mergeMeta = new Map(); // id -> {name, vat_number, usage_total}
 
 function escHtml(s) {
     const d = document.createElement('div');
@@ -63,7 +69,12 @@ function renderRow(c) {
     const netClass = net > 0 ? 'text-success' : (net < 0 ? 'text-danger' : 'text-muted');
 
     const detailUrl = `${BASE}/contacts/detail?id=${c.id}`;
+    const checked = mergeSelection.has(c.id) ? 'checked' : '';
     tr.innerHTML = `
+        <td>
+            <input type="checkbox" class="form-check-input contact-merge-cb" data-id="${c.id}" ${checked}
+                   title="Includi nella fusione">
+        </td>
         <td>
             <span class="d-inline-block rounded-circle"
                   style="width:1.2rem;height:1.2rem;background-color:${escHtml(c.color)}"></span>
@@ -90,6 +101,39 @@ function renderRow(c) {
     return tr;
 }
 
+// ── Merge selection helpers ─────────────────────────────────────────────────
+
+function addToMergeSelection(c) {
+    mergeSelection.add(c.id);
+    mergeMeta.set(c.id, {
+        id:          c.id,
+        name:        c.name,
+        vat_number:  c.vat_number || '',
+        usage_total: c.usage?.total ?? 0,
+    });
+}
+
+function refreshMergeUi() {
+    const btn = document.getElementById('contacts-merge-btn');
+    const cnt = document.querySelector('#contacts-merge-btn [data-merge-count]');
+    if (!btn) return;
+    if (mergeSelection.size >= 2) {
+        btn.classList.remove('d-none');
+        if (cnt) cnt.textContent = String(mergeSelection.size);
+    } else {
+        btn.classList.add('d-none');
+    }
+    // Sincronizza select-all sulla pagina visibile.
+    const selAll = document.getElementById('contacts-select-all');
+    if (selAll) {
+        const visibleIds = [...cache.contactsById.keys()];
+        const allChecked = visibleIds.length > 0 && visibleIds.every(id => mergeSelection.has(id));
+        const anyChecked = visibleIds.some(id => mergeSelection.has(id));
+        selAll.checked       = allChecked;
+        selAll.indeterminate = !allChecked && anyChecked;
+    }
+}
+
 function renderRows(items, total) {
     const tbody = document.getElementById('contacts-tbody');
     const empty = document.getElementById('contacts-empty');
@@ -102,6 +146,9 @@ function renderRows(items, total) {
         empty?.classList.add('d-none');
         for (const c of items) {
             cache.contactsById.set(c.id, c);
+            // Se l'utente l'aveva gia' selezionata, sincronizza i metadati
+            // (potrebbero essere cambiati: name, usage…).
+            if (mergeSelection.has(c.id)) addToMergeSelection(c);
             tbody.appendChild(renderRow(c));
         }
     }
@@ -109,6 +156,7 @@ function renderRows(items, total) {
     if (countEl) {
         countEl.textContent = `${total} totali`;
     }
+    refreshMergeUi();
 }
 
 function renderPagerSection(total) {
@@ -304,6 +352,121 @@ function wire() {
         pageOffset = 0;
         loadList();
     });
+
+    // ── Selezione per fusione ────────────────────────────────────────────
+    tbody?.addEventListener('change', (ev) => {
+        const cb = ev.target.closest('input.contact-merge-cb');
+        if (!cb) return;
+        const id = Number(cb.dataset.id);
+        const c  = cache.contactsById.get(id);
+        if (cb.checked) {
+            if (c) addToMergeSelection(c);
+        } else {
+            mergeSelection.delete(id);
+            mergeMeta.delete(id);
+        }
+        refreshMergeUi();
+    });
+
+    document.getElementById('contacts-select-all')?.addEventListener('change', (ev) => {
+        const checked = ev.target.checked;
+        for (const c of cache.contactsById.values()) {
+            if (checked) addToMergeSelection(c);
+            else { mergeSelection.delete(c.id); mergeMeta.delete(c.id); }
+        }
+        // Aggiorna i checkbox visibili.
+        for (const cb of document.querySelectorAll('input.contact-merge-cb')) {
+            cb.checked = mergeSelection.has(Number(cb.dataset.id));
+        }
+        refreshMergeUi();
+    });
+
+    // ── Merge modal ──────────────────────────────────────────────────────
+    document.getElementById('contacts-merge-btn')?.addEventListener('click', openMergeModal);
+    const mergeDlg  = document.getElementById('merge-modal');
+    mergeDlg?.addEventListener('click', (ev) => {
+        if (ev.target.closest('[data-action="merge-close"]')) closeMergeModal();
+    });
+    mergeDlg?.addEventListener('change', (ev) => {
+        if (!ev.target.matches('input[name="merge-winner"]')) return;
+        const submitBtn = mergeDlg.querySelector('button[data-action="merge-submit"]');
+        if (submitBtn) submitBtn.disabled = false;
+    });
+    document.getElementById('merge-form')?.addEventListener('submit', submitMerge);
+}
+
+function openMergeModal() {
+    const dlg  = document.getElementById('merge-modal');
+    const tbody = document.getElementById('merge-candidates');
+    const submitBtn = dlg?.querySelector('button[data-action="merge-submit"]');
+    if (!dlg || !tbody) return;
+    if (mergeSelection.size < 2) {
+        toast.warning('Seleziona almeno 2 anagrafiche da fondere.');
+        return;
+    }
+    // Renderizza la tabella interna ordinata per usage (chi ha piu'
+    // movimenti e' candidato naturale a vincitore).
+    const rows = [...mergeMeta.values()].sort(
+        (a, b) => (b.usage_total ?? 0) - (a.usage_total ?? 0) || a.name.localeCompare(b.name)
+    );
+    tbody.innerHTML = rows.map((m, i) => `
+        <tr>
+            <td class="text-center">
+                <input type="radio" class="form-check-input" name="merge-winner" value="${m.id}"${i === 0 ? ' checked' : ''}>
+            </td>
+            <td>
+                <div>${escHtml(m.name)}</div>
+                ${m.vat_number ? `<code class="small text-muted">${escHtml(m.vat_number)}</code>` : ''}
+            </td>
+            <td class="text-end">${m.usage_total > 0 ? `${m.usage_total} mov.` : '<span class="text-muted">—</span>'}</td>
+        </tr>
+    `).join('');
+    if (submitBtn) submitBtn.disabled = false; // c'e' sempre un radio prechecked
+    dlg.showModal();
+}
+
+function closeMergeModal() {
+    document.getElementById('merge-modal')?.close();
+}
+
+async function submitMerge(ev) {
+    ev.preventDefault();
+    const dlg = document.getElementById('merge-modal');
+    const winnerInput = dlg?.querySelector('input[name="merge-winner"]:checked');
+    const winnerId = Number(winnerInput?.value || 0);
+    if (winnerId <= 0) {
+        toast.warning('Scegli un\'anagrafica vincitrice.');
+        return;
+    }
+    const losers = [...mergeSelection].filter(id => id !== winnerId);
+    if (losers.length === 0) {
+        toast.warning('Servono almeno 2 anagrafiche selezionate (vincitore + 1 perdente).');
+        return;
+    }
+    const winnerName = mergeMeta.get(winnerId)?.name ?? '?';
+    if (!confirm(
+        `Fondere ${losers.length} anagrafic${losers.length === 1 ? 'a' : 'he'} in "${winnerName}"? `
+        + 'I movimenti collegati verranno spostati e le anagrafiche perdenti cancellate.'
+    )) return;
+
+    const params = new URLSearchParams({
+        winner_id: String(winnerId),
+        loser_ids: JSON.stringify(losers),
+        _csrf:     getCsrfToken(),
+    });
+    try {
+        const r = await send(`${BASE}/contacts/merge`, params);
+        const stats = r?.data?.result ?? {};
+        const re = stats.reassigned ?? {};
+        const total = (re.expenses ?? 0) + (re.incomes ?? 0) + (re.recurring ?? 0);
+        toast.success(`Fusione: ${stats.merged ?? 0} anagrafic${(stats.merged ?? 0) === 1 ? 'a' : 'he'} eliminat${(stats.merged ?? 0) === 1 ? 'a' : 'e'}, ${total} movimenti spostati su "${stats.winner_name ?? winnerName}".`);
+        mergeSelection.clear();
+        mergeMeta.clear();
+        closeMergeModal();
+        loadList();
+    } catch (err) {
+        toast.error(err.message ?? 'Errore fusione anagrafiche.');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
