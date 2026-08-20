@@ -35,3 +35,6 @@ desktop.ini
 # PHPUnit
 /.phpunit.cache/
 /.phpunit.result.cache
+
+# Artefatti di build (installer prodotto da electron-builder)
+/dist/
