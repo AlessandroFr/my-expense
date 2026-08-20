@@ -30,6 +30,8 @@ const CASI = [
   ['expenses', 'limit=10&offset=30', { limit: 10, offset: 30 }, ['expenses', 'total']],
   ['expenses', 'limit=500', { limit: 500 }, ['expenses', 'total']],
   ['incomes', 'limit=50', { limit: 50 }, ['incomes', 'total', 'sources']],
+  ['transfers', 'limit=100', { limit: 100 }, ['transfers', 'total']],
+  ['transfers', 'limit=20&account_id=3', { limit: 20, account_id: 3 }, ['transfers', 'total']],
   ['incomes', 'limit=20&search=bonifico', { limit: 20, search: 'bonifico' }, ['incomes', 'total']],
   ['incomes', 'limit=500', { limit: 500 }, ['incomes', 'total', 'sources']],
 ];

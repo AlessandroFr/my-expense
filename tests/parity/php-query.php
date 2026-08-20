@@ -46,6 +46,13 @@ $risultato = match ($dominio) {
             (new App\Models\Repositories\CategoryRepository())->listForUser($userId),
         ),
     ],
+    'transfers' => (static function () use ($filtri, $userId): array {
+        $repo = new App\Models\Repositories\TransferRepository();
+        return [
+            'transfers' => array_map(static fn($t) => $t->toArray(), $repo->list($userId, $filtri)),
+            'total'     => $repo->count($userId, $filtri),
+        ];
+    })(),
     default => throw new InvalidArgumentException("Dominio sconosciuto: {$dominio}"),
 };
 
