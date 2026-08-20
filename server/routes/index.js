@@ -11,6 +11,7 @@ import { contactRoutes } from './contacts.js';
 import { expenseRoutes } from './expenses.js';
 import { filterRoutes } from './filters.js';
 import { incomeRoutes } from './incomes.js';
+import { pacRoutes } from './pac.js';
 import { recurringRoutes } from './recurring.js';
 import { securitiesRoutes } from './securities.js';
 import { tagRoutes } from './tags.js';
@@ -30,4 +31,5 @@ export const routes = new Map(Object.entries({
   ...attachmentRoutes,
   ...backupRoutes,
   ...securitiesRoutes,
+  ...pacRoutes,
 }));
