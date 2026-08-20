@@ -3,6 +3,8 @@
 // di app da PHP a Node.
 
 import { accountRoutes } from './accounts.js';
+import { attachmentRoutes } from './attachments.js';
+import { backupRoutes } from './backup.js';
 import { budgetRoutes } from './budgets.js';
 import { categoryRoutes } from './categories.js';
 import { contactRoutes } from './contacts.js';
@@ -24,4 +26,6 @@ export const routes = new Map(Object.entries({
   ...transferRoutes,
   ...recurringRoutes,
   ...contactRoutes,
+  ...attachmentRoutes,
+  ...backupRoutes,
 }));
