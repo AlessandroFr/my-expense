@@ -12,6 +12,7 @@ import { expenseRoutes } from './expenses.js';
 import { filterRoutes } from './filters.js';
 import { incomeRoutes } from './incomes.js';
 import { pacRoutes } from './pac.js';
+import { reconciliationRoutes } from './reconciliations.js';
 import { recurringRoutes } from './recurring.js';
 import { reportRoutes } from './reports.js';
 import { securitiesRoutes } from './securities.js';
@@ -34,4 +35,5 @@ export const routes = new Map(Object.entries({
   ...securitiesRoutes,
   ...pacRoutes,
   ...reportRoutes,
+  ...reconciliationRoutes,
 }));
