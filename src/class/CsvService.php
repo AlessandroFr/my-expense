@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Models\Repositories\CategoryRepository;
+use App\Services\CategoryService;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -101,8 +103,8 @@ final class CsvService
         }
 
         $catCache = [];
-        foreach (Category::allForUser($userId) as $c) {
-            $catCache[mb_strtolower((string) $c['name'])] = (int) $c['id'];
+        foreach ((new CategoryRepository())->listForUser($userId) as $c) {
+            $catCache[mb_strtolower($c->name)] = $c->id;
         }
 
         $imported = 0;
@@ -128,7 +130,9 @@ final class CsvService
                     if (isset($catCache[$key])) {
                         $catId = $catCache[$key];
                     } elseif ($createMissingCategories) {
-                        $catId = Category::create($userId, $catName, '#6c757d', null, 0);
+                        $catId = (new CategoryService())
+                            ->create($userId, ['name' => $catName, 'color' => '#6c757d', 'icon' => null, 'sort_order' => 0])
+                            ->id;
                         $catCache[$key] = $catId;
                     } else {
                         throw new InvalidArgumentException("Categoria '{$catName}' non esistente.");

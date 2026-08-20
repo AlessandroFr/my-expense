@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Services\CategoryService;
 use DateTime;
 use InvalidArgumentException;
 use RuntimeException;
@@ -82,12 +83,12 @@ final class AccountReconciliation
                 );
                 $adjustmentType = 'income';
             } elseif ($difference < 0.0) {
-                $categoryId = Category::findOrCreateByName(
+                $categoryId = (new CategoryService())->findOrCreateByName(
                     $userId,
                     self::ADJUSTMENT_LABEL,
                     '#6c757d',
                     'arrow-repeat'
-                );
+                )->id;
                 $adjustmentExpenseId = Expense::create(
                     $userId,
                     $categoryId,

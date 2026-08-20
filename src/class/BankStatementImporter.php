@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Models\Repositories\CategoryRepository;
 use App\Models\Repositories\ExpenseRepository;
 use App\Models\Repositories\TransferRepository;
+use App\Services\CategoryService;
 use App\Services\InstallmentCalculator;
 use InvalidArgumentException;
 use RuntimeException;
@@ -114,29 +116,32 @@ final class BankStatementImporter
 
         $iban = self::extractIban(array_slice($lines, 0, $headerIdx));
 
+        $catRepo    = new CategoryRepository();
         $categories = [];
         $catByName  = [];
-        foreach (Category::allForUser($userId) as $c) {
+        foreach ($catRepo->listForUser($userId) as $c) {
             $categories[] = [
-                'id'    => (int) $c['id'],
-                'name'  => (string) $c['name'],
-                'color' => (string) ($c['color'] ?? '#6c757d'),
+                'id'    => $c->id,
+                'name'  => $c->name,
+                'color' => $c->color,
             ];
-            $catByName[mb_strtolower((string) $c['name'])] = (int) $c['id'];
+            $catByName[mb_strtolower($c->name)] = $c->id;
         }
 
         // Auto-crea le categorie suggerite mancanti durante la preview.
         // Cosi' nel modal l'utente vede gia' la categoria selezionata
         // (proposta == esistente) invece di "— nessuna —" + hint testuale.
-        $ensureCategory = static function (string $name) use (&$categories, &$catByName, $userId): int {
+        $ensureCategory = static function (string $name) use (&$categories, &$catByName, $userId, $catRepo): int {
             $key = mb_strtolower($name);
             if (isset($catByName[$key])) return $catByName[$key];
             try {
-                $newId = Category::create($userId, $name, '#6c757d', null, 0);
+                $newId = (new CategoryService())
+                    ->create($userId, ['name' => $name, 'color' => '#6c757d', 'icon' => null, 'sort_order' => 0])
+                    ->id;
             } catch (\Throwable $e) {
                 // Se la create fallisce (es. race su unique key), ricarica e riprova.
-                foreach (Category::allForUser($userId) as $c) {
-                    if (mb_strtolower((string) $c['name']) === $key) return (int) $c['id'];
+                foreach ($catRepo->listForUser($userId) as $c) {
+                    if (mb_strtolower($c->name) === $key) return $c->id;
                 }
                 throw $e;
             }
