@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "My Expense"
+  },
+  "db": {
+    "_commento": "Il database e' un unico file. Per farne il backup basta copiarlo (chiudendo prima l'app). Percorso relativo = dalla cartella del progetto.",
+    "path": "data/my-expense.sqlite"
+  }
+}

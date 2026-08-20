@@ -8,11 +8,15 @@ import { readFileSync } from 'node:fs';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Legge il path del database dalla stessa config che usa PHP. */
+/** Percorso del file del database, dalla configurazione locale. */
 function databasePath() {
-  const raw = readFileSync(join(projectRoot, 'config/config.php'), 'utf8');
-  const match = raw.match(/'path'\s*=>\s*'([^']+)'/);
-  const path = match ? match[1] : 'data/my-expense.sqlite';
+  let path = 'data/my-expense.sqlite';
+  try {
+    const cfg = JSON.parse(readFileSync(join(projectRoot, 'config/config.json'), 'utf8'));
+    if (cfg?.db?.path) path = cfg.db.path;
+  } catch {
+    // Senza config si usa il percorso predefinito: e' il caso del primo avvio.
+  }
   return isAbsolute(path) ? path : join(projectRoot, path);
 }
 
@@ -47,11 +51,25 @@ export function transaction(fn) {
 }
 
 /**
- * L'app e' monoutente: la registrazione si chiude dopo il primo utente
- * (src/class/Auth.php), quindi l'id e' sempre lo stesso.
+ * L'app e' per una persona sola: c'e' una riga sola in `users` e il suo id e'
+ * quello di tutti i dati.
  */
 export function currentUserId() {
   const row = one('SELECT id FROM users ORDER BY id LIMIT 1');
-  if (!row) throw new Error('Nessun utente: completa prima la registrazione da /setup.');
+  if (!row) return ensureUser();
   return row.id;
+}
+
+/**
+ * Crea l'utente al primo avvio. Non essendoci piu' un login, non c'e' niente da
+ * chiedere: serve solo una riga a cui agganciare i dati. Il nome si puo'
+ * cambiare dalle impostazioni.
+ */
+export function ensureUser() {
+  const row = one('SELECT id FROM users ORDER BY id LIMIT 1');
+  if (row) return row.id;
+  const res = run(
+    "INSERT INTO users (username, password_hash) VALUES ('io', '')",
+  );
+  return Number(res.lastInsertRowid);
 }

@@ -11,13 +11,11 @@ Per chiuderla, chiudi la finestra nera che è comparsa insieme all'app.
 
 ## La prima volta
 
-1. Installa [PHP 8.1 o successivo](https://windows.php.net/download) e
-   assicurati che `php` risponda dal Prompt dei comandi.
-2. Apri il Prompt dei comandi nella cartella del progetto e lancia
-   `composer install`.
-3. Copia `config/config.example.php` in `config/config.php`.
-4. Doppio click su `avvia.cmd`: al primo avvio ti chiede di creare le tue
-   credenziali.
+1. Installa [Node 22 o successivo](https://nodejs.org) e assicurati che `node`
+   risponda dal Prompt dei comandi.
+2. Copia `config/config.example.json` in `config/config.json`.
+3. Doppio click su `avvia.cmd`. Non serve altro: niente da installare, niente
+   password da scegliere.
 
 ## Fare il backup
 

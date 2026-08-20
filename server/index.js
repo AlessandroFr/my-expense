@@ -1,60 +1,61 @@
 /**
  * Server dell'applicazione.
  *
- * Durante la migrazione da PHP a Node questo processo sta DAVANTI: serve gli
- * endpoint gia' riscritti e inoltra tutto il resto a `php -S` su una porta
- * interna. Il frontend non se ne accorge — stessi URL, stesso envelope JSON.
+ * Serve le pagine, gli endpoint JSON e i file statici. Ascolta solo su
+ * 127.0.0.1: l'app è per chi sta davanti al computer, non per la rete.
  *
- * Quando l'ultimo dominio sara' passato a Node, il proxy sparisce e con lui PHP.
+ * Non c'è login: è un'applicazione per una persona sola sulla sua macchina, e
+ * chi ha accesso al computer ha già accesso al file del database. Resta invece
+ * il token CSRF, che serve a impedire a una pagina qualunque aperta nel browser
+ * di chiamare 127.0.0.1 a nostra insaputa.
  */
 
-import { createServer, request as httpRequest } from 'node:http';
-import { assertLocalOrigin, fail, HttpError } from './http.js';
+import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
+
+import { assertLocalOrigin, fail, HttpError, parseCookies } from './http.js';
 import { routes } from './routes/index.js';
+import { serveStatic } from './static.js';
+import { ensureUser } from './db.js';
 
 const PORT = Number(process.env.PORT ?? 8080);
-const PHP_PORT = Number(process.env.PHP_PORT ?? 8081);
 
-/** Inoltra la richiesta a php -S mantenendo header, cookie e corpo. */
-function proxyToPhp(req, res) {
-  const upstream = httpRequest(
-    {
-      host: '127.0.0.1',
-      port: PHP_PORT,
-      method: req.method,
-      path: req.url,
-      headers: { ...req.headers, host: `127.0.0.1:${PHP_PORT}` },
-    },
-    (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
-      upstreamRes.pipe(res);
-    },
-  );
-
-  upstream.on('error', (err) => {
-    if (res.headersSent) { res.destroy(); return; }
-    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(
-      'Il processo PHP non risponde sulla porta ' + PHP_PORT + '.\n' +
-      'Avvia l\'app con avvia.cmd, che lancia entrambi i processi.\n\n' +
-      err.message,
-    );
-  });
-
-  req.pipe(upstream);
-}
+/**
+ * Token CSRF del processo. Vale finché l'app resta aperta: non c'è una sessione
+ * da cui derivarlo, e per il doppio invio (cookie + header) questo basta.
+ */
+const csrfToken = randomBytes(32).toString('hex');
 
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url ?? '/', 'http://localhost');
-  const handler = routes.get(`${req.method} ${pathname}`);
-
-  if (!handler) {
-    proxyToPhp(req, res);
-    return;
-  }
 
   try {
     assertLocalOrigin(req);
+  } catch (err) {
+    fail(res, err);
+    return;
+  }
+
+  if (serveStatic(req, res, pathname)) return;
+
+  const handler = routes.get(`${req.method} ${pathname}`);
+  if (!handler) {
+    res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><meta charset="utf-8"><title>Pagina non trovata</title>'
+      + '<p style="font:16px system-ui;padding:2rem">Pagina non trovata. '
+      + '<a href="/dashboard">Torna alla dashboard</a>.</p>');
+    return;
+  }
+
+  // Il cookie viene creato alla prima pagina; se manca (per esempio dopo un
+  // riavvio) lo si rimanda insieme alla risposta.
+  req.csrfToken = csrfToken;
+  const cookie = parseCookies(req).csrf_token;
+  if (cookie !== csrfToken && !res.headersSent) {
+    res.setHeader('Set-Cookie', `csrf_token=${csrfToken}; Path=/; SameSite=Lax`);
+  }
+
+  try {
     await handler(req, res);
   } catch (err) {
     if (!(err instanceof HttpError)) console.error(`[${req.method} ${pathname}]`, err);
@@ -62,8 +63,8 @@ const server = createServer(async (req, res) => {
   }
 });
 
+ensureUser();
+
 server.listen(PORT, '127.0.0.1', () => {
-  const migrati = routes.size;
   console.log(`My Expense in ascolto su http://127.0.0.1:${PORT}/`);
-  console.log(`  ${migrati} endpoint serviti da Node, il resto inoltrato a PHP:${PHP_PORT}`);
 });

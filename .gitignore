@@ -1,43 +1,35 @@
-# Composer
-/vendor/
-
 # Il database e i suoi file WAL: dati personali, mai in git
 /data/
 
-# Local config (real DB credentials — never commit)
-/config/config.php
+# Configurazione locale
+/config/config.json
 
-# Runtime logs
+# Log
 /logs/*
 !/logs/.gitkeep
 
-# Allegati utente (file binari, non commit)
+# Allegati: file dell'utente, non vanno in git
 /uploads/expenses/
 !/uploads/.gitkeep
-!/uploads/.htaccess
 
-# Editor / IDE
+# Editor
 /.idea/
 /.vscode/
 
-# Claude Code (user-local settings)
+# Claude Code (impostazioni locali)
 /.claude/
 
-# OS / OneDrive cruft
+# Scarti di sistema
 Thumbs.db
 desktop.ini
 .DS_Store
 
-# Local-only files
+# File solo locali
 *.local
 
-# Node / JS test harness
+# Node
 /node_modules/
 /package-lock.json
 
-# PHPUnit
-/.phpunit.cache/
-/.phpunit.result.cache
-
-# Artefatti di build (installer prodotto da electron-builder)
+# Artefatti di build (l'installer prodotto da electron-builder)
 /dist/

@@ -13,7 +13,9 @@ import { csvRoutes } from './csv.js';
 import { expenseRoutes } from './expenses.js';
 import { filterRoutes } from './filters.js';
 import { incomeRoutes } from './incomes.js';
+import { manutenzioneRoutes } from './manutenzione.js';
 import { pacRoutes } from './pac.js';
+import { pageRoutes } from './pages.js';
 import { reconciliationRoutes } from './reconciliations.js';
 import { recurringRoutes } from './recurring.js';
 import { reportRoutes } from './reports.js';
@@ -23,6 +25,8 @@ import { transferBackfillRoutes } from './transfers-backfill.js';
 import { transferRoutes } from './transfers.js';
 
 export const routes = new Map(Object.entries({
+  ...pageRoutes,
+  ...manutenzioneRoutes,
   ...categoryRoutes,
   ...tagRoutes,
   ...filterRoutes,
