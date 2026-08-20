@@ -8,6 +8,7 @@ import { categoryRoutes } from './categories.js';
 import { expenseRoutes } from './expenses.js';
 import { filterRoutes } from './filters.js';
 import { incomeRoutes } from './incomes.js';
+import { recurringRoutes } from './recurring.js';
 import { tagRoutes } from './tags.js';
 import { transferRoutes } from './transfers.js';
 
@@ -20,4 +21,5 @@ export const routes = new Map(Object.entries({
   ...expenseRoutes,
   ...incomeRoutes,
   ...transferRoutes,
+  ...recurringRoutes,
 }));
