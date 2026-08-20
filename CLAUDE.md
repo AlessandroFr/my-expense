@@ -23,11 +23,15 @@ scelta, sta in
 `C:\Users\perso\.claude\plans\prendi-in-mano-my-expense-noble-prism.md`.
 
 Fatto finora: via Apache e MySQL, database SQLite, doppioni del refactor MVC
-eliminati.
+eliminati, e **92 endpoint su 99 serviti da Node**. Tutti i domini
+dell'applicazione sono migrati; a PHP restano solo i 5 endpoint di
+autenticazione e i 2 che chiedono la password come freno prima di
+un'operazione distruttiva (`/backup/restore`, `/db/reset`) — verificarla
+significa confrontare un hash bcrypt, che Node non fa senza dipendenze.
 
-Da fare: sostituire PHP con Node un dominio alla volta (strangler: un server
-`node:http` davanti che serve gli endpoint già migrati e inoltra gli altri a
-`php -S`), poi impacchettare con `electron-builder`.
+Da fare: la fase 6 elimina l'autenticazione (un'app desktop monoutente non ne
+ha bisogno) e con essa quei 7 endpoint, poi converte le 20 pagine HTML e
+spegne PHP; la fase 7 impacchetta con `electron-builder`.
 
 **Il frontend non va toccato.** `public/js/` (9.000 righe) parla col backend via
 `fetch()` su un envelope JSON stabile: finché URL ed envelope restano quelli, il
@@ -37,15 +41,20 @@ HTTP locale resta anche dentro Electron, invece di passare a IPC.
 ## Comandi
 
 ```powershell
-avvia.cmd                      # avvia l'app e apre la finestra
-php vendor/bin/phpunit         # test PHP
-npm test                       # test JS (node --test, zero dipendenze)
-composer install               # dipendenze (l'autoload serve al front controller)
+avvia.cmd                                  # avvia l'app e apre la finestra
+npm test                                   # test JS (node --test, zero dipendenze)
+php vendor/bin/phpunit                     # test PHP (quel che resta)
+node tests/parity/confronta.mjs            # confronta le risposte di Node con quelle di PHP
+composer install                           # dipendenze PHP, finché PHP c'è
 ```
 
-L'app parte con il web server integrato di PHP:
-`php -S 127.0.0.1:8080 -t public public/router.php`. Niente XAMPP, niente
-Apache, niente MySQL.
+`avvia.cmd` lancia due processi: Node davanti sulla 8080, che serve gli
+endpoint migrati, e `php -S` dietro sulla 8081 per il resto. Niente XAMPP,
+niente Apache, niente MySQL.
+
+**Il confronto di parità è il collaudo della migrazione**: interroga PHP da
+riga di comando (quindi senza login) e mette il risultato a fianco di quello
+di Node. Ogni dominio spostato deve superarlo prima di considerarsi migrato.
 
 ## Stack
 
@@ -73,6 +82,9 @@ Apache, niente MySQL.
 | `src/Models/Entities/` | POPO immutabili (`toArray()` per il JSON) |
 | `src/Validation/` | Validator a regole + Request per dominio |
 | `src/Views/` | Motore di template minimale + template per dominio |
+| `server/` | Il backend Node: `index.js` (server e proxy verso PHP), `db.js`, `http.js`, `routes/` un file per dominio |
+| `server/routes/index.js` | Registro degli endpoint su Node: quel che non è qui viene inoltrato a PHP |
+| `tests/parity/` | Confronto fra le risposte di Node e quelle di PHP |
 | `src/class/` | Infrastruttura (Auth, Csrf, Config, Database, Session, Json) e domini non ancora migrati a Repository |
 | `database/schema.sql` | Schema SQLite completo — l'unica fonte |
 | `config/config.php` | Configurazione locale, gitignored |
@@ -109,6 +121,17 @@ col frontend.
 **Le soglie si confrontano sui valori grezzi.** `Budget::nearLimit()` non usa
 `progressPct()`, che è arrotondato a un decimale e farebbe scattare l'avviso già
 a 79,95%.
+
+**Gli arrotondamenti in Node passano da `roundLikePhp`.**
+`Math.round(x * 100) / 100` non basta: `263.585 * 100` in virgola mobile fa
+`26358.499999999996`, quindi JS arrotonda per difetto dove PHP arrotonda per
+eccesso. La differenza è emersa su un dato vero — la media mensile di un anno.
+
+**Anche i comportamenti discutibili vanno riprodotti, finché i due backend
+convivono.** PHP legge `1.234,56` come **1.234**, perché non gestisce il
+separatore delle migliaia (`server/amount.js`). Correggerlo in Node
+significherebbe salvare lo stesso valore in modo diverso a seconda di chi
+risponde alla richiesta.
 
 ## Convenzioni
 
