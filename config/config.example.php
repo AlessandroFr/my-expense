@@ -9,9 +9,10 @@
 return [
     'app' => [
         'name'     => 'My Expense',
-        // URL base sotto cui l'app è servita (es. '/my-expense' se sotto htdocs/my-expense).
-        // Lascia stringa vuota se servi direttamente da DocumentRoot.
-        'base_url' => '/my-expense',
+        // URL base sotto cui l'app è servita. Con `avvia.cmd` l'app sta alla
+        // radice, quindi va lasciata vuota. Serve solo se la ospiti in una
+        // sottocartella (es. '/my-expense' sotto htdocs).
+        'base_url' => '',
         'debug'    => true,
     ],
 
