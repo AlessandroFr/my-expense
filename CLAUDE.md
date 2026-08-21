@@ -24,8 +24,12 @@ piccola parte: il lettore di form multipart, lo scrittore/lettore ZIP, il
 riconoscimento del tipo di un file caricato.
 
 Il frontend è invariato dai tempi di PHP: pagine HTML rese dal server e
-migliorate da un modulo ES per pagina in `public/js/pages/`, con Bootstrap,
-Chart.js e Tesseract.js da CDN. Nessun bundler.
+migliorate da un modulo ES per pagina in `public/js/pages/`. Nessun bundler.
+
+Bootstrap, le icone, i font, Chart.js e TinyMCE stanno in `public/vendor/`, non
+su un CDN: un'applicazione installata deve funzionare senza rete. I file si
+copiano da `node_modules` (le versioni sono fissate nelle devDependencies) e
+sono in git, così il repo appena clonato funziona.
 
 Si distribuisce come **applicazione installabile**: `electron-builder` produce un
 installer per Windows, e dentro c'è un solo runtime. Electron 43 porta con sé
@@ -60,6 +64,7 @@ npm run dist       # crea l'installer in dist\
 | `server/zip.js`, `multipart.js` | Formati che Node non ha in libreria standard |
 | `server/bank-statement.js` | Lettura degli estratti conto |
 | `public/js/` | Il frontend, un modulo per pagina |
+| `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
 | `database/schema.sql` | Lo schema di partenza |
 | `database/migrate.js` | Porta il database alla versione attesa, a ogni avvio |
 | `build/icon.png` | L'icona dell'app |
@@ -84,6 +89,18 @@ un'installazione già esistente riceve le modifiche allo schema, cosa che con il
 vecchio installer non succedeva mai. Su database vuoto si crea da `schema.sql` e
 le migration presenti si segnano come applicate senza eseguirle; su database
 esistente si applicano solo quelle non registrate, una transazione ciascuna.
+
+**Una sola cosa chiede ancora la rete: la lettura degli scontrini.** `ocr.js`
+carica Tesseract.js da un CDN quando serve, perché portarlo dentro vorrebbe dire
+venti megabyte fra libreria e modello della lingua per una funzione accessoria.
+Se la rete manca, il messaggio lo dice e il resto continua a funzionare. Tutto il
+resto è in `public/vendor/` e non esce mai dal computer.
+
+**Il service worker esiste solo per disinstallarsi.** Serviva quando l'app si
+apriva nel browser e si poteva installare come PWA. Cancellarlo non sarebbe
+bastato: uno già registrato resta attivo finché non si toglie da solo, ed è
+quello che ora fa `public/sw.js`. Quando sarà passato abbastanza tempo perché
+nessun browser lo abbia più, si può togliere anche quello.
 
 **Le foreign key di SQLite sono spente di default.** `db()` esegue
 `PRAGMA foreign_keys = ON` a ogni connessione: senza quella riga i vincoli dello

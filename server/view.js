@@ -72,19 +72,14 @@ export function page(o) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${esc(`${o.title ?? ''} - ${NOME_APP}`)}</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/vendor/fonts.css">
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="${asset('css/pastel.css')}">
     <link rel="stylesheet" href="${asset('css/transitions.css')}">
 
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#9B7CD9">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%239B7CD9'/><stop offset='1' stop-color='%23FF9D6E'/></linearGradient></defs><rect width='192' height='192' rx='40' fill='url(%23g)'/><text x='50%25' y='52%25' font-family='system-ui' font-size='110' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>%E2%82%AC</text></svg>">
+    <!-- Il service worker esiste solo per disinstallarsi: vedi public/sw.js. -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
@@ -178,8 +173,8 @@ ${o.head ?? ''}</head>
 ${o.content}
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tinymce@7.6.0/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="/vendor/tinymce/tinymce.min.js"></script>
 <script type="module" src="${asset('js/theme.js')}"></script>
 <script type="module" src="${asset('js/icon-picker.js')}"></script>
 <script type="module" src="${asset('js/rich-editor.js')}"></script>

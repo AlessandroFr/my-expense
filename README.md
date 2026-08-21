@@ -8,7 +8,9 @@ computer: un solo file di database, niente account, niente nuvola.
 Apri `MyExpense-Setup-1.0.0.exe` e segui l'installazione. Poi doppio click
 sull'icona, sul desktop o nel menu avvio.
 
-Non serve nient'altro: né PHP, né Node, né XAMPP. È tutto dentro il pacchetto.
+Non serve nient'altro: né PHP, né Node, né XAMPP. È tutto dentro il pacchetto,
+e funziona anche senza connessione a Internet. L'unica cosa che la richiede è
+la lettura automatica dell'importo dalla foto di uno scontrino.
 
 ## Dove finiscono i dati
 

@@ -16,8 +16,12 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
+    "chart.js": "^4.4.6",
     "electron": "^43.4.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "tinymce": "^7.6.0"
   },
   "build": {
     "appId": "com.alessandrofranco.my-expense",

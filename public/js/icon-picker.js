@@ -3,9 +3,8 @@
 // turns it into an input-group with a live preview + a "browse" button that
 // opens a modal containing a searchable grid of all Bootstrap Icons.
 //
-// Icon list is extracted at runtime from the Bootstrap Icons CSS file
-// (CDN URL parsed in <head>) and cached in localStorage so we hit the
-// network only on the first picker open.
+// Icon list is extracted at runtime from the local Bootstrap Icons CSS file
+// and cached in localStorage, so the file is read only on the first open.
 //
 // Usage in HTML:
 //   <input type="text" name="icon" class="form-control" data-icon-picker>
@@ -16,7 +15,7 @@
 
 const BI_VERSION = '1.11.3';
 const CACHE_KEY = 'mx-bi-names';
-const CDN_URL = `https://cdn.jsdelivr.net/npm/bootstrap-icons@${BI_VERSION}/font/bootstrap-icons.min.css`;
+const CSS_URL = '/vendor/bootstrap-icons/bootstrap-icons.min.css';
 
 let iconNamesPromise = null;
 
@@ -48,7 +47,7 @@ function loadIconNames() {
         } catch (_) {}
 
         if (!css) {
-            const res = await fetch(CDN_URL, { credentials: 'omit' });
+            const res = await fetch(CSS_URL, { credentials: 'omit' });
             if (!res.ok) throw new Error('Failed to load Bootstrap Icons CSS');
             css = await res.text();
         }

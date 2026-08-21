@@ -137,6 +137,6 @@ export const render = ({ username }) => `
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="/vendor/chart/chart.umd.min.js"></script>
 <script type="module" src="${asset('js/pages/dashboard.js')}"></script>
 `;

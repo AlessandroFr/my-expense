@@ -1,5 +1,5 @@
 /**
- * File statici sotto public/: CSS, JavaScript, manifest, service worker.
+ * File statici sotto public/: CSS, JavaScript, font, librerie.
  *
  * Prende il posto di `php -S`, che finora li serviva insieme al resto. Fuori da
  * public/ non c'e' niente di raggiungibile: uploads/, config/ e data/ restano
@@ -17,7 +17,6 @@ const TIPI = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
