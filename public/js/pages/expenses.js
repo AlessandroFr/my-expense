@@ -1286,6 +1286,63 @@ function bankRenderSummary(d) {
     }
 }
 
+/**
+ * Il pannello del riconoscimento: quale banca ha vinto e dove e' finita ogni
+ * colonna del file. Si guarda prima di importare, ed e' il motivo per cui un
+ * tracciato sbagliato non arriva mai al database.
+ */
+function bankRenderProfile(d, onCambia) {
+    const box = document.getElementById('bank-profile-recognized');
+    if (!box) return;
+    const p = d.profile_used;
+    if (!p) { box.innerHTML = ''; return; }
+
+    const mappate = (d.header_preview ?? []).filter(h => h.field);
+    const ignorate = (d.header_preview ?? []).filter(h => !h.field).map(h => h.column).filter(Boolean);
+    const alternative = d.profile_alternatives ?? [];
+
+    const colonne = mappate.map(h => `
+        <span class="badge bg-light text-dark border me-1 mb-1">
+            ${escHtml(h.column)} <i class="bi bi-arrow-right mx-1 text-muted"></i>
+            <strong>${escHtml(h.field_label)}</strong>
+        </span>`).join('');
+
+    const scelta = (d.profiles ?? []).map(o =>
+        `<option value="${o.id}"${o.id === p.id ? ' selected' : ''}>${escHtml(o.name)}</option>`).join('');
+
+    box.innerHTML = `
+        <div class="alert ${p.auto ? 'alert-success' : 'alert-secondary'} small mb-0 py-2">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <span>
+                    <i class="bi bi-bank me-1"></i>
+                    ${p.auto ? 'Riconosciuta' : 'Banca scelta'}:
+                    <strong>${escHtml(p.name)}</strong>
+                    <span class="text-muted">
+                        &middot; intestazione alla riga ${p.header_row}
+                        &middot; ${p.matched_columns} colonne riconosciute
+                        &middot; ${p.amount_mode === 'signed' ? 'una colonna importo' : 'colonne uscite/entrate'}
+                    </span>
+                </span>
+                <span class="ms-auto d-flex align-items-center gap-1">
+                    <label class="text-muted" for="bank-profile-switch">Non è lei?</label>
+                    <select id="bank-profile-switch" class="form-select form-select-sm" style="width:auto">${scelta}</select>
+                </span>
+            </div>
+            <div>${colonne}</div>
+            ${ignorate.length ? `<div class="text-muted mt-1">Colonne del file non usate: ${escHtml(ignorate.join(', '))}.</div>` : ''}
+            ${alternative.length ? `<div class="text-muted mt-1">
+                Queste stesse colonne le leggerebbero anche
+                ${escHtml(alternative.slice(0, 3).map(a => a.name).join(', '))}${alternative.length > 3 ? ` e altri ${alternative.length - 3}` : ''}:
+                il nome della banca è un'ipotesi, la mappatura qui sopra invece è quella che verrà usata.
+            </div>` : ''}
+            ${p.notes ? `<div class="text-muted mt-1">${escHtml(p.notes)}</div>` : ''}
+        </div>`;
+
+    box.querySelector('#bank-profile-switch')?.addEventListener('change', (ev) => {
+        onCambia(Number(ev.target.value) || 0);
+    });
+}
+
 function bankShowStep(n) {
     document.getElementById('bank-import-step1').classList.toggle('d-none', n !== 1);
     document.getElementById('bank-step1-footer').classList.toggle('d-none', n !== 1);
@@ -1504,6 +1561,11 @@ function wireBankImport() {
             setStep1Status('');
             bankRenderRows();
             bankRenderSummary(d);
+            bankRenderProfile(d, (profileId) => {
+                const sel = form.querySelector('select[name="profile_id"]');
+                if (sel) sel.value = String(profileId);
+                runPreview();
+            });
             bankShowStep(2);
         } catch (err) {
             setStep1Status('Errore: ' + (err.message ?? 'anteprima fallita.'), 'error');

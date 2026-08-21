@@ -1,9 +1,13 @@
-// Import da estratto conto — contratto identico a BankImportController +
-// App\BankStatementImporter.
+// Import da estratto conto.
 //
 // Due passaggi: l'anteprima legge il file e propone tipo, categoria e
 // controparte riga per riga senza scrivere nulla; la conferma riceve le righe
 // come le ha lasciate l'utente e le scrive.
+//
+// Quale colonna sia cosa lo dice il profilo della banca (../bank-profiles.js):
+// o lo sceglie l'utente, o lo riconosce il tracciato del file. L'anteprima
+// mostra sempre quale profilo ha vinto e dove sono finite le colonne, cosi'
+// un riconoscimento sbagliato si vede prima di importare e non dopo.
 //
 // Un movimento gia' importato non entra due volte: ogni riga ha un'impronta
 // (conto + data + importo con segno + descrizione) con un vincolo UNIQUE.
@@ -16,11 +20,13 @@ import { parseMultipart } from '../multipart.js';
 import { explodeInstallments, validateSpec } from '../installments.js';
 import { splitCsvLine } from './csv.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
+import { FIELD_LABELS, matchProfiles } from '../bank-profiles.js';
+import { findById as findProfile, listForUser as listProfiles } from './bank-profiles.js';
 import {
   KIND_ATM_PAIR, KIND_EXPENSE, KIND_INCOME, KIND_TRANSFER_PAIR,
   classifyExpense, classifyIncomeSource, extractCounterparty, extractIban,
-  findHeaderRow, guessIncomePaymentMethod, guessPaymentMethod,
-  isAtmWithdrawalDescription, loadAndDecode, normalizeName, parseBankAmount, parseItDate,
+  guessIncomePaymentMethod, guessPaymentMethod, isAtmWithdrawalDescription,
+  loadAndDecode, normalizeName, parseBankAmountSigned, parseStatementDate,
 } from '../bank-statement.js';
 
 const KINDS = [KIND_EXPENSE, KIND_INCOME, KIND_TRANSFER_PAIR, KIND_ATM_PAIR];
@@ -71,6 +77,50 @@ function previewBackfillCount(userId, name) {
     + conta('SELECT COUNT(*) AS n FROM recurring_expenses WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?', userId, like);
 }
 
+/**
+ * Il modo di leggere l'importo. 'auto' guarda cosa c'e' davvero nel file, e
+ * anche una scelta esplicita ripiega sull'altra se le colonne non ci sono: un
+ * profilo configurato male fa perdere tempo, non deve importare al contrario.
+ */
+export function resolveAmountMode(configurato, mapping) {
+  const haCoppia = mapping.outflow !== undefined || mapping.inflow !== undefined;
+  const haImporto = mapping.amount !== undefined;
+  if (configurato === 'in_out' && haCoppia) return 'in_out';
+  if (configurato === 'signed' && haImporto) return 'signed';
+  return haCoppia ? 'in_out' : 'signed';
+}
+
+/**
+ * Gli altri profili che leggerebbero questo file con lo stesso punteggio del
+ * vincitore: se sono tanti, il nome della banca riconosciuta e' un'ipotesi e
+ * l'interfaccia lo dice invece di far finta di essere sicura.
+ */
+function alternative(esito, vincitore) {
+  const migliore = esito.best.score;
+  const visti = new Set([vincitore.id]);
+  const out = [];
+  for (const e of esito.candidates) {
+    if (e.score < migliore || visti.has(e.profile.id)) continue;
+    visti.add(e.profile.id);
+    out.push({ id: e.profile.id, name: e.profile.name });
+  }
+  return out;
+}
+
+/** Quando nessun profilo riconosce il file, l'errore dice cosa c'era dentro. */
+function noProfileError(headersSeen, profiloScelto) {
+  const viste = headersSeen.map((h) => h.join(' | ')).slice(0, 3);
+  const dettaglio = viste.length > 0
+    ? ` Intestazioni trovate nel file: ${viste.map((v) => `«${v}»`).join('; ')}.`
+    : ' Nel file non si vede nessuna riga di intestazione.';
+  const chi = profiloScelto
+    ? `Il profilo «${profiloScelto.name}» non riconosce le colonne di questo file.`
+    : 'Nessun profilo banca riconosce le colonne di questo file.';
+  return HttpError.badRequest(
+    `${chi}${dettaglio} Apri «Profili banca», crea o correggi il profilo incollando la riga di intestazione, poi riprova.`,
+  );
+}
+
 // ─── Anteprima ──────────────────────────────────────────────────────────────
 
 async function preview(req, res) {
@@ -85,18 +135,42 @@ async function preview(req, res) {
 
   const file = files.file;
   if (!file) throw HttpError.badRequest('Nessun file caricato.');
-  if (!/\.csv$/i.test(file.filename)) throw HttpError.badRequest('Sono accettati solo file .csv.');
+  if (!/\.(csv|txt)$/i.test(file.filename)) throw HttpError.badRequest('Sono accettati solo file .csv o .txt.');
 
   const autoPairRicariche = fields.auto_pair_ricariche === undefined || int(fields.auto_pair_ricariche) === 1;
   const autoPairPrelievi = fields.auto_pair_prelievi === undefined || int(fields.auto_pair_prelievi) === 1;
 
-  const lines = loadAndDecode(file.data).split(/\r\n|\n|\r/);
-  const headerIdx = findHeaderRow(lines);
-  if (headerIdx === null) {
-    throw HttpError.badRequest(
-      "Header non trovato. Atteso: 'Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate'.",
-    );
+  // Profilo scelto a mano, oppure tutti quelli che ci sono e vinca il migliore.
+  const tuttiProfili = listProfiles(userId);
+  const richiesto = int(fields.profile_id);
+  let daProvare = tuttiProfili;
+  if (richiesto > 0) {
+    const scelto = findProfile(richiesto, userId);
+    if (!scelto) throw HttpError.badRequest('Profilo banca non trovato.');
+    daProvare = [scelto];
   }
+  if (daProvare.length === 0) throw HttpError.badRequest('Nessun profilo banca configurato.');
+
+  let lines = loadAndDecode(file.data).split(/\r\n|\n|\r/);
+  const esito = matchProfiles(lines, daProvare);
+  if (!esito.best) throw noProfileError(esito.headersSeen, richiesto > 0 ? daProvare[0] : null);
+
+  const profilo = esito.best.profile;
+  // La codifica del profilo vince sull'indovinata, ma solo dopo aver
+  // riconosciuto il profilo: prima non si sa di chi sia il file.
+  if (profilo.encoding !== 'auto') {
+    lines = loadAndDecode(file.data, profilo.encoding).split(/\r\n|\n|\r/);
+  }
+
+  const headerIdx = esito.best.headerIdx;
+  const delimiter = esito.best.delimiter;
+  const mapping = esito.best.mapping;
+  const amountMode = resolveAmountMode(profilo.amount_mode, mapping);
+  const dateOrder = profilo.date_order;
+
+  const cell = (cols, i) => (i === undefined ? '' : str(cols[i]));
+  const descrizioneDi = (cols) => (mapping.description ?? [])
+    .map((i) => str(cols[i])).filter((s) => s !== '').join(' ');
 
   const iban = extractIban(lines.slice(0, headerIdx));
 
@@ -147,24 +221,37 @@ async function preview(req, res) {
     const raw = lines[i] ?? '';
     if (raw.trim() === '') { emptyCnt++; continue; }
 
-    const cols = splitCsvLine(raw, ';');
-    if (cols.length < 6) { emptyCnt++; continue; }
+    const cols = splitCsvLine(raw, delimiter);
+    // Senza la data non e' un movimento: e' un totale, una nota, un piede.
+    if (cell(cols, mapping.op_date) === '') { emptyCnt++; continue; }
 
     try {
-      const tipologia = str(cols[2]);
-      const descrizione = str(cols[3]);
-      const uscita = str(cols[4]);
-      const entrata = str(cols[5]);
+      const tipologia = cell(cols, mapping.tipologia);
+      const descrizione = descrizioneDi(cols);
 
-      const opDate = parseItDate(cols[0]);
-      const valDate = str(cols[1]) === '' ? null : parseItDate(cols[1]);
+      const opDate = parseStatementDate(cell(cols, mapping.op_date), dateOrder);
+      const valGrezza = cell(cols, mapping.value_date);
+      const valDate = valGrezza === '' ? null : parseStatementDate(valGrezza, dateOrder);
 
-      const isExpense = uscita !== '';
-      const isIncome = entrata !== '';
-      if (!isExpense && !isIncome) { emptyCnt++; continue; }
-      if (isExpense && isIncome) throw HttpError.badRequest('Riga con sia Uscita che Entrata: non supportato.');
-
-      const amount = parseBankAmount(isExpense ? uscita : entrata);
+      let isExpense;
+      let amount;
+      if (amountMode === 'signed') {
+        const grezzo = cell(cols, mapping.amount);
+        if (grezzo === '') { emptyCnt++; continue; }
+        const importo = parseBankAmountSigned(grezzo);
+        if (importo.value === 0) { emptyCnt++; continue; }
+        isExpense = importo.negative;
+        amount = importo.value;
+      } else {
+        const uscita = cell(cols, mapping.outflow);
+        const entrata = cell(cols, mapping.inflow);
+        if (uscita === '' && entrata === '') { emptyCnt++; continue; }
+        if (uscita !== '' && entrata !== '') {
+          throw HttpError.badRequest('Riga con sia Uscita che Entrata: non supportato.');
+        }
+        isExpense = uscita !== '';
+        amount = parseBankAmountSigned(isExpense ? uscita : entrata).value;
+      }
       if (amount <= 0) throw HttpError.badRequest('Importo non valido (zero o negativo dopo parsing).');
 
       // Ricarica di una prepagata e prelievo bancomat non sono spese: sono
@@ -272,6 +359,18 @@ async function preview(req, res) {
   }
   for (const r of rows) if (r.contact_backfill_count === undefined) r.contact_backfill_count = 0;
 
+  // Le colonne del file con il campo in cui sono finite: e' quello che
+  // l'utente guarda per accorgersi che il riconoscimento ha sbagliato.
+  const perColonna = new Map();
+  for (const [campo, indici] of Object.entries(mapping)) {
+    for (const i of [indici].flat()) perColonna.set(i, campo);
+  }
+  const headerPreview = esito.best.cells.map((testo, i) => ({
+    column: testo.trim(),
+    field: perColonna.get(i) ?? null,
+    field_label: perColonna.has(i) ? FIELD_LABELS[perColonna.get(i)] : null,
+  }));
+
   ok(res, {
     account: { id: sourceAccount.id, name: sourceAccount.name },
     account_iban_detected: iban,
@@ -281,6 +380,22 @@ async function preview(req, res) {
     skipped_empty: emptyCnt,
     parse_errors: parseErrors,
     rows,
+    profile_used: {
+      id: profilo.id,
+      name: profilo.name,
+      builtin_key: profilo.builtin_key,
+      auto: richiesto <= 0,
+      notes: profilo.notes,
+      delimiter: delimiter === '\t' ? 'tab' : delimiter,
+      amount_mode: amountMode,
+      date_order: dateOrder,
+      header_row: headerIdx + 1,
+      matched_columns: headerPreview.filter((h) => h.field !== null).length,
+    },
+    // Gli altri profili che leggerebbero comunque questo file, per il menu.
+    profile_alternatives: alternative(esito, profilo),
+    header_preview: headerPreview,
+    profiles: tuttiProfili.map((p) => ({ id: p.id, name: p.name })),
   });
 }
 

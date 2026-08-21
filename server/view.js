@@ -48,7 +48,7 @@ function navState(path) {
   return {
     dashboard: matches(['/dashboard']),
     movements: matches(['/expenses', '/incomes', '/recurring', '/transfers']),
-    plan: matches(['/categories', '/budgets', '/accounts', '/contacts', '/securities', '/pac']),
+    plan: matches(['/categories', '/budgets', '/accounts', '/bank-profiles', '/contacts', '/securities', '/pac']),
     reports: matches(['/reports']),
   };
 }
@@ -133,6 +133,7 @@ ${o.head ?? ''}</head>
                     <li><a class="dropdown-item" href="/categories"><i class="bi bi-tags me-2"></i>Categorie</a></li>
                     <li><a class="dropdown-item" href="/budgets"><i class="bi bi-bullseye me-2"></i>Budget</a></li>
                     <li><a class="dropdown-item" href="/accounts"><i class="bi bi-bank me-2"></i>Conti</a></li>
+                    <li><a class="dropdown-item" href="/bank-profiles"><i class="bi bi-table me-2"></i>Profili banca</a></li>
                     <li><a class="dropdown-item" href="/securities"><i class="bi bi-graph-up-arrow me-2"></i>Investimenti</a></li>
                     <li><a class="dropdown-item" href="/pac"><i class="bi bi-piggy-bank me-2"></i>Piani di Accumulo</a></li>
                     <li><a class="dropdown-item" href="/contacts"><i class="bi bi-person-rolodex me-2"></i>Anagrafiche</a></li>

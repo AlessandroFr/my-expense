@@ -1,6 +1,6 @@
 import { esc, each, asset, csrfField, vuoto } from '../view.js';
 
-export const render = ({ csrfToken, categories, accounts, contacts, defaultCash, today, paymentMethods, paymentLabels }) => `
+export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts, defaultCash, today, paymentMethods, paymentLabels }) => `
 <div class="row mb-3 align-items-center">
     <div class="col-md-6">
         <h1 class="h3 mb-0"><i class="bi bi-receipt me-2"></i>Spese</h1>
@@ -26,7 +26,7 @@ export const render = ({ csrfToken, categories, accounts, contacts, defaultCash,
                         Formato accettato: header <code>Data;Categoria;Descrizione;Importo;Pagamento</code>
                         (separatore <code>;</code> o <code>,</code>). Data <code>YYYY-MM-DD</code> o <code>DD/MM/YYYY</code>.
                     </p>
-                    <input type="file" name="file" accept=".csv" class="form-control mb-2" required>
+                    <input type="file" name="file" accept=".csv,.txt" class="form-control mb-2" required>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="create-missing-cats" name="create_missing_categories" value="1" checked>
                         <label class="form-check-label small" for="create-missing-cats">
@@ -58,11 +58,21 @@ export const render = ({ csrfToken, categories, accounts, contacts, defaultCash,
             <form id="bank-import-form" enctype="multipart/form-data" action="javascript:void(0)" method="post" onsubmit="return false">
                 ${csrfField(csrfToken)}                <div class="modal-body" id="bank-import-step1">
                     <p class="small text-muted mb-2">
-                        Formato Banca Sella / Patavina (header
-                        <code>Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate</code>,
-                        encoding Windows-1252, date <code>DD/MM/YYYY</code>).
-                        Le righe in <strong>Uscite</strong> diventano spese, quelle in <strong>Entrate</strong> diventano entrate.
+                        Carica il file dei movimenti scaricato dalla banca (.csv).
+                        Prima di importare vedrai quale banca è stata riconosciuta e in quale
+                        campo finisce ogni colonna del file.
                     </p>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="bank-profile-select">Banca</label>
+                        <select name="profile_id" id="bank-profile-select" class="form-select">
+                            <option value="0">Riconoscila dal file</option>
+                            ${each(bankProfiles, (p) => `                            <option value="${p.id}">${esc(p.name)}</option>
+                            `)}                        </select>
+                        <div class="form-text">
+                            Se il file non viene riconosciuto, o le colonne finiscono nel campo sbagliato,
+                            sistema il tracciato in <a href="/bank-profiles">Profili banca</a>.
+                        </div>
+                    </div>
                     <div class="mb-2">
                         <label class="form-label small fw-semibold">Conto su cui importare</label>
                         ${(vuoto(accounts)) ? `                            <div class="alert alert-warning small mb-0">
@@ -73,7 +83,7 @@ export const render = ({ csrfToken, categories, accounts, contacts, defaultCash,
                                 ${each(accounts, (a) => `                                    <option value="${a.id}">${esc(a.name)} (${esc(a.type)})</option>
                                 `)}                            </select>
                         `}                    </div>
-                    <input type="file" name="file" accept=".csv" class="form-control mb-2" required>
+                    <input type="file" name="file" accept=".csv,.txt" class="form-control mb-2" required>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="bank-pair-ricariche" name="auto_pair_ricariche" value="1" checked>
                         <label class="form-check-label small" for="bank-pair-ricariche">
@@ -103,6 +113,7 @@ export const render = ({ csrfToken, categories, accounts, contacts, defaultCash,
 
             <div id="bank-import-step2" class="d-none">
                 <div class="modal-body">
+                    <div id="bank-profile-recognized" class="mb-2"></div>
                     <div id="bank-preview-summary" class="mb-2"></div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 border rounded bg-light">
                         <strong class="small">Categorie</strong>

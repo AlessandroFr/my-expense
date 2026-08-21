@@ -1,10 +1,14 @@
 /**
- * Lettura degli estratti conto Banca Sella / Patavina — traduce la parte di
- * analisi di App\BankStatementImporter, quella che non tocca il database.
+ * Lettura degli estratti conto bancari — la parte di analisi che non tocca il
+ * database.
+ *
+ * Quali colonne cercare e come si chiamano lo dice il profilo della banca
+ * (`bank-profiles.js`); qui si legge il testo: la codifica, le date, gli
+ * importi, e le regole di significato (categoria proposta, controparte,
+ * metodo di pagamento) che valgono per tutte le banche.
  *
  * Il file arriva in Windows-1252 o UTF-8, con un blocco di intestazione prima
- * dei movimenti veri. Da ogni riga si ricava tipo, importo, categoria proposta
- * e possibile controparte.
+ * dei movimenti veri.
  */
 
 import { HttpError } from './http.js';
@@ -30,25 +34,17 @@ const MCC_MAP = {
  * Decodifica il file. Se non e' UTF-8 valido si assume Windows-1252, che e'
  * quello che producono i gestionali bancari italiani.
  */
-export function loadAndDecode(buffer) {
+export function loadAndDecode(buffer, encoding = 'auto') {
   let raw = buffer;
   if (raw.length >= 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf) raw = raw.subarray(3);
 
+  if (encoding === 'windows-1252') return new TextDecoder('windows-1252').decode(raw);
+
   const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(raw);
+  if (encoding === 'utf-8') return utf8;
   // Il carattere di sostituzione tradisce byte non validi in UTF-8.
   if (!utf8.includes('�')) return utf8;
   return new TextDecoder('windows-1252').decode(raw);
-}
-
-export function findHeaderRow(lines) {
-  for (let i = 0; i < lines.length; i++) {
-    const low = lines[i].toLowerCase();
-    if (low.includes('operazione') && low.includes('valuta')
-        && (low.includes('uscite') || low.includes('entrate'))) {
-      return i;
-    }
-  }
-  return null;
 }
 
 export function extractIban(lines) {
@@ -59,40 +55,74 @@ export function extractIban(lines) {
   return null;
 }
 
-/** Le date della banca sono gg/mm/aaaa, a volte con l'anno a due cifre. */
-export function parseItDate(raw) {
+const pad = (n) => String(Number(n)).padStart(2, '0');
+
+/** Anno a due cifre: sopra il 70 e' del secolo scorso. */
+const anno4 = (a) => (String(a).length === 4 ? Number(a) : (Number(a) >= 70 ? 1900 + Number(a) : 2000 + Number(a)));
+
+/**
+ * Le date di un estratto conto. `order` viene dal profilo della banca:
+ * 'dmy' all'italiana, 'ymd', 'mdy' per i tracciati in inglese. Con 'auto' si
+ * accetta la forma ISO se la data ha quella faccia, altrimenti gg/mm/aaaa —
+ * che era l'unico formato letto quando la banca era una sola.
+ */
+export function parseStatementDate(raw, order = 'auto') {
   const s = String(raw ?? '').trim();
   if (s === '') throw HttpError.badRequest('Data mancante.');
 
-  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return `${m[3].padStart(4, '0')}-${String(Number(m[2])).padStart(2, '0')}-${String(Number(m[1])).padStart(2, '0')}`;
+  // Le date con l'ora in coda ("12/03/2026 14:07") si accorciano.
+  const solaData = s.split(/[T ]/)[0];
 
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-  if (m) {
-    const anno = Number(m[3]) >= 70 ? 1900 + Number(m[3]) : 2000 + Number(m[3]);
-    return `${anno}-${String(Number(m[2])).padStart(2, '0')}-${String(Number(m[1])).padStart(2, '0')}`;
+  const iso = solaData.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso && (order === 'auto' || order === 'ymd')) return `${iso[1]}-${pad(iso[2])}-${pad(iso[3])}`;
+
+  const parti = solaData.match(/^(\d{1,4})[/.-](\d{1,2})[/.-](\d{1,4})$/);
+  if (parti) {
+    const [, a, b, c] = parti;
+    if (order === 'ymd') return `${anno4(a)}-${pad(b)}-${pad(c)}`;
+    if (order === 'mdy') return `${anno4(c)}-${pad(a)}-${pad(b)}`;
+    return `${anno4(c)}-${pad(b)}-${pad(a)}`;
   }
   throw HttpError.badRequest(`Data non valida: '${s}'.`);
 }
 
-/** Importi con separatore delle migliaia, simbolo di valuta, segno. */
-export function parseBankAmount(raw) {
-  let clean = String(raw ?? '').replace(/[€ \s]/g, '').replace(/EUR|€/g, '').trim();
+/** Il vecchio nome: la data all'italiana. */
+export const parseItDate = (raw) => parseStatementDate(raw, 'dmy');
+
+/**
+ * Importi con separatore delle migliaia, simbolo di valuta, segno.
+ *
+ * @returns {{value: number, negative: boolean}} il valore e' sempre positivo:
+ *   il segno sta a parte perche' in un tracciato a due colonne lo porta la
+ *   colonna, in uno a colonna unica lo porta il numero.
+ */
+export function parseBankAmountSigned(raw) {
+  let clean = String(raw ?? '').replace(/[€ \s]/g, '').replace(/EUR|€/g, '').trim();
   if (clean === '') throw HttpError.badRequest('Importo vuoto.');
 
+  // Il segno in coda o fra parentesi capita: "1.234,56-", "(1.234,56)".
   let negative = false;
+  if (/^\(.*\)$/.test(clean)) { negative = true; clean = clean.slice(1, -1); }
+  if (clean.endsWith('-')) { negative = true; clean = clean.slice(0, -1); }
   if (clean.startsWith('-')) { negative = true; clean = clean.slice(1); }
   else if (clean.startsWith('+')) clean = clean.slice(1);
 
   const hasDot = clean.includes('.');
   const hasComma = clean.includes(',');
-  if (hasDot && hasComma) clean = clean.replace(/\./g, '').replace(',', '.');
-  else if (hasComma) clean = clean.replace(',', '.');
+  if (hasDot && hasComma) {
+    // L'ultimo dei due e' il decimale: vale per "1.234,56" e per "1,234.56".
+    clean = clean.lastIndexOf(',') > clean.lastIndexOf('.')
+      ? clean.replace(/\./g, '').replace(',', '.')
+      : clean.replace(/,/g, '');
+  } else if (hasComma) clean = clean.replace(',', '.');
 
   if (!/^\d+(\.\d*)?$|^\.\d+$/.test(clean)) throw HttpError.badRequest(`Importo non valido: '${raw}'.`);
-  const val = Number(clean);
-  return negative ? Math.abs(val) : val;
+  return { value: Number(clean), negative };
 }
+
+/** Il valore assoluto dell'importo: il segno lo decide chi chiama. */
+export const parseBankAmount = (raw) => parseBankAmountSigned(raw).value;
+
 
 export function isAtmWithdrawalDescription(desc) {
   const s = String(desc ?? '');

@@ -488,7 +488,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
         <li><strong>Rateizzazione</strong>: dividi una spesa grande in N rate. Vedi <a href="#rateizzazione">Rateizzazione</a>.</li>
         <li><strong>OCR scontrino</strong>: bottone "Scansiona scontrino" che usa la fotocamera del telefono. Vedi <a href="#ocr">OCR</a>.</li>
         <li><strong>Import / export CSV</strong>: vedi <a href="#import-csv">la sezione dedicata</a>.</li>
-        <li><strong>Import estratto conto</strong>: per Banca Sella / Patavina, vedi <a href="#import-bancario">Import estratto conto</a>.</li>
+        <li><strong>Import estratto conto</strong>: scegli la banca e importa, vedi <a href="#import-bancario">Import estratto conto</a>.</li>
     </ul>
     <details><summary>Campi di una spesa</summary><div>
         <code>data operazione</code>, <code>data valuta</code> (per i movimenti importati), <code>categoria</code>, <code>conto</code>, <code>metodo pagamento</code>, <code>fornitore/anagrafica</code>, <code>descrizione</code> (rich text), <code>importo totale</code>, <code>quota tua</code> (se splittata), <code>diviso con</code>, <code>tag</code>, <code>allegati</code>, <code>hash import</code> (se da estratto conto, usato per idempotenza).
@@ -705,19 +705,21 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── IMPORT BANK ─ -->
 <section class="wiki-section" data-wiki-section>
-    ${intestazione(SEZIONI[17])}    <p class="wiki-section-lead">Importa un estratto conto CSV (formato <strong>Banca Sella / Patavina</strong>) e my-expense crea spese, entrate e trasferimenti riconoscendo le tipologie di operazione.</p>
+    ${intestazione(SEZIONI[17])}    <p class="wiki-section-lead">Importa il file dei movimenti scaricato dalla banca e my-expense crea spese, entrate e trasferimenti. Ogni banca ha il suo <strong>profilo</strong>, cioè l'elenco dei nomi che quella banca dà alle colonne: l'app confronta il file con i profili, ti dice quale ha riconosciuto e dove finisce ogni colonna, e solo dopo la tua conferma scrive qualcosa.</p>
     <ol>
-        <li>Su <code>/expenses</code> clicca "Estratto conto".</li>
-        <li>Scegli il file CSV.</li>
+        <li>Su <code>/expenses</code> clicca "Estratto conto bancario".</li>
+        <li>Lascia <strong>Banca: riconoscila dal file</strong>, oppure scegli tu la banca dal menu.</li>
         <li><strong>Seleziona il conto</strong> di destinazione (obbligatorio).</li>
+        <li>Scegli il file <code>.csv</code>.</li>
         <li>Conferma l'opzione "Partita doppia su ricariche prepagate" (default ON).</li>
-        <li>Vedi l'anteprima e confermi.</li>
+        <li>Nell'anteprima <strong>controlla il riquadro in alto</strong>: dice quale banca è stata riconosciuta e mostra ogni colonna del file con il campo in cui è finita. Se qualcosa non torna, cambia banca dal menu lì accanto o correggi il profilo in <a href="/bank-profiles">Profili banca</a>.</li>
+        <li>Rivedi le righe e conferma.</li>
     </ol>
     <p><strong>Cosa fa il parser:</strong></p>
     <ul>
+        <li><strong>Profilo della banca</strong>: le colonne si riconoscono <strong>per nome</strong>, non per posizione, quindi lo stesso tracciato con le colonne in ordine diverso viene letto lo stesso.</li>
         <li><strong>Encoding</strong>: rileva e converte automaticamente Windows-1252 → UTF-8.</li>
-        <li>Cerca l'header <code>Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate</code> saltando i metadata di intestazione.</li>
-        <li>Per ogni riga: importo in <code>Uscite</code> → spesa, importo in <code>Entrate</code> → entrata.</li>
+        <li>Per ogni riga: importo in <code>Uscite</code> → spesa, importo in <code>Entrate</code> → entrata. Le banche che usano <strong>una colonna sola</strong> con il meno davanti alle uscite funzionano allo stesso modo.</li>
         <li><strong>Mapping MCC</strong>: codici esercente comuni (5411 = Spesa alimentare, 5812/5814 = Ristorazione, 5912 = Farmacia, 5541/5542 = Carburante, 7941 = Sport…) producono la categoria giusta.</li>
         <li><strong>Sorgente entrata</strong>: dal testo descrizione viene dedotto (es. "Stipendio", "Bonifico da Mario", "P2P").</li>
     </ul>
@@ -733,6 +735,14 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
         Ogni riga importata calcola un <code>import_hash</code> SHA-256 dei suoi dati salienti. Se reimporti lo stesso file, le righe già presenti vengono <strong>saltate</strong> e contate come <code>skipped_duplicate</code>. Puoi quindi reimportare senza paura di duplicare.
     </div></details>
     <div class="wiki-tip"><i class="bi bi-calendar-event"></i><div>Per ogni riga vengono salvate due date: <code>data operazione</code> (quando hai pagato) e <code>data valuta</code> (quando la banca ha contabilizzato). I filtri usano la data operazione di default.</div></div>
+    <details><summary>Profili banca: quando toccarli</summary><div>
+        Arrivano già pronti i profili delle banche italiane più diffuse, Mediolanum compresa. <strong>Solo quello di Banca Sella è provato su file veri</strong>: gli altri sono compilati sui nomi di colonna che quelle banche usano di solito, quindi la prima volta che importi vale la pena guardare la mappatura in anteprima.
+        <ul class="mb-0">
+            <li>Colonna finita nel campo sbagliato, o file non riconosciuto? Apri <a href="/bank-profiles">Profili banca</a>, incolla la prima riga del file nel campo "Riga di intestazione", premi "Compila i campi" e correggi quello che serve.</li>
+            <li>I profili preimpostati si modificano ma non si cancellano: c'è "Rimetti com'era" per tornare indietro.</li>
+            <li>La banca non c'è? Crea un profilo nuovo: serve il nome della colonna della data e o la coppia uscite/entrate o la colonna dell'importo con segno.</li>
+        </ul>
+    </div></details>
 </section>
 
 <!-- ──────────────────────────────────────────────────────────── BACKUP ────── -->

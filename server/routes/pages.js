@@ -7,8 +7,11 @@
 import { all, one, currentUserId } from '../db.js';
 import { HttpError, int, str } from '../http.js';
 import { page } from '../view.js';
+import { GENERIC_COLUMNS } from '../bank-profiles.js';
+import { listForUser as profiliBanca } from './bank-profiles.js';
 
 import * as accountsPage from '../pages/accounts.js';
+import * as bankProfilesPage from '../pages/bank-profiles.js';
 import * as budgetsPage from '../pages/budgets.js';
 import * as categoriesPage from '../pages/categories.js';
 import * as categoriesEditPage from '../pages/categories-edit.js';
@@ -93,6 +96,7 @@ export const pageRoutes = {
   'GET /expenses': pagina('Spese', expensesPage, (userId) => ({
     categories: categorie(userId),
     accounts: contiAttivi(userId),
+    bankProfiles: profiliBanca(userId),
     contacts: anagrafiche(userId),
     defaultCash: contoCassa(userId),
     today: oggi(),
@@ -125,6 +129,11 @@ export const pageRoutes = {
   })),
 
   'GET /accounts': pagina('Conti', accountsPage),
+
+  'GET /bank-profiles': pagina('Profili banca', bankProfilesPage, (userId) => ({
+    profiles: profiliBanca(userId),
+    genericColumns: GENERIC_COLUMNS,
+  })),
   'GET /transfers': pagina('Trasferimenti', transfersPage, (userId) => ({
     accounts: contiAttivi(userId),
   })),

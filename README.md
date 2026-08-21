@@ -35,7 +35,7 @@ allegati: icona con la nuvola, in alto a destra.
 - Rubrica di fornitori e clienti
 - Investimenti e piani di accumulo
 - Report annuali con grafici
-- Importazione da file CSV e da estratto conto Banca Sella / Patavina
+- Importazione da file CSV e da estratto conto bancario, con un profilo di tracciato per banca
 - Rateizzazione di una spesa in più quote
 
 ## Lavorare al codice

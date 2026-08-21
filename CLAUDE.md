@@ -12,7 +12,7 @@ Copre: spese ed entrate (con filtri, tag, allegati, quote condivise,
 rateizzazione), budget mensili per categoria, spese ricorrenti, multi-conto con
 saldi e riconciliazioni, trasferimenti fra conti, anagrafiche fornitori/clienti,
 investimenti (strumenti, operazioni, posizioni) e piani di accumulo, report
-annuali, import da CSV e da estratto conto Banca Sella/Patavina, backup ZIP,
+annuali, import da CSV e da estratto conto bancario (un profilo per banca), backup ZIP,
 lettura degli scontrini nel browser.
 
 ## Stack
@@ -62,7 +62,8 @@ npm run dist       # crea l'installer in dist\
 | `server/routes/pages.js` | Le pagine HTML e i dati del primo caricamento |
 | `server/amount.js` | Lettura e arrotondamento degli importi |
 | `server/zip.js`, `multipart.js` | Formati che Node non ha in libreria standard |
-| `server/bank-statement.js` | Lettura degli estratti conto |
+| `server/bank-statement.js` | Lettura degli estratti conto: date, importi, significato |
+| `server/bank-profiles.js` | Il tracciato di ogni banca e il suo riconoscimento |
 | `public/js/` | Il frontend, un modulo per pagina |
 | `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
 | `database/schema.sql` | Lo schema di partenza |
@@ -128,6 +129,16 @@ precisione esatta la strada è memorizzare i centesimi come `INTEGER`.
 il separatore delle migliaia. Era il comportamento di prima ed è rimasto per non
 cambiare in silenzio il significato dei dati già inseriti. Cambiarlo è una
 decisione, non una correzione.
+
+**L'estratto conto si legge per nome di colonna, non per posizione.** Un
+profilo (`bank_profiles`) dice come si chiamano le colonne di quella banca; il
+riconoscimento prova ogni profilo su ogni riga di intestazione plausibile e
+vince chi mappa più colonne. I profili preimpostati nascono da
+`ensureBuiltins()` in `routes/bank-profiles.js`, **non** da un `INSERT` nella
+migration: su database nuovo le migration vengono solo registrate, quindi una
+semina SQL non girerebbe mai. Solo il profilo di Banca Sella è verificato su
+file veri — gli altri sono ipotesi, ed è per questo che l'anteprima mostra
+sempre la mappatura prima di scrivere.
 
 **Il CSRF resta anche senza login.** Non serve a sapere chi sei: impedisce a una
 pagina qualunque aperta nel browser di chiamare `127.0.0.1` a tua insaputa. Il

@@ -6,6 +6,7 @@ import { accountRoutes } from './accounts.js';
 import { attachmentRoutes } from './attachments.js';
 import { backupRoutes } from './backup.js';
 import { bankImportRoutes } from './bank-import.js';
+import { bankProfileRoutes } from './bank-profiles.js';
 import { budgetRoutes } from './budgets.js';
 import { categoryRoutes } from './categories.js';
 import { contactRoutes } from './contacts.js';
@@ -45,5 +46,6 @@ export const routes = new Map(Object.entries({
   ...reconciliationRoutes,
   ...csvRoutes,
   ...bankImportRoutes,
+  ...bankProfileRoutes,
   ...transferBackfillRoutes,
 }));
