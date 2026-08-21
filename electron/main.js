@@ -21,12 +21,15 @@ import { join } from 'node:path';
  * l'app si aggiorna o si disinstalla. Da sorgente: nella cartella del progetto,
  * come `npm start`, cosi' le prove non toccano i dati veri.
  *
+ * MY_EXPENSE_DATA_DIR ha comunque l'ultima parola. Serve a provare una versione
+ * nuova su una copia dei dati invece che su quelli veri, e a tenere i dati
+ * altrove — su un disco esterno, per dirne una.
+ *
  * Va deciso adesso, prima di caricare il server, che legge questa variabile nel
  * momento in cui viene importato.
  */
-const cartellaDati = app.isPackaged
-  ? app.getPath('userData')
-  : join(import.meta.dirname, '..');
+const cartellaDati = process.env.MY_EXPENSE_DATA_DIR
+  || (app.isPackaged ? app.getPath('userData') : join(import.meta.dirname, '..'));
 
 process.env.MY_EXPENSE_DATA_DIR = cartellaDati;
 
