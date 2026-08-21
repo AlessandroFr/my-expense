@@ -74,11 +74,21 @@ npm run dist       # crea l'installer in dist\
 ## Cose da sapere prima di toccare il codice
 
 **I dati stanno in due posti diversi a seconda di come parte l'app.** Da sorgente
-nella cartella del progetto, installata in `%APPDATA%\My Expense`. Decide
-`MY_EXPENSE_DATA_DIR`, che `electron/main.js` imposta **prima** di caricare il
-server: `paths.js` la legge nel momento in cui viene importato, quindi
-sostituire quell'`import` dinamico con uno statico in cima al file scriverebbe i
-dati dentro la cartella di installazione, in silenzio.
+nella cartella del progetto (`app.isPackaged` è falso), installata in
+`%APPDATA%\My Expense` — il nome viene da `productName`, che va tenuto nella
+**radice** del package.json e non solo dentro `build`, o Electron ripiega su
+`name` e i dati finiscono in un'altra cartella. Decide `MY_EXPENSE_DATA_DIR`,
+che `electron/main.js` imposta **prima** di caricare il server: `paths.js` la
+legge nel momento in cui viene importato, quindi sostituire quell'`import`
+dinamico con uno statico in cima al file scriverebbe i dati dentro la cartella
+di installazione, in silenzio.
+
+**Mai un `await` al livello più esterno di `electron/main.js`.** Electron
+considera l'app pronta solo dopo che quel file ha finito di essere valutato: un
+`await app.whenReady()` scritto lì lo tiene in valutazione per sempre, quindi
+«pronta» non arriva mai e la finestra non si apre — senza errori e senza
+messaggi. Per questo l'avvio sta dentro `avviaApplicazione()`, chiamata **senza**
+await.
 
 **La porta la sceglie il sistema operativo.** `avvia(0)` chiede una porta libera
 qualunque e restituisce quella assegnata. Nessuna porta fissa da difendere,

@@ -14,10 +14,21 @@ import { app, BrowserWindow, Menu, dialog, shell } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-// I dati stanno nella cartella dell'utente, non in quella di installazione:
-// cosi' restano al loro posto quando l'app si aggiorna o si disinstalla.
-// Va deciso prima di caricare il server, che legge questa variabile all'avvio.
-process.env.MY_EXPENSE_DATA_DIR = app.getPath('userData');
+/**
+ * Dove tenere i dati.
+ *
+ * Installata: nella cartella dell'utente, cosi' restano al loro posto quando
+ * l'app si aggiorna o si disinstalla. Da sorgente: nella cartella del progetto,
+ * come `npm start`, cosi' le prove non toccano i dati veri.
+ *
+ * Va deciso adesso, prima di caricare il server, che legge questa variabile nel
+ * momento in cui viene importato.
+ */
+const cartellaDati = app.isPackaged
+  ? app.getPath('userData')
+  : join(import.meta.dirname, '..');
+
+process.env.MY_EXPENSE_DATA_DIR = cartellaDati;
 
 /**
  * Diario dell'avvio.
@@ -28,7 +39,7 @@ process.env.MY_EXPENSE_DATA_DIR = app.getPath('userData');
  */
 function nota(messaggio) {
   try {
-    const dir = join(app.getPath('userData'), 'logs');
+    const dir = join(cartellaDati, 'logs');
     mkdirSync(dir, { recursive: true });
     appendFileSync(join(dir, 'avvio.log'), `${new Date().toISOString()}  ${messaggio}\n`);
   } catch { /* se non si puo' scrivere, pazienza: non e' questo a dover fermare l'avvio */ }
@@ -101,27 +112,37 @@ app.on('second-instance', () => {
 
 app.on('window-all-closed', () => app.quit());
 
-await app.whenReady();
-nota('pronta');
+/**
+ * Tutto l'avvio sta qui dentro, e questa funzione va chiamata **senza await**.
+ *
+ * Non e' pignoleria: Electron considera l'applicazione pronta solo dopo che
+ * questo file ha finito di essere valutato. Un `await` al livello piu' esterno
+ * del file lo tiene in valutazione per sempre, quindi «pronta» non arriva mai,
+ * l'attesa non finisce mai e la finestra non si apre — senza un errore, senza
+ * un messaggio, senza niente. Dentro una funzione, invece, il file finisce
+ * subito e l'attesa si risolve regolarmente.
+ */
+async function avviaApplicazione() {
+  await app.whenReady();
+  nota('pronta');
 
-// Solo le voci che servono davvero: ricarica, zoom, strumenti di sviluppo. Il
-// resto del menu standard parla di finestre e schede che qui non esistono.
-Menu.setApplicationMenu(Menu.buildFromTemplate([{
-  label: 'Visualizza',
-  submenu: [
-    { role: 'reload', label: 'Ricarica' },
-    { type: 'separator' },
-    { role: 'resetZoom', label: 'Dimensione normale' },
-    { role: 'zoomIn', label: 'Ingrandisci' },
-    { role: 'zoomOut', label: 'Rimpicciolisci' },
-    { type: 'separator' },
-    { role: 'toggleDevTools', label: 'Strumenti di sviluppo' },
-    { type: 'separator' },
-    { role: 'quit', label: 'Esci' },
-  ],
-}]));
+  // Solo le voci che servono davvero: ricarica, zoom, strumenti di sviluppo. Il
+  // resto del menu standard parla di finestre e schede che qui non esistono.
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{
+    label: 'Visualizza',
+    submenu: [
+      { role: 'reload', label: 'Ricarica' },
+      { type: 'separator' },
+      { role: 'resetZoom', label: 'Dimensione normale' },
+      { role: 'zoomIn', label: 'Ingrandisci' },
+      { role: 'zoomOut', label: 'Rimpicciolisci' },
+      { type: 'separator' },
+      { role: 'toggleDevTools', label: 'Strumenti di sviluppo' },
+      { type: 'separator' },
+      { role: 'quit', label: 'Esci' },
+    ],
+  }]));
 
-try {
   // Importato qui e non in cima perche' la cartella dei dati dev'essere gia'
   // decisa: il server la legge nel momento in cui viene caricato.
   const { avvia } = await import('../server/index.js');
@@ -129,13 +150,15 @@ try {
   nota(`server in ascolto sulla porta ${porta}`);
   creaFinestra(url);
   nota('finestra aperta');
-} catch (err) {
+}
+
+avviaApplicazione().catch((err) => {
   // Senza server non c'e' niente da mostrare: meglio dirlo che aprire una
   // finestra che non funziona.
   nota(`avvio fallito: ${err?.stack ?? err}`);
   dialog.showErrorBox(
     'My Expense non riesce ad avviarsi',
-    `${err.message}\n\nI dettagli sono in:\n${join(app.getPath('userData'), 'logs', 'avvio.log')}`,
+    `${err.message}\n\nI dettagli sono in:\n${join(cartellaDati, 'logs', 'avvio.log')}`,
   );
   app.exit(1);
-}
+});
