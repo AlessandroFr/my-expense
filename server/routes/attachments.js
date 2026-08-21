@@ -4,10 +4,11 @@
 // I file stanno in uploads/expenses/{user_id}/, fuori da public/: l'unico modo
 // di leggerli e' questo endpoint, che verifica sempre a chi appartengono.
 
-import { createReadStream, existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createReadStream, existsSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+
+import { uploadsDir } from '../paths.js';
 
 import { all, one, run, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
@@ -22,16 +23,13 @@ const ALLOWED_MIME = {
   'application/pdf': 'pdf',
 };
 
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const uploadsRoot = () => join(projectRoot, 'uploads', 'expenses');
-
 const findForUser = (id, userId) => one(
   `SELECT id, expense_id, user_id, original_name, stored_name, mime_type, size_bytes
    FROM expense_attachments WHERE id = ? AND user_id = ? LIMIT 1`,
   id, userId,
 );
 
-const filePath = (userId, storedName) => join(uploadsRoot(), String(userId), storedName);
+const filePath = (userId, storedName) => join(uploadsDir(userId), storedName);
 
 async function list(req, res) {
   const { searchParams } = new URL(req.url, 'http://localhost');
@@ -77,8 +75,7 @@ async function upload(req, res) {
   let original = str(file.filename).split(/[\\/]/).pop() || 'file';
   if ([...original].length > 255) original = [...original].slice(0, 255).join('');
 
-  const userDir = join(uploadsRoot(), String(userId));
-  mkdirSync(userDir, { recursive: true });
+  const userDir = uploadsDir(userId, true);
 
   const stored = `${randomBytes(16).toString('hex')}.${ext}`;
   writeFileSync(join(userDir, stored), file.data);

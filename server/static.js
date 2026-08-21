@@ -7,10 +7,9 @@
  */
 
 import { createReadStream, existsSync, statSync } from 'node:fs';
-import { dirname, extname, join, normalize, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { extname, join, normalize, sep } from 'node:path';
 
-const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
+import { publicDir } from './paths.js';
 
 const TIPI = {
   '.html': 'text/html; charset=utf-8',

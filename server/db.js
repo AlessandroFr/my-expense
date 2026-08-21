@@ -2,29 +2,30 @@
 // nessuna dipendenza, nessun modulo nativo da ricompilare per Electron.
 
 import { DatabaseSync } from 'node:sqlite';
-import { dirname, isAbsolute, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import { mkdirSync, readFileSync } from 'node:fs';
 
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { configFile, dataRoot } from './paths.js';
 
 /** Percorso del file del database, dalla configurazione locale. */
-function databasePath() {
+export function databasePath() {
   let path = 'data/my-expense.sqlite';
   try {
-    const cfg = JSON.parse(readFileSync(join(projectRoot, 'config/config.json'), 'utf8'));
+    const cfg = JSON.parse(readFileSync(configFile, 'utf8'));
     if (cfg?.db?.path) path = cfg.db.path;
   } catch {
     // Senza config si usa il percorso predefinito: e' il caso del primo avvio.
   }
-  return isAbsolute(path) ? path : join(projectRoot, path);
+  return isAbsolute(path) ? path : join(dataRoot, path);
 }
 
 let handle = null;
 
 export function db() {
   if (handle) return handle;
-  handle = new DatabaseSync(databasePath());
+  const file = databasePath();
+  mkdirSync(join(file, '..'), { recursive: true });
+  handle = new DatabaseSync(file);
   // Le foreign key in SQLite sono spente di default: senza questa riga i
   // vincoli dello schema non varrebbero. Stesso motivo in src/class/Database.php.
   handle.exec('PRAGMA foreign_keys = ON');

@@ -1,15 +1,52 @@
 {
   "name": "my-expense",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Tracker di spese personali. Gira in locale, un solo file di dati.",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server/index.js",
+    "app": "electron .",
+    "dist": "electron-builder --win",
     "test": "node --test --test-reporter=spec \"tests/js/**/*.test.js\"",
     "test:watch": "node --test --watch --test-reporter=spec \"tests/js/**/*.test.js\""
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.alessandrofranco.my-expense",
+    "productName": "My Expense",
+    "copyright": "Alessandro Franco",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "public/**/*",
+      "database/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "artifactName": "MyExpense-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "My Expense",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

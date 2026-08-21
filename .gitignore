@@ -27,9 +27,8 @@ desktop.ini
 # File solo locali
 *.local
 
-# Node
+# Node (il lock va invece in git: fissa le versioni di Electron)
 /node_modules/
-/package-lock.json
 
 # Artefatti di build (l'installer prodotto da electron-builder)
 /dist/

@@ -27,23 +27,30 @@ Il frontend è invariato dai tempi di PHP: pagine HTML rese dal server e
 migliorate da un modulo ES per pagina in `public/js/pages/`, con Bootstrap,
 Chart.js e Tesseract.js da CDN. Nessun bundler.
 
+Si distribuisce come **applicazione installabile**: `electron-builder` produce un
+installer per Windows, e dentro c'è un solo runtime. Electron 43 porta con sé
+Node 24, quindi `node:sqlite` arriva dalla libreria standard e **non c'è nessun
+modulo nativo da ricompilare**.
+
 PHP non c'è più. La migrazione è raccontata in
-`C:\Users\perso\.claude\plans\prendi-in-mano-my-expense-noble-prism.md`; resta
-da fare solo l'ultimo passo, impacchettare con `electron-builder`.
+`C:\Users\perso\.claude\plans\prendi-in-mano-my-expense-noble-prism.md`.
 
 ## Comandi
 
 ```powershell
-avvia.cmd          # avvia l'app e apre la finestra
-npm start          # solo il server
+npm run app        # la finestra dell'app (Electron)
+npm start          # solo il server, da aprire nel browser
 npm test           # i test
+npm run dist       # crea l'installer in dist\
 ```
 
 ## Com'è organizzato
 
 | Path | Ruolo |
 |------|------|
-| `server/index.js` | Il server: file statici, pagine, endpoint |
+| `electron/main.js` | Il processo principale: dati, server, finestra |
+| `server/index.js` | Il server: file statici, pagine, endpoint; esporta `avvia()` |
+| `server/paths.js` | Dove stanno database, allegati e configurazione |
 | `server/db.js` | Accesso al database e id dell'utente |
 | `server/view.js` | Layout e helper di rendering (`esc`, `asset`, `each`) |
 | `server/pages/` | Una funzione per pagina, restituisce HTML |
@@ -53,11 +60,30 @@ npm test           # i test
 | `server/zip.js`, `multipart.js` | Formati che Node non ha in libreria standard |
 | `server/bank-statement.js` | Lettura degli estratti conto |
 | `public/js/` | Il frontend, un modulo per pagina |
-| `database/schema.sql` | Lo schema, l'unica fonte |
+| `database/schema.sql` | Lo schema di partenza |
+| `database/migrate.js` | Porta il database alla versione attesa, a ogni avvio |
+| `build/icon.png` | L'icona dell'app |
 | `config/config.json` | Configurazione locale, gitignored |
-| `data/my-expense.sqlite` | I dati. Gitignored: il backup è copiarlo |
+| `data/my-expense.sqlite` | I dati da sorgente. Gitignored: il backup è copiarlo |
 
 ## Cose da sapere prima di toccare il codice
+
+**I dati stanno in due posti diversi a seconda di come parte l'app.** Da sorgente
+nella cartella del progetto, installata in `%APPDATA%\My Expense`. Decide
+`MY_EXPENSE_DATA_DIR`, che `electron/main.js` imposta **prima** di caricare il
+server: `paths.js` la legge nel momento in cui viene importato, quindi
+sostituire quell'`import` dinamico con uno statico in cima al file scriverebbe i
+dati dentro la cartella di installazione, in silenzio.
+
+**La porta la sceglie il sistema operativo.** `avvia(0)` chiede una porta libera
+qualunque e restituisce quella assegnata. Nessuna porta fissa da difendere,
+nessun conflitto con quello che gira già sulla macchina.
+
+**`migrate()` gira a ogni avvio e dev'essere sempre idempotente.** È così che
+un'installazione già esistente riceve le modifiche allo schema, cosa che con il
+vecchio installer non succedeva mai. Su database vuoto si crea da `schema.sql` e
+le migration presenti si segnano come applicate senza eseguirle; su database
+esistente si applicano solo quelle non registrate, una transazione ciascuna.
 
 **Le foreign key di SQLite sono spente di default.** `db()` esegue
 `PRAGMA foreign_keys = ON` a ogni connessione: senza quella riga i vincoli dello
@@ -99,8 +125,9 @@ e volute.
   italiano. Adeguarsi al file in cui si sta scrivendo.
 - Gli endpoint rispondono con `{ok: true, data}` oppure
   `{ok: false, error: {code, message}}`.
-- Modifiche allo schema: si aggiorna `database/schema.sql`. Un runner di
-  migration idempotente arriverà col pacchetto Electron, dove serve davvero.
+- Modifiche allo schema: `database/schema.sql` **più** un file in
+  `database/migrations/`. Solo il primo, e chi ha già l'app installata resta
+  indietro per sempre.
 - Test dove la logica non è banale; sui percorsi che toccano denaro la
   correttezza viene prima della brevità.
 - Ogni pezzo di lavoro finito e verificato va committato su `main`.

@@ -12,13 +12,13 @@
 
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 import { assertLocalOrigin, fail, HttpError, parseCookies } from './http.js';
 import { routes } from './routes/index.js';
 import { serveStatic } from './static.js';
-import { ensureUser } from './db.js';
-
-const PORT = Number(process.env.PORT ?? 8080);
+import { databasePath, ensureUser } from './db.js';
+import { migrate } from '../database/migrate.js';
 
 /**
  * Token CSRF del processo. Vale finché l'app resta aperta: non c'è una sessione
@@ -63,8 +63,36 @@ const server = createServer(async (req, res) => {
   }
 });
 
-ensureUser();
+/**
+ * Prepara il database e mette il server in ascolto.
+ *
+ * La porta 0 significa «scegline una libera tu»: e' quello che usa Electron,
+ * e toglie di mezzo sia i conflitti sia la ricerca di una porta libera.
+ *
+ * @param {number} porta 0 per una porta qualunque
+ * @returns {Promise<{porta: number, url: string, chiudi: () => void}>}
+ */
+export function avvia(porta = 0) {
+  migrate(databasePath());
+  ensureUser();
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`My Expense in ascolto su http://127.0.0.1:${PORT}/`);
-});
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(porta, '127.0.0.1', () => {
+      const { port } = server.address();
+      resolve({
+        porta: port,
+        url: `http://127.0.0.1:${port}/`,
+        chiudi: () => server.close(),
+      });
+    });
+  });
+}
+
+// Avviato a mano (`npm start`): porta fissa, cosi' l'indirizzo non cambia a
+// ogni riavvio e il browser tiene i preferiti. Importato da Electron: niente,
+// e' il main process a decidere quando partire.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { url } = await avvia(Number(process.env.PORT ?? 8080));
+  console.log(`My Expense in ascolto su ${url}`);
+}

@@ -8,13 +8,12 @@
 // dell'autenticazione (vedi Fase 6 del piano).
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+
+import { uploadsDir } from '../paths.js';
 
 import { all, db, currentUserId } from '../db.js';
 import { createZip } from '../zip.js';
-
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
  * Tabelle incluse nel backup, nell'ordine in cui vanno reinserite perche' le
@@ -124,10 +123,10 @@ async function download(req, res) {
     { name: 'README.txt', data: Buffer.from(readme(userId, now), 'utf8') },
   ];
 
-  const uploadsDir = join(projectRoot, 'uploads', 'expenses', String(userId));
-  if (existsSync(uploadsDir)) {
-    for (const name of readdirSync(uploadsDir)) {
-      const path = join(uploadsDir, name);
+  const dir = uploadsDir(userId);
+  if (existsSync(dir)) {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
       if (!statSync(path).isFile()) continue;
       entries.push({ name: `uploads/${name}`, data: readFileSync(path) });
     }

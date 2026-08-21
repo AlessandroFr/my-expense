@@ -10,10 +10,9 @@
  */
 
 import { existsSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { publicDir } from './paths.js';
 
 /** Come htmlspecialchars($v, ENT_QUOTES, 'UTF-8'): protegge anche gli apici. */
 export function esc(value) {
@@ -32,7 +31,7 @@ export function esc(value) {
  */
 export function asset(relPath) {
   const rel = relPath.replace(/^\/+/, '');
-  const full = join(projectRoot, 'public', rel);
+  const full = join(publicDir, rel);
   const v = existsSync(full) ? Math.floor(statSync(full).mtimeMs / 1000) : 0;
   return esc(`/${rel}?v=${v}`);
 }

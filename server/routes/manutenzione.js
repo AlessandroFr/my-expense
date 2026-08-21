@@ -5,16 +5,15 @@
 // scaricare prima (che l'interfaccia impone) e la frase da scrivere per esteso,
 // che e' l'ultimo passo volontario prima di procedere.
 
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { uploadsDir } from '../paths.js';
 
 import { db, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, ok, readBody, str } from '../http.js';
 import { parseMultipart } from '../multipart.js';
 import { readZip } from '../zip.js';
-
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const AMBITI = ['movements', 'movements_recurring', 'investments', 'all'];
 
@@ -33,7 +32,7 @@ const TABELLE_RIPRISTINO = [
   'securities_transactions', 'pac_funds', 'pac_fund_navs', 'pac_plans', 'pac_contributions',
 ];
 
-const cartellaAllegati = (userId) => join(projectRoot, 'uploads', 'expenses', String(userId));
+const cartellaAllegati = (userId) => uploadsDir(userId);
 
 /** Cancella i file degli allegati dell'utente, senza far fallire il resto. */
 function svuotaAllegati(userId) {
@@ -227,8 +226,7 @@ async function backupRestore(req, res) {
 
   let fileEstratti = 0;
   if (allegati.length > 0) {
-    const dir = cartellaAllegati(userId);
-    mkdirSync(dir, { recursive: true });
+    const dir = uploadsDir(userId, true);
     for (const a of allegati) {
       try { writeFileSync(join(dir, a.nome), a.dati); fileEstratti++; } catch { /* best-effort */ }
     }

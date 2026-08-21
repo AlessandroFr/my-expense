@@ -1,25 +1,22 @@
 # My Expense
 
 Tracker di spese personali. Gira sul tuo computer, i dati restano sul tuo
-computer: un solo file, `data/my-expense.sqlite`.
+computer: un solo file di database, niente account, niente nuvola.
 
-## Avviare
+## Installare
 
-Doppio click su **`avvia.cmd`**. Si apre la finestra dell'applicazione.
+Apri `MyExpense-Setup-1.0.0.exe` e segui l'installazione. Poi doppio click
+sull'icona, sul desktop o nel menu avvio.
 
-Per chiuderla, chiudi la finestra nera che è comparsa insieme all'app.
+Non serve nient'altro: né PHP, né Node, né XAMPP. È tutto dentro il pacchetto.
 
-## La prima volta
+## Dove finiscono i dati
 
-1. Installa [Node 22 o successivo](https://nodejs.org) e assicurati che `node`
-   risponda dal Prompt dei comandi.
-2. Copia `config/config.example.json` in `config/config.json`.
-3. Doppio click su `avvia.cmd`. Non serve altro: niente da installare, niente
-   password da scegliere.
+In `%APPDATA%\My Expense`, cioè fuori dalla cartella dove si installa il
+programma. Vuol dire che restano al loro posto quando arriva una versione nuova,
+e non spariscono se disinstalli.
 
-## Fare il backup
-
-Chiudi l'app e copia il file `data/my-expense.sqlite` dove preferisci. È tutto lì.
+Per copiartelo via: chiudi l'app e copia la cartella `data` dove preferisci.
 
 Dall'app puoi anche scaricare un archivio ZIP che contiene i dati **e** gli
 allegati: icona con la nuvola, in alto a destra.
@@ -39,7 +36,17 @@ allegati: icona con la nuvola, in alto a destra.
 - Importazione da file CSV e da estratto conto Banca Sella / Patavina
 - Rateizzazione di una spesa in più quote
 
-## In caso di problemi
+## Lavorare al codice
 
-Gli errori vengono scritti in `logs/`. Se l'app non parte, il messaggio utile è
-quasi sempre l'ultima riga di quel file.
+Serve [Node 22 o successivo](https://nodejs.org), poi:
+
+```sh
+npm install
+npm run app     # la finestra dell'app, come per chi la installa
+npm start       # solo il server, da aprire nel browser su 127.0.0.1:8080
+npm test
+npm run dist    # crea l'installer in dist\
+```
+
+Con `npm run app` e `npm start` i dati stanno nella cartella del progetto,
+non in `%APPDATA%`, così le prove non toccano i dati veri.
