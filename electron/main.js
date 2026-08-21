@@ -11,15 +11,45 @@
  */
 
 import { app, BrowserWindow, Menu, dialog, shell } from 'electron';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 // I dati stanno nella cartella dell'utente, non in quella di installazione:
 // cosi' restano al loro posto quando l'app si aggiorna o si disinstalla.
 // Va deciso prima di caricare il server, che legge questa variabile all'avvio.
 process.env.MY_EXPENSE_DATA_DIR = app.getPath('userData');
 
-// Due copie aperte scriverebbero sullo stesso database: la seconda cede il
-// posto alla prima, che si fa avanti.
-if (!app.requestSingleInstanceLock()) app.quit();
+/**
+ * Diario dell'avvio.
+ *
+ * L'applicazione installata non ha una finestra nera dove leggere gli errori:
+ * se qualcosa va storto prima che compaia la finestra, senza questo file non
+ * resta traccia di niente e il sintomo e' soltanto «non si apre».
+ */
+function nota(messaggio) {
+  try {
+    const dir = join(app.getPath('userData'), 'logs');
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(join(dir, 'avvio.log'), `${new Date().toISOString()}  ${messaggio}\n`);
+  } catch { /* se non si puo' scrivere, pazienza: non e' questo a dover fermare l'avvio */ }
+}
+
+process.on('uncaughtException', (err) => {
+  nota(`errore non gestito: ${err?.stack ?? err}`);
+  dialog.showErrorBox('My Expense si e\' fermata', String(err?.message ?? err));
+  app.exit(1);
+});
+
+nota(`avvio, versione ${app.getVersion()}`);
+
+// Due copie aperte scriverebbero sullo stesso database. La seconda cede il
+// posto alla prima e se ne va subito: `app.quit()` non basterebbe, perche'
+// chiude con calma e intanto il resto del file continuerebbe a girare,
+// avviando un secondo server.
+if (!app.requestSingleInstanceLock()) {
+  nota('c\'e\' gia\' una copia aperta: cedo il posto a quella');
+  app.exit(0);
+}
 
 let finestra = null;
 
@@ -72,6 +102,7 @@ app.on('second-instance', () => {
 app.on('window-all-closed', () => app.quit());
 
 await app.whenReady();
+nota('pronta');
 
 // Solo le voci che servono davvero: ricarica, zoom, strumenti di sviluppo. Il
 // resto del menu standard parla di finestre e schede che qui non esistono.
@@ -94,14 +125,17 @@ try {
   // Importato qui e non in cima perche' la cartella dei dati dev'essere gia'
   // decisa: il server la legge nel momento in cui viene caricato.
   const { avvia } = await import('../server/index.js');
-  const { url } = await avvia(0);
+  const { url, porta } = await avvia(0);
+  nota(`server in ascolto sulla porta ${porta}`);
   creaFinestra(url);
+  nota('finestra aperta');
 } catch (err) {
   // Senza server non c'e' niente da mostrare: meglio dirlo che aprire una
   // finestra che non funziona.
+  nota(`avvio fallito: ${err?.stack ?? err}`);
   dialog.showErrorBox(
     'My Expense non riesce ad avviarsi',
-    `${err.message}\n\nI dati si trovano in:\n${app.getPath('userData')}`,
+    `${err.message}\n\nI dettagli sono in:\n${join(app.getPath('userData'), 'logs', 'avvio.log')}`,
   );
-  app.quit();
+  app.exit(1);
 }
