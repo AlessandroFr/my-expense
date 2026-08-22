@@ -192,6 +192,7 @@ ${o.content}
 
 <script src="/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/vendor/tinymce/tinymce.min.js"></script>
+<script type="module" src="${asset('js/modal-guard.js')}"></script>
 <script type="module" src="${asset('js/theme.js')}"></script>
 <script type="module" src="${asset('js/icon-picker.js')}"></script>
 <script type="module" src="${asset('js/rich-editor.js')}"></script>

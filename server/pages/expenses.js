@@ -13,7 +13,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
 </div>
 
 <!-- Modal: import CSV -->
-<div class="modal fade" id="csv-import-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="csv-import-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="csv-import-form" enctype="multipart/form-data">
@@ -47,7 +47,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
 </div>
 
 <!-- Modal: import estratto conto bancario -->
-<div class="modal fade" id="bank-import-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="bank-import-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
@@ -404,7 +404,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
 </div>
 
 <!-- Modal: rateizza riga di import bancario -->
-<div class="modal fade" id="bank-installment-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="bank-installment-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -453,7 +453,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
 </div>
 
 <!-- Modal: edit spesa -->
-<div class="modal fade" id="expense-edit-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="expense-edit-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <form id="expense-edit-form" autocomplete="off">
@@ -522,7 +522,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
 </div>
 
 <!-- Modal: allegati -->
-<div class="modal fade" id="attachments-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="attachments-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">

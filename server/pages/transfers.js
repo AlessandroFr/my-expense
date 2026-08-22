@@ -83,7 +83,7 @@ export const render = ({ csrfToken, accounts }) => {
 </div>
 
 <!-- Modal: edit trasferimento -->
-<div class="modal fade" id="transfer-edit-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="transfer-edit-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">

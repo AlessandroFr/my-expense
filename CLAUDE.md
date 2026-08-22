@@ -67,6 +67,7 @@ npm run dist       # crea l'installer in dist\
 | `server/bank-profiles.js` | Il tracciato di ogni banca e il suo riconoscimento |
 | `server/contact-dedup.js` | Quali anagrafiche sono la stessa cosa scritta in due modi |
 | `public/js/` | Il frontend, un modulo per pagina |
+| `public/js/modal-guard.js` | Le finestre non si chiudono per sbaglio e non perdono quel che c'era scritto |
 | `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
 | `database/schema.sql` | Lo schema di partenza |
 | `database/migrate.js` | Porta il database alla versione attesa, a ogni avvio |
@@ -118,6 +119,20 @@ carica Tesseract.js da un CDN quando serve, perché portarlo dentro vorrebbe dir
 venti megabyte fra libreria e modello della lingua per una funzione accessoria.
 Se la rete manca, il messaggio lo dice e il resto continua a funzionare. Tutto il
 resto è in `public/vendor/` e non esce mai dal computer.
+
+**Le finestre si chiudono solo con un bottone.** `public/js/modal-guard.js` si
+carica dal layout su ogni pagina e vale per tutte e sedici: le Bootstrap hanno
+`data-bs-backdrop="static"` e `data-bs-keyboard="false"` nel markup, le
+`<dialog>` native non si chiudevano gia' su clic esterno e ora nemmeno con Esc
+(evento `cancel`). Se una finestra si chiude lo stesso, quel che c'era scritto
+viene ripreso alla riapertura — ma **solo sullo stesso record**, chiave
+`id della finestra + valore del campo id`, altrimenti aprire la scheda di
+un'altra spesa mostrerebbe i dati della precedente. Il ripristino passa da
+`showModal()` sostituita sul prototipo, quindi **le pagine devono riempire i
+campi prima di aprire**, non dopo: al contrario il ripristino verrebbe
+sovrascritto. Dopo un invio del form non si riprende niente (`mxSalvato`), a
+meno che l'utente ricominci a scrivere — cosa che succede quando il
+salvataggio e' fallito.
 
 **Il service worker esiste solo per disinstallarsi.** Serviva quando l'app si
 apriva nel browser e si poteva installare come PWA. Cancellarlo non sarebbe
