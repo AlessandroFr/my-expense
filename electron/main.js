@@ -13,6 +13,7 @@
 import { app, BrowserWindow, Menu, dialog, shell } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { controllaAggiornamenti } from './update.js';
 
 /**
  * Dove tenere i dati.
@@ -153,6 +154,11 @@ async function avviaApplicazione() {
   nota(`server in ascolto sulla porta ${porta}`);
   creaFinestra(url);
   nota('finestra aperta');
+
+  // Dopo la finestra, non prima: un aggiornamento che non arriva non deve
+  // ritardare l'avvio, e se qualcosa va storto l'app e' gia' utilizzabile.
+  controllaAggiornamenti(app, dialog, nota)
+    .catch((err) => nota(`aggiornamenti: ${err?.stack ?? err}`));
 }
 
 avviaApplicazione().catch((err) => {

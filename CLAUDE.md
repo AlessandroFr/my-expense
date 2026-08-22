@@ -53,6 +53,7 @@ npm run dist       # crea l'installer in dist\
 | Path | Ruolo |
 |------|------|
 | `electron/main.js` | Il processo principale: dati, server, finestra |
+| `electron/update.js` | L'aggiornamento: cerca un installer piu' recente e lo esegue |
 | `server/index.js` | Il server: file statici, pagine, endpoint; esporta `avvia()` |
 | `server/paths.js` | Dove stanno database, allegati e configurazione |
 | `server/db.js` | Accesso al database e id dell'utente |
@@ -100,6 +101,16 @@ un'installazione già esistente riceve le modifiche allo schema, cosa che con il
 vecchio installer non succedeva mai. Su database vuoto si crea da `schema.sql` e
 le migration presenti si segnano come applicate senza eseguirle; su database
 esistente si applicano solo quelle non registrate, una transazione ciascuna.
+
+**L'app si aggiorna da una cartella, non da un server.** All'avvio
+`electron/update.js` guarda in `C:\dev\my-expense\dist` (o in
+`MY_EXPENSE_UPDATE_DIR`) se c'e' un `MyExpense-Setup-<versione>.exe` piu' recente
+di quello in esecuzione; se c'e', lo propone e lo lancia con `/S`. Quindi
+pubblicare una modifica e' `npm run dist`, e basta — ma **la versione in
+package.json va alzata prima**, altrimenti l'installer nuovo si chiama come il
+vecchio e l'app non ha modo di accorgersene. Da sorgente il controllo non parte
+(`app.isPackaged`). Il giorno in cui l'app dovesse girare su un altro computer
+questo non basta piu': li' serve electron-updater con le Release del repo.
 
 **Una sola cosa chiede ancora la rete: la lettura degli scontrini.** `ocr.js`
 carica Tesseract.js da un CDN quando serve, perché portarlo dentro vorrebbe dire
