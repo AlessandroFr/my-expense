@@ -11,14 +11,31 @@ const ICONS = {
     info:    'bi-info-circle',
 };
 
+/**
+ * Il posto dove appendere gli avvisi.
+ *
+ * Se c'e' una finestra `<dialog>` aperta, gli avvisi vanno dentro quella. Le
+ * finestre native stanno nel «top layer» del browser, che e' sopra qualunque
+ * z-index: un avviso appeso al `body` mentre una finestra e' aperta finirebbe
+ * dietro, dove non si vede. Restando figlio della finestra, invece, sale con
+ * lei — e continua a posizionarsi rispetto allo schermo, non alla finestra.
+ *
+ * Fra piu' finestre aperte si sceglie l'ultima del documento: quelle create al
+ * momento (la conferma, il selettore delle icone) si appendono in fondo al
+ * body, quindi e' quella che sta sopra.
+ */
 function ensureContainer() {
+    const aperte = document.querySelectorAll('dialog[open]');
+    const casa = aperte.length > 0 ? aperte[aperte.length - 1] : document.body;
+
     let c = document.getElementById('toast-container');
-    if (c) return c;
-    c = document.createElement('div');
-    c.id = 'toast-container';
-    c.className = 'toast-container position-fixed top-0 end-0 p-3';
-    c.style.zIndex = '1080';
-    document.body.appendChild(c);
+    if (!c) {
+        c = document.createElement('div');
+        c.id = 'toast-container';
+        c.className = 'toast-container position-fixed top-0 end-0 p-3';
+        c.style.zIndex = '1080';
+    }
+    if (c.parentNode !== casa) casa.appendChild(c);
     return c;
 }
 

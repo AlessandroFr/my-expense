@@ -72,27 +72,28 @@ let activeInput = null;
 function buildPickerModal() {
     if (pickerModalEl) return pickerModalEl;
 
-    pickerModalEl = document.createElement('div');
-    pickerModalEl.className = 'modal fade';
+    // Una `<dialog>` nativa e non un modale Bootstrap: il selettore si apre
+    // quasi sempre da dentro un'altra finestra (la scheda di un conto, di una
+    // categoria), e un modale Bootstrap chiamato da li' comparirebbe dietro.
+    pickerModalEl = document.createElement('dialog');
+    pickerModalEl.className = 'border-0 rounded-3 shadow p-0';
     pickerModalEl.id = 'mx-icon-picker-modal';
-    pickerModalEl.tabIndex = -1;
-    pickerModalEl.setAttribute('aria-hidden', 'true');
+    pickerModalEl.style.maxWidth = '720px';
+    pickerModalEl.style.width = '95%';
     pickerModalEl.innerHTML = `
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-grid-3x3-gap-fill me-2"></i>Scegli un'icona</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+        <div class="modal-content border-0">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-grid-3x3-gap-fill me-2"></i>Scegli un'icona</h5>
+                <button type="button" class="btn-close" data-action="icon-picker-close" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="search" id="mx-icon-search" class="form-control" placeholder="Cerca: cart, bank, calendar, fuel..." autocomplete="off">
+                    <span class="input-group-text small text-muted" id="mx-icon-count"></span>
                 </div>
-                <div class="modal-body">
-                    <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text"><i class="bi bi-search"></i></span>
-                        <input type="search" id="mx-icon-search" class="form-control" placeholder="Cerca: cart, bank, calendar, fuel..." autocomplete="off">
-                        <span class="input-group-text small text-muted" id="mx-icon-count"></span>
-                    </div>
-                    <div id="mx-icon-grid" class="mx-icon-grid" role="listbox" aria-label="Icone disponibili"></div>
-                    <div id="mx-icon-status" class="text-muted small text-center py-2"></div>
-                </div>
+                <div id="mx-icon-grid" class="mx-icon-grid" role="listbox" aria-label="Icone disponibili"></div>
+                <div id="mx-icon-status" class="text-muted small text-center py-2"></div>
             </div>
         </div>
     `;
@@ -105,6 +106,11 @@ function buildPickerModal() {
     });
 
     pickerModalEl.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action="icon-picker-close"]')) {
+            pickerModalEl.close();
+            activeInput = null;
+            return;
+        }
         const btn = e.target.closest('.mx-icon-btn[data-icon-name]');
         if (!btn) return;
         e.preventDefault();
@@ -146,17 +152,11 @@ function applyFilter(grid, query) {
 async function openPicker(input) {
     activeInput = input;
     const modalEl = buildPickerModal();
-    const Modal = window.bootstrap && window.bootstrap.Modal;
-    if (!Modal) {
-        console.warn('Bootstrap Modal not available');
-        return;
-    }
-    const modal = Modal.getOrCreateInstance(modalEl);
     const grid = modalEl.querySelector('#mx-icon-grid');
     const status = modalEl.querySelector('#mx-icon-status');
     const search = modalEl.querySelector('#mx-icon-search');
 
-    modal.show();
+    modalEl.showModal();
 
     if (!grid.dataset.loaded) {
         status.textContent = 'Carico icone...';
@@ -184,9 +184,7 @@ function pickIcon(name) {
     activeInput.value = `bi-${name}`;
     activeInput.dispatchEvent(new Event('input', { bubbles: true }));
     activeInput.dispatchEvent(new Event('change', { bubbles: true }));
-    if (pickerModalEl && window.bootstrap && window.bootstrap.Modal) {
-        window.bootstrap.Modal.getInstance(pickerModalEl)?.hide();
-    }
+    pickerModalEl?.close();
     activeInput = null;
 }
 

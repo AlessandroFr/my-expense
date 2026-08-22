@@ -364,8 +364,15 @@ export function notifyWarning(notifier, response) {
 // ── Dialog Helpers (Bootstrap modal replacements for native alert/confirm/prompt)
 
 /**
- * Mostra un modale di conferma Bootstrap al posto di confirm() nativo.
+ * Mostra un modale di conferma al posto di confirm() nativo.
  * Restituisce una Promise<boolean> — true se confermato, false se annullato.
+ *
+ * E' una `<dialog>` nativa e non un modale Bootstrap, perche' la conferma
+ * arriva quasi sempre da dentro un'altra finestra. Una `<dialog>` aperta con
+ * showModal() sta nel «top layer» del browser, che e' sopra qualunque
+ * z-index: un modale Bootstrap chiamato da li' dentro comparirebbe **dietro**
+ * la finestra che l'ha chiesto, irraggiungibile. Fra due `<dialog>`, invece,
+ * vince l'ultima aperta.
  *
  * @param {string} message  — Testo del messaggio
  * @param {object} [opts]   — Opzioni
@@ -384,115 +391,39 @@ export function confirmDialog(message, opts = {}) {
     } = opts;
 
     return new Promise(resolve => {
-        const id = 'sv-confirm-dialog-' + Date.now();
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = `
-            <div class="modal fade" id="${id}" tabindex="-1" aria-hidden="true"
-                 aria-labelledby="${id}-title" data-bs-backdrop="static">
-                <div class="modal-dialog modal-dialog-centered modal-sm">
-                    <div class="modal-content sv-modal">
-                        <div class="modal-header">
-                            <h5 class="modal-title fw-bold" id="${id}-title">
-                                <i class="bi bi-question-circle me-2 text-primary"></i>${_escapeHtml(title)}
-                            </h5>
-                        </div>
-                        <div class="modal-body">
-                            <p class="mb-0">${_escapeHtml(message)}</p>
-                        </div>
-                        <div class="modal-footer border-0 justify-content-between">
-                            <button type="button" class="btn sv-btn-secondary rounded-pill px-3" data-action="cancel">${_escapeHtml(cancelText)}</button>
-                            <button type="button" class="btn ${confirmClass} rounded-pill px-3" data-action="confirm">${_escapeHtml(confirmText)}</button>
-                        </div>
-                    </div>
+        const dlg = document.createElement('dialog');
+        dlg.className = 'border-0 rounded-3 shadow p-0';
+        dlg.style.maxWidth = '420px';
+        dlg.style.width = '92%';
+        dlg.innerHTML = `
+            <div class="modal-content sv-modal border-0">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2 text-primary"></i>${_escapeHtml(title)}
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">${_escapeHtml(message)}</p>
+                </div>
+                <div class="modal-footer border-0 justify-content-between">
+                    <button type="button" class="btn sv-btn-secondary rounded-pill px-3" data-action="cancel">${_escapeHtml(cancelText)}</button>
+                    <button type="button" class="btn ${confirmClass} rounded-pill px-3" data-action="confirm">${_escapeHtml(confirmText)}</button>
                 </div>
             </div>`;
 
-        document.body.appendChild(wrapper);
-        const modalEl = wrapper.querySelector('.modal');
-        const modal   = new bootstrap.Modal(modalEl);
+        document.body.appendChild(dlg);
 
-        const cleanup = (result) => {
-            modal.hide();
-            modalEl.addEventListener('hidden.bs.modal', () => {
-                wrapper.remove();
-                resolve(result);
-            }, { once: true });
+        // Chi chiama aspetta una risposta: la promise si risolve sempre, e la
+        // finestra si toglie di mezzo invece di restare appesa al documento.
+        const rispondi = (esito) => {
+            dlg.close();
+            dlg.remove();
+            resolve(esito);
         };
+        dlg.querySelector('[data-action="confirm"]').addEventListener('click', () => rispondi(true));
+        dlg.querySelector('[data-action="cancel"]').addEventListener('click', () => rispondi(false));
 
-        wrapper.querySelector('[data-action="confirm"]').addEventListener('click', () => cleanup(true));
-        wrapper.querySelector('[data-action="cancel"]').addEventListener('click', () => cleanup(false));
-
-        modal.show();
-    });
-}
-
-/**
- * Mostra un modale di selezione Bootstrap al posto di prompt() nativo.
- * Presenta una lista di opzioni cliccabili e restituisce l'indice selezionato (0-based)
- * oppure null se annullato.
- *
- * @param {string} title         — Titolo del modale
- * @param {string[]} options     — Lista di opzioni da mostrare
- * @returns {Promise<number|null>} — Indice dell'opzione selezionata o null
- */
-export function selectDialog(title, options) {
-    return new Promise(resolve => {
-        const id = 'sv-select-dialog-' + Date.now();
-        const wrapper = document.createElement('div');
-
-        const listHtml = options.map((opt, i) =>
-            `<button type="button" class="list-group-item list-group-item-action py-2" data-index="${i}">
-                ${_escapeHtml(opt)}
-            </button>`
-        ).join('');
-
-        wrapper.innerHTML = `
-            <div class="modal fade" id="${id}" tabindex="-1" aria-hidden="true"
-                 aria-labelledby="${id}-title">
-                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content sv-modal">
-                        <div class="modal-header">
-                            <h5 class="modal-title fw-bold" id="${id}-title">
-                                <i class="bi bi-person-plus me-2 text-primary"></i>${_escapeHtml(title)}
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
-                        </div>
-                        <div class="modal-body p-0">
-                            <div class="list-group list-group-flush">${listHtml}</div>
-                        </div>
-                        <div class="modal-footer border-0">
-                            <button type="button" class="btn sv-btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Annulla</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-
-        document.body.appendChild(wrapper);
-        const modalEl = wrapper.querySelector('.modal');
-        const modal   = new bootstrap.Modal(modalEl);
-
-        let resolved = false;
-
-        wrapper.querySelector('.list-group').addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-index]');
-            if (!btn) return;
-            resolved = true;
-            const index = parseInt(btn.dataset.index, 10);
-            modal.hide();
-            modalEl.addEventListener('hidden.bs.modal', () => {
-                wrapper.remove();
-                resolve(index);
-            }, { once: true });
-        });
-
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            if (!resolved) {
-                wrapper.remove();
-                resolve(null);
-            }
-        }, { once: true });
-
-        modal.show();
+        dlg.showModal();
     });
 }
 
