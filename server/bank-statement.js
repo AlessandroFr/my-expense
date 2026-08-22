@@ -184,9 +184,18 @@ const BUROCRAZIA = new RegExp(`^(?:${[
   'PREL', 'PAGAM', 'PAGAMENTO', 'PAGAMENTI', 'PRELIEVO', 'PRELIEVI',
   'CARTA', 'VALUTA', 'PAESE', 'PAESI', 'CIRCUITO', 'MASTERCARD', 'VISA',
   'EUROPAY', 'MAESTRO', 'BONIFICO', 'ADDEBITO', 'ADDEBITI', 'ACCREDITO',
-  'OPERAZIONE', 'TRASFERIMENTO', 'DISPOSIZIONE', 'SEPA', 'POS', 'NFC',
+  'OPERAZIONE', 'TRASFERIMENTO', 'DISPOSIZIONE', 'VOSTRA', 'SEPA', 'POS', 'NFC',
   'SAMSUNG', 'GOOGLE', 'APPLE', 'EMOLUMENTI', 'IMPOSTA', 'COMMISSIONI',
 ].join('|')})\\b`, 'i');
+
+/**
+ * Se un nome e' gergo della banca e non un fornitore.
+ *
+ * Serve due volte: qui, per non proporre nomi come «Prel», e nella pagina
+ * delle anagrafiche, per ritrovare quelli che erano stati creati prima che
+ * questa regola esistesse.
+ */
+export const sembraGergoBancario = (nome) => BUROCRAZIA.test(String(nome ?? '').trim());
 
 /** Ripulisce il nome estratto: spazi, codici in coda, iniziali maiuscole. */
 export function cleanupCounterpartyName(raw) {

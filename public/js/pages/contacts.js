@@ -386,6 +386,7 @@ function wire() {
     const dedupDlg = document.getElementById('dedup-modal');
     dedupDlg?.addEventListener('click', (ev) => {
         if (ev.target.closest('[data-action="dedup-close"]')) { dedupDlg.close(); return; }
+        if (ev.target.closest('[data-action="junk-delete"]')) { deleteJunk(); return; }
         const btn = ev.target.closest('[data-dedup-merge]');
         if (btn) mergeDedupGroup(btn.dataset.dedupMerge);
     });
@@ -421,6 +422,7 @@ async function openDedupModal() {
     try {
         const resp = await api.get(`${BASE}/contacts/duplicates`);
         renderDedupGroups(resp?.data?.groups ?? [], Number(resp?.data?.scanned ?? 0));
+        renderJunk(resp?.data?.junk ?? []);
     } catch (err) {
         box.innerHTML = `<div class="alert alert-danger small mb-0">${escHtml(err.message ?? 'Ricerca fallita.')}</div>`;
     }
@@ -459,6 +461,54 @@ function renderDedupGroups(groups, scanned) {
                 </div>
             </div>`;
     }).join('');
+}
+
+/** I nomi che sono gergo della banca: si spuntano e si buttano. */
+function renderJunk(junk) {
+    const box  = document.getElementById('dedup-junk');
+    const list = document.getElementById('dedup-junk-list');
+    if (!box || !list) return;
+
+    if (junk.length === 0) { box.classList.add('d-none'); return; }
+    box.classList.remove('d-none');
+    list.innerHTML = junk.map(c => `
+        <label class="list-group-item d-flex align-items-center gap-2 py-1">
+            <input type="checkbox" class="form-check-input m-0" data-junk-id="${c.id}" checked>
+            <span class="flex-grow-1">${escHtml(c.name)}</span>
+            <span class="small text-muted">${c.usage_total > 0 ? `${c.usage_total} mov.` : '—'}</span>
+        </label>`).join('');
+}
+
+async function deleteJunk() {
+    const spuntati = [...document.querySelectorAll('#dedup-junk-list input[data-junk-id]:checked')];
+    if (spuntati.length === 0) { toast.warning('Non hai spuntato nessun nome.'); return; }
+
+    const conferma = await confirmDialog(
+        `Cancellare ${spuntati.length} anagrafic${spuntati.length === 1 ? 'a' : 'he'}? `
+        + 'I movimenti restano, ma senza fornitore.',
+        { confirmText: 'Cancella', confirmClass: 'btn-danger' },
+    );
+    if (!conferma) return;
+
+    let fatti = 0;
+    for (const cb of spuntati) {
+        try {
+            await send(`${BASE}/contacts/delete`, new URLSearchParams({
+                id: cb.dataset.junkId, _csrf: getCsrfToken(),
+            }));
+            cb.closest('label')?.remove();
+            fatti++;
+        } catch (err) {
+            toast.error(`«${cb.closest('label')?.textContent.trim()}»: ${err.message ?? 'errore'}`);
+        }
+    }
+    if (fatti > 0) {
+        toast.success(`Cancellat${fatti === 1 ? 'a 1 anagrafica' : `e ${fatti} anagrafiche`}.`);
+        loadList();
+    }
+    if (!document.querySelector('#dedup-junk-list input[data-junk-id]')) {
+        document.getElementById('dedup-junk')?.classList.add('d-none');
+    }
 }
 
 async function mergeDedupGroup(gi) {

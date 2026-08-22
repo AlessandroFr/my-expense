@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   classifyExpense, extractCounterparty, extractIban, loadAndDecode,
-  parseBankAmountSigned, parseStatementDate,
+  parseBankAmountSigned, parseStatementDate, sembraGergoBancario,
 } from '../../server/bank-statement.js';
 import { builtinProfiles, matchProfiles, normalizeHeader } from '../../server/bank-profiles.js';
 import { resolveAmountMode } from '../../server/routes/bank-import.js';
@@ -207,6 +207,18 @@ test('il negozio si stacca dall\'indirizzo e da quel che la banca aggiunge dopo'
     ),
     'Old Wild West',
   );
+});
+
+test('si riconosce un nome che e\' gergo della banca', () => {
+  // La stessa regola serve a due cose: non proporre questi nomi, e ritrovare
+  // quelli finiti in anagrafica prima che la regola esistesse.
+  for (const n of ['Prel', 'Bonifico', 'Vostra Disposizione', 'Carta Di Debito',
+    'Pagamenti Paesi Ue Carta', 'Trasferimento', 'IMPOSTA DI BOLLO']) {
+    assert.equal(sembraGergoBancario(n), true, n);
+  }
+  for (const n of ['Old Wild West', 'Poste Italiane', 'Verdi Anna', 'Supermercato Coop', 'Postemobile']) {
+    assert.equal(sembraGergoBancario(n), false, n);
+  }
 });
 
 test('il gergo della banca non diventa un fornitore', () => {

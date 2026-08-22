@@ -8,6 +8,7 @@ import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { roundLikePhp } from '../amount.js';
 import { gruppiDoppioni } from '../contact-dedup.js';
+import { sembraGergoBancario } from '../bank-statement.js';
 
 const TYPES = ['supplier', 'customer', 'both'];
 
@@ -507,11 +508,16 @@ async function duplicates(req, res) {
     }
   }
 
-  const groups = gruppiDoppioni(contatti.map((c) => ({
+  const conUsi = contatti.map((c) => ({
     id: c.id, name: c.name, vat_number: c.vat_number, usage_total: usi.get(c.id) ?? 0,
-  })));
+  }));
 
-  ok(res, { groups, scanned: contatti.length });
+  // Nomi nati dal gergo della banca prima che l'import imparasse a riconoscerlo
+  // («Prel», «Vostra Disposizione», «Carta Di Debito»). Non sono doppioni: non
+  // vanno uniti, vanno buttati. I movimenti restano, senza fornitore.
+  const junk = conUsi.filter((c) => sembraGergoBancario(c.name));
+
+  ok(res, { groups: gruppiDoppioni(conUsi), junk, scanned: contatti.length });
 }
 
 async function reassign(req, res) {

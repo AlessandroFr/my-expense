@@ -185,6 +185,20 @@ export const render = ({ csrfToken }) => `
                     <div class="spinner-border spinner-border-sm me-2"></div>Sto cercando…
                 </div>
             </div>
+
+            <div id="dedup-junk" class="d-none">
+                <hr class="my-3">
+                <h6 class="mb-1"><i class="bi bi-trash3 me-1"></i>Nomi che non sono fornitori</h6>
+                <p class="small text-muted mb-2">
+                    Sono pezzi di descrizione della banca finiti in anagrafica prima che
+                    l'import imparasse a riconoscerli. Non si uniscono: si buttano. I movimenti
+                    restano dove sono, solo senza fornitore.
+                </p>
+                <div id="dedup-junk-list" class="list-group list-group-flush mb-2"></div>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-action="junk-delete">
+                    <i class="bi bi-trash3 me-1"></i>Cancella i nomi spuntati
+                </button>
+            </div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-action="dedup-close">Chiudi</button>
