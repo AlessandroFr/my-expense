@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS `pac_funds` (
     `asset_class_id`         INTEGER,
     `name`                   TEXT COLLATE NOCASE NOT NULL,
     `isin`                   TEXT COLLATE NOCASE,
+    `symbol`                 TEXT COLLATE NOCASE,
     `fund_type`              TEXT COLLATE NOCASE NOT NULL DEFAULT 'etf' CHECK (`fund_type` IN ('etf', 'mutual', 'index', 'other')),
     `currency`               TEXT COLLATE NOCASE NOT NULL DEFAULT 'EUR',
     `notes`                  TEXT COLLATE NOCASE,

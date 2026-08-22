@@ -123,6 +123,30 @@ function renderKpi() {
     ].join('');
 }
 
+// ── Quotazioni da Internet ───────────────────────────────────────────────────
+
+const navFetchBtn = document.getElementById('nav-fetch-btn');
+
+navFetchBtn?.addEventListener('click', async () => {
+    const testo = navFetchBtn.innerHTML;
+    navFetchBtn.disabled = true;
+    navFetchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scarico…';
+    try {
+        const r = await send(`${BASE}/pac/funds/nav-fetch`, { fund_id: navFetchBtn.dataset.fundId });
+        const d = r?.data ?? {};
+        const versamenti = d.valorizzati > 0 ? ` ${d.valorizzati} versamenti hanno ora le loro quote.` : '';
+        toast.success((d.salvati > 0
+            ? `${d.salvati} quotazioni nuove da ${d.symbol} (${d.dal} → ${d.al}).`
+            : `Nessuna quotazione nuova: ${d.symbol} era già aggiornato.`) + versamenti);
+        await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
+    } catch (err) {
+        toast.error(err.message ?? 'Non sono riuscito a scaricare le quotazioni.');
+    } finally {
+        navFetchBtn.disabled = false;
+        navFetchBtn.innerHTML = testo;
+    }
+});
+
 // ── Andamento ────────────────────────────────────────────────────────────────
 
 let andamentoDati = null;

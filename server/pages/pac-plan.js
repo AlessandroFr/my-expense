@@ -84,6 +84,13 @@ export const render = ({ csrfToken, plan, freqLabel }) => {
                 </button>
             </div>
         </form>
+        <div class="d-grid mt-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="nav-fetch-btn"
+                    data-fund-id="${plan.fund_id}">
+                <i class="bi bi-cloud-download me-1"></i>Scarica le quotazioni
+            </button>
+            <div class="form-text">Le prende da Internet con l'ISIN del fondo. Quelle scritte a mano restano come sono.</div>
+        </div>
         <hr class="my-3">
         <div class="small text-muted mb-2">Storico NAV recente</div>
         <div id="nav-history">

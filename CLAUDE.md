@@ -67,6 +67,7 @@ npm run dist       # crea l'installer in dist\
 | `server/bank-profiles.js` | Il tracciato di ogni banca e il suo riconoscimento |
 | `server/contact-dedup.js` | Quali anagrafiche sono la stessa cosa scritta in due modi |
 | `server/pac-performance.js` | Andamento e rendimento di un piano di accumulo |
+| `server/nav-fetch.js` | Le quotazioni dei fondi prese da Internet |
 | `public/js/` | Il frontend, un modulo per pagina |
 | `public/js/modal-guard.js` | Le finestre non si chiudono per sbaglio e non perdono quel che c'era scritto |
 | `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
@@ -115,11 +116,34 @@ vecchio e l'app non ha modo di accorgersene. Da sorgente il controllo non parte
 (`app.isPackaged`). Il giorno in cui l'app dovesse girare su un altro computer
 questo non basta piu': li' serve electron-updater con le Release del repo.
 
-**Una sola cosa chiede ancora la rete: la lettura degli scontrini.** `ocr.js`
-carica Tesseract.js da un CDN quando serve, perché portarlo dentro vorrebbe dire
-venti megabyte fra libreria e modello della lingua per una funzione accessoria.
-Se la rete manca, il messaggio lo dice e il resto continua a funzionare. Tutto il
+**Due cose chiedono la rete, e nessuna delle due parte da sola.** La lettura
+degli scontrini (`ocr.js` carica Tesseract.js da un CDN quando serve: portarlo
+dentro vorrebbe dire venti megabyte fra libreria e modello della lingua per una
+funzione accessoria) e lo scarico delle quotazioni (`nav-fetch.js`, sotto). Se
+la rete manca, il messaggio lo dice e il resto continua a funzionare. Tutto il
 resto è in `public/vendor/` e non esce mai dal computer.
+
+**Le quotazioni si scaricano da Yahoo Finance, che non ha una API dichiarata.**
+`nav-fetch.js` è l'unica parte del *server* che esce dal computer, e lo fa solo
+quando l'utente preme il bottone: niente aggiornamenti in sottofondo, niente
+chiamate all'avvio; quel che parte è un ISIN o un simbolo di borsa. Il NAV a
+mano resta ed è la strada che non può rompersi — se un giorno l'endpoint
+cambia, l'unica cosa che smette di funzionare è il bottone.
+
+Tre regole che vengono dai soldi, non dal codice:
+- **La valuta si verifica prima di salvare.** Lo stesso ETF è quotato su più
+  borse: preso il listino in dollari, il piano sembrerebbe cresciuto o calato
+  per il cambio. Si provano i candidati in ordine (Milano per prima) e si tiene
+  il primo che quota nella valuta del fondo.
+- **Cercare l'ISIN spesso trova una borsa sola**, e non è detto sia quella
+  giusta — dell'iShares Core MSCI World esce solo Londra in dollari. Per questo
+  si cerca una seconda volta per **nome esteso**, che invece le trova tutte. Il
+  simbolo buono resta scritto sul fondo (`pac_funds.symbol`) e si può correggere
+  a mano.
+- **Quello che c'è già non si tocca**: `INSERT OR IGNORE`, quindi un NAV scritto
+  a mano vince sempre su uno scaricato. I versamenti rimasti senza quote perché
+  al momento non c'era un NAV vengono invece valorizzati, ma solo quelli
+  (`nav IS NULL OR units IS NULL`).
 
 **Le finestre si chiudono solo con un bottone.** `public/js/modal-guard.js` si
 carica dal layout su ogni pagina e vale per tutte e sedici: le Bootstrap hanno

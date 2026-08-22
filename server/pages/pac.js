@@ -139,6 +139,12 @@ export const render = ({ csrfToken }) => {
                     <div class="col-md-6">
                         <label class="form-label small mb-1">ISIN</label>
                         <input type="text" name="isin" class="form-control" maxlength="12" placeholder="IE00BK5BQT80">
+                        <div class="form-text">Serve a scaricare le quotazioni da solo.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Simbolo di borsa</label>
+                        <input type="text" name="symbol" class="form-control" maxlength="20" placeholder="SWDA.MI">
+                        <div class="form-text">Facoltativo: lo trova dall'ISIN. Da correggere se sbaglia borsa.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small mb-1">Tipo</label>

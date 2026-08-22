@@ -12,6 +12,7 @@ import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
 import { avanza } from './recurring.js';
 import { riepilogo } from '../pac-performance.js';
+import { NavError, simboliDaIsin, storico } from '../nav-fetch.js';
 
 const FUND_TYPES = ['etf', 'mutual', 'index', 'other'];
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
@@ -39,7 +40,7 @@ function avanzaPac(dateStr, frequency) {
 // ─── Fondi ──────────────────────────────────────────────────────────────────
 
 const FUND_SELECT = `
-  SELECT f.id, f.user_id, f.asset_class_id, f.name, f.isin, f.fund_type,
+  SELECT f.id, f.user_id, f.asset_class_id, f.name, f.isin, f.symbol, f.fund_type,
          f.currency, f.notes, f.archived, f.created_at, f.updated_at,
          ac.name AS asset_class_name, ac.color AS asset_class_color,
          (SELECT n.nav      FROM pac_fund_navs n WHERE n.fund_id = f.id ORDER BY n.nav_date DESC LIMIT 1) AS last_nav,
@@ -53,6 +54,7 @@ const fundToPublic = (r) => ({
   asset_class_id: r.asset_class_id ?? null,
   name: r.name,
   isin: r.isin ?? null,
+  symbol: r.symbol ?? null,
   fund_type: r.fund_type,
   currency: r.currency,
   notes: r.notes ?? null,
@@ -96,9 +98,17 @@ function normalizeFund(data) {
   let notes = data.notes === undefined || data.notes === null ? null : str(data.notes);
   if (notes === '') notes = null;
 
+  // Il simbolo di borsa (SWDA.MI): lettere, cifre, punto e trattino, nient'altro.
+  let symbol = data.symbol === undefined || data.symbol === null ? null : str(data.symbol).toUpperCase();
+  if (symbol === '') symbol = null;
+  if (symbol !== null && !/^[A-Z0-9.\-^]{1,20}$/.test(symbol)) {
+    throw HttpError.badRequest('Simbolo di borsa non valido (es. SWDA.MI).');
+  }
+
   return {
     name,
     isin,
+    symbol,
     asset_class_id: nullableInt(data.asset_class_id),
     fund_type: fundType,
     currency,
@@ -381,9 +391,9 @@ async function createFund(req, res) {
     throw HttpError.conflict(`Esiste gia' un fondo '${row.name}'.`);
   }
   const result = run(
-    `INSERT INTO pac_funds (user_id, name, isin, asset_class_id, fund_type, currency, notes, archived)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    userId, row.name, row.isin, row.asset_class_id, row.fund_type, row.currency, row.notes, row.archived,
+    `INSERT INTO pac_funds (user_id, name, isin, symbol, asset_class_id, fund_type, currency, notes, archived)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    userId, row.name, row.isin, row.symbol, row.asset_class_id, row.fund_type, row.currency, row.notes, row.archived,
   );
   ok(res, { fund: findFund(Number(result.lastInsertRowid), userId) });
 }
@@ -398,9 +408,9 @@ async function updateFund(req, res) {
 
   const row = normalizeFund(body);
   run(
-    `UPDATE pac_funds SET name = ?, isin = ?, asset_class_id = ?, fund_type = ?,
+    `UPDATE pac_funds SET name = ?, isin = ?, symbol = ?, asset_class_id = ?, fund_type = ?,
             currency = ?, notes = ?, archived = ? WHERE id = ? AND user_id = ?`,
-    row.name, row.isin, row.asset_class_id, row.fund_type, row.currency, row.notes, row.archived, id, userId,
+    row.name, row.isin, row.symbol, row.asset_class_id, row.fund_type, row.currency, row.notes, row.archived, id, userId,
   );
   ok(res, { fund: findFund(id, userId) });
 }
@@ -622,6 +632,111 @@ async function listContributions(req, res) {
 }
 
 /**
+ * Scarica le quotazioni del fondo e le salva come NAV.
+ *
+ * Parte solo su richiesta e non tocca i NAV gia' presenti: quello scritto a
+ * mano vince sempre su quello scaricato, perche' se l'utente si e' preso la
+ * briga di scriverlo un motivo ci sara'.
+ */
+async function fetchNavs(req, res) {
+  const body = await readBody(req);
+  assertCsrf(req, body);
+  const userId = currentUserId();
+
+  const fundId = int(body.fund_id);
+  const fondo = fundId > 0 ? findFund(fundId, userId) : null;
+  if (!fondo) throw HttpError.notFound('Fondo non trovato.');
+  if (!fondo.symbol && !fondo.isin) {
+    throw HttpError.badRequest('Al fondo manca sia l\'ISIN sia il simbolo di borsa: senza non c\'e\' niente da cercare.');
+  }
+
+  try {
+    // Col simbolo gia' scritto sul fondo si va dritti; senza si prova la
+    // lista che esce dall'ISIN, dal piu' probabile in giu'.
+    const daProvare = fondo.symbol ? [fondo.symbol] : (await simboliDaIsin(fondo.isin, fondo.currency)).slice(0, 4);
+
+    // Da un mese prima del primo versamento: prima non servirebbe a niente.
+    const primo = one(
+      `SELECT MIN(c.contribution_date) AS d FROM pac_contributions c
+       INNER JOIN pac_plans p ON p.id = c.plan_id
+       WHERE c.user_id = ? AND p.fund_id = ?`, userId, fundId,
+    )?.d ?? null;
+    const da = str(body.from) || (primo ? new Date(new Date(`${primo}T00:00:00Z`).getTime() - 31 * 86400000).toISOString().slice(0, 10) : null);
+
+    // La valuta sbagliata non e' un dettaglio: quei numeri farebbero sembrare
+    // il piano cresciuto o calato per il cambio. Meglio provare la borsa dopo.
+    let serie = null;
+    let symbol = null;
+    const scartati = [];
+    for (const candidato of daProvare) {
+      const s = await storico(candidato, da);
+      if (s.currency && s.currency !== fondo.currency.toUpperCase()) {
+        scartati.push(`${candidato} (${s.currency})`);
+        continue;
+      }
+      serie = s;
+      symbol = candidato;
+      break;
+    }
+    if (serie === null) {
+      throw new NavError(
+        `Trovato solo ${scartati.join(', ')}, ma il fondo e' in ${fondo.currency}. `
+        + 'Scrivi a mano il simbolo di borsa sulla scheda del fondo: per l\'Italia finisce in .MI '
+        + '(per esempio SWDA.MI).',
+      );
+    }
+
+    // Il simbolo buono resta scritto sul fondo: la volta dopo si va dritti.
+    if (symbol !== fondo.symbol) {
+      run('UPDATE pac_funds SET symbol = ? WHERE id = ? AND user_id = ?', symbol, fundId, userId);
+    }
+
+    let salvati = 0;
+    let valorizzati = 0;
+    transaction(() => {
+      for (const q of serie.punti) {
+        const r = run(
+          'INSERT OR IGNORE INTO pac_fund_navs (fund_id, nav_date, nav) VALUES (?, ?, ?)',
+          fundId, q.nav_date, q.nav,
+        );
+        salvati += r.changes;
+      }
+
+      // I versamenti registrati quando il NAV non c'era erano rimasti senza
+      // quote, e senza quote non entrano nel valore del piano. Ora il NAV c'e'.
+      const orfani = all(
+        `SELECT c.id, c.contribution_date, c.amount FROM pac_contributions c
+         INNER JOIN pac_plans p ON p.id = c.plan_id
+         WHERE c.user_id = ? AND p.fund_id = ? AND (c.nav IS NULL OR c.units IS NULL)`,
+        userId, fundId,
+      );
+      for (const c of orfani) {
+        const nav = navOnOrBefore(fundId, c.contribution_date);
+        if (nav === null || nav <= 0) continue;
+        run(
+          'UPDATE pac_contributions SET nav = ?, units = ? WHERE id = ? AND user_id = ?',
+          dec6(nav), dec6(Number(c.amount) / nav), c.id, userId,
+        );
+        valorizzati += 1;
+      }
+    });
+
+    ok(res, {
+      symbol,
+      currency: serie.currency,
+      scaricati: serie.punti.length,
+      salvati,
+      valorizzati,
+      dal: serie.punti[0]?.nav_date ?? null,
+      al: serie.punti[serie.punti.length - 1]?.nav_date ?? null,
+    });
+  } catch (err) {
+    if (err instanceof NavError) throw HttpError.badRequest(err.message);
+    throw err;
+  }
+}
+
+/**
  * L'andamento del piano: quanto e' entrato, quanto vale, quanto ha reso.
  *
  * I versamenti sono l'altra faccia dei trasferimenti dal conto sorgente (ogni
@@ -713,6 +828,7 @@ export const pacRoutes = {
   'GET /pac/funds/navs': listNavs,
   'POST /pac/funds/nav-update': updateNav,
   'POST /pac/funds/nav-delete': deleteNav,
+  'POST /pac/funds/nav-fetch': fetchNavs,
   'GET /pac/plans': listPlans,
   'POST /pac/plans/create': createPlan,
   'POST /pac/plans/update': updatePlan,
