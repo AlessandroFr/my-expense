@@ -2,7 +2,7 @@
  * componentBase.js — Utility condivise per i componenti StraVigo-Cloud
  *
  * Centralizza pattern duplicati: API error-wrapping, ricerca tabelle, notifiche.
- * Importare singole funzioni: import { apiSend, searchTable } from '../../javascript/componentBase.js';
+ * Importare singole funzioni: import { apiSend, searchTable } from './componentBase.js';
  */
 
 // ── API Error Wrapper ───────────────────────────────────────────────────────
@@ -60,8 +60,8 @@ function normalizeApiResponse(r) {
  * se la risposta è in errore (sia envelope nuovo che legacy).
  *
  * Uso:
- *   import FetchRequest from '../../javascript/FetchRequest.js';
- *   import { apiSend } from '../../javascript/componentBase.js';
+ *   import FetchRequest from './FetchRequest.js';
+ *   import { apiSend } from './componentBase.js';
  *   const _api  = FetchRequest.getInstance();
  *   const _send = apiSend(_api);
  *   const r = await _send('../../endpoints/foo.php', params);
