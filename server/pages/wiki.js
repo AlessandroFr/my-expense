@@ -12,7 +12,7 @@ const SECTIONS = [
     "id": "primi-passi",
     "icon": "bi-rocket-takeoff",
     "title": "Primi passi",
-    "app": "/setup",
+    "app": "/accounts",
     "group": "Inizia"
   },
   {
@@ -142,13 +142,6 @@ const SECTIONS = [
     "group": "Manutenzione"
   },
   {
-    "id": "pwa-offline",
-    "icon": "bi-phone",
-    "title": "PWA e modalità offline",
-    "app": null,
-    "group": "Sistema"
-  },
-  {
     "id": "dark-mode",
     "icon": "bi-circle-half",
     "title": "Tema chiaro / scuro",
@@ -170,6 +163,9 @@ const SECTIONS = [
     "group": "Sistema"
   }
 ];
+
+/** Una sezione per id: cosi' toglierne una non sposta tutte le altre. */
+const section = (id) => SECTIONS.find((s) => s.id === id);
 
 /** Le sezioni raggruppate, nell'ordine in cui compaiono nell'indice. */
 const GROUPS = SECTIONS.reduce((acc, s) => {
@@ -406,7 +402,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── INTRO ─────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[0])}    <p class="wiki-section-lead">
+    ${heading(section('intro'))}    <p class="wiki-section-lead">
         my-expense è un <strong>tracker personale delle finanze</strong>: registra spese, entrate e trasferimenti tra conti, calcola budget e bilanci, importa estratti conto bancari, fa OCR degli scontrini e ti aiuta a capire dove vanno i tuoi soldi.
     </p>
     <p>
@@ -422,20 +418,18 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── PRIMI PASSI ─ -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[1])}    <p class="wiki-section-lead">Tutto inizia con la pagina di <code>/setup</code>, dove crei l'unico utente del sistema. Da lì in poi userai sempre <code>/login</code>.</p>
+    ${heading(section('primi-passi'))}    <p class="wiki-section-lead">Non c'&egrave; nessuna registrazione e nessuna password: l'app &egrave; tua e gira sul tuo computer. Si apre e si comincia.</p>
     <ol>
-        <li><strong>Registrazione (una sola volta).</strong> Visita <code>/setup</code>: scegli username e password (minimo 8 caratteri). La password viene salvata con bcrypt — il sistema non la conosce in chiaro.</li>
-        <li><strong>Accesso.</strong> Da quel momento <code>/setup</code> è disabilitato per sempre. Usa <code>/login</code> con le tue credenziali.</li>
-        <li><strong>Crea almeno un conto.</strong> Vai in <a href="#conti">Conti multipli</a> e aggiungi il tuo conto principale (corrente, contanti, carta…). Tutti i movimenti saranno collegati a un conto.</li>
-        <li><strong>Personalizza le categorie.</strong> Trovi un set di partenza, ma puoi modificare nomi/colori/icone in <a href="#categorie">Categorie</a>.</li>
-        <li><strong>Comincia a registrare.</strong> Vai a <a href="#spese">Spese</a> per la prima registrazione, oppure importa un estratto conto già esistente da <a href="#import-bancario">Import estratto conto</a>.</li>
+        <li><strong>Crea almeno un conto.</strong> Vai in <a href="#conti">Conti multipli</a> e aggiungi il tuo conto principale (corrente, contanti, carta&hellip;). Ogni movimento sta su un conto.</li>
+        <li><strong>Sistema le categorie.</strong> Ne trovi gi&agrave; un po'; nomi, colori e icone si cambiano in <a href="#categorie">Categorie</a>.</li>
+        <li><strong>Comincia a registrare.</strong> Da <a href="#spese">Spese</a> per la prima a mano, oppure carica il file della banca da <a href="#import-bancario">Import estratto conto</a> e in un colpo ci sono tutti.</li>
     </ol>
-    <div class="wiki-tip"><i class="bi bi-shield-check"></i><div>La pagina di setup è protetta: una volta creato l'utente non è più raggiungibile. Per "ricominciare da zero" usa il <a href="#reset-db">Reset database</a>.</div></div>
+    <div class="wiki-tip"><i class="bi bi-shield-check"></i><div>Per ricominciare da zero c'&egrave; il <a href="#reset-db">Reset database</a>. Prima, per&ograve;, scarica un <a href="#backup-restore">backup</a>.</div></div>
 </section>
 
 <!-- ──────────────────────────────────────────────────────────── DASHBOARD ─── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[2])}    <p class="wiki-section-lead">La <strong>pagina d'arrivo</strong>: sintetizza il tuo periodo (mese in corso, trimestre, anno, ultimi 30/90 giorni o intervallo personalizzato) in quattro KPI e mostra grafici di tendenza.</p>
+    ${heading(section('dashboard'))}    <p class="wiki-section-lead">La <strong>pagina d'arrivo</strong>: sintetizza il tuo periodo (mese in corso, trimestre, anno, ultimi 30/90 giorni o intervallo personalizzato) in quattro KPI e mostra grafici di tendenza.</p>
     <div class="mockup-pane">
         <div class="row g-2">
             <div class="col-6 col-md-3"><div class="mx-stat-card spese"><div class="mx-stat-l">Spese mese</div><div class="mx-stat-v mx-num">€ 1.247,80</div></div></div>
@@ -461,7 +455,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── SPESE ─────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[3])}    <p class="wiki-section-lead">Il cuore dell'app: registra ogni uscita di denaro con data, importo, categoria, conto, metodo di pagamento, fornitore, tag e allegati.</p>
+    ${heading(section('spese'))}    <p class="wiki-section-lead">Il cuore dell'app: registra ogni uscita di denaro con data, importo, categoria, conto, metodo di pagamento, fornitore, tag e allegati.</p>
 
     <div class="mockup-pane">
         <table class="table table-sm table-borderless align-middle mb-0">
@@ -498,7 +492,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── ENTRATE ───── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[4])}    <p class="wiki-section-lead">Mirror simmetrico delle spese: stesso pattern (CRUD inline, filtri, CSV, allegati) ma con un campo libero <strong>"Fonte"</strong> al posto della categoria-pagamento (es. <em>Stipendio</em>, <em>Freelance</em>, <em>Rimborso</em>, <em>Bonifico da Mario</em>).</p>
+    ${heading(section('entrate'))}    <p class="wiki-section-lead">Mirror simmetrico delle spese: stesso pattern (CRUD inline, filtri, CSV, allegati) ma con un campo libero <strong>"Fonte"</strong> al posto della categoria-pagamento (es. <em>Stipendio</em>, <em>Freelance</em>, <em>Rimborso</em>, <em>Bonifico da Mario</em>).</p>
     <ul>
         <li>Le entrate sono integrate nei KPI della <a href="#dashboard">Dashboard</a> e nel bilancio netto.</li>
         <li>Anche le entrate possono essere collegate a un'<a href="#anagrafiche">anagrafica</a> (es. il tuo datore di lavoro o un cliente).</li>
@@ -508,7 +502,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── TRASFERIMENTI -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[5])}    <p class="wiki-section-lead">Sposti soldi tra <strong>due tuoi conti</strong> (es. dal corrente al contanti, o ricarica della prepagata). Il movimento non altera il bilancio totale, ma cambia i saldi dei singoli conti.</p>
+    ${heading(section('trasferimenti'))}    <p class="wiki-section-lead">Sposti soldi tra <strong>due tuoi conti</strong> (es. dal corrente al contanti, o ricarica della prepagata). Il movimento non altera il bilancio totale, ma cambia i saldi dei singoli conti.</p>
     <div class="mockup-pane">
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <div class="mini-card"><div class="text-muted small">Da</div><strong>Conto Corrente</strong><div class="text-danger mx-num">- € 200,00</div></div>
@@ -526,7 +520,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── RICORRENTI ── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[6])}    <p class="wiki-section-lead">Definisci una volta una spesa che si ripete (canone Netflix, mutuo, abbonamento palestra…) e my-expense la genera <strong>automaticamente</strong> ogni volta che è scaduta.</p>
+    ${heading(section('ricorrenti'))}    <p class="wiki-section-lead">Definisci una volta una spesa che si ripete (canone Netflix, mutuo, abbonamento palestra…) e my-expense la genera <strong>automaticamente</strong> ogni volta che è scaduta.</p>
     <ul>
         <li><strong>Frequenze</strong>: settimanale, mensile, annuale.</li>
         <li><strong>Data di inizio</strong> e <strong>data di fine opzionale</strong> (per abbonamenti a tempo determinato).</li>
@@ -541,7 +535,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── CATEGORIE ─── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[7])}    <p class="wiki-section-lead">Etichette per classificare le spese (e in parte le entrate). Ogni categoria ha <strong>nome, colore e icona Bootstrap</strong> personalizzabili.</p>
+    ${heading(section('categorie'))}    <p class="wiki-section-lead">Etichette per classificare le spese (e in parte le entrate). Ogni categoria ha <strong>nome, colore e icona Bootstrap</strong> personalizzabili.</p>
     <div class="mockup-pane d-flex gap-2 flex-wrap">
         <span class="mx-pill" style="background:var(--mx-mint);color:var(--mx-mint-deep)"><i class="bi bi-cart3 me-1"></i>Spesa</span>
         <span class="mx-pill" style="background:var(--mx-peach);color:var(--mx-peach-deep)"><i class="bi bi-cup-hot me-1"></i>Ristorante</span>
@@ -558,7 +552,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── BUDGET ────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[8])}    <p class="wiki-section-lead">Definisci un <strong>tetto mensile per categoria</strong>. Il sistema calcola in tempo reale la percentuale già spesa e ti avvisa con colori a semaforo.</p>
+    ${heading(section('budget'))}    <p class="wiki-section-lead">Definisci un <strong>tetto mensile per categoria</strong>. Il sistema calcola in tempo reale la percentuale già spesa e ti avvisa con colori a semaforo.</p>
     <div class="mockup-pane">
         <div class="mb-2"><strong>Spesa alimentare</strong> <span class="text-muted small ms-2">€ 320 / € 400</span>
             <div class="progress mt-1" style="height: 8px;"><div class="progress-bar bg-success" style="width: 80%"></div></div></div>
@@ -578,7 +572,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── CONTI ─────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[9])}    <p class="wiki-section-lead">Gestisci <strong>conti multipli</strong> (corrente, contanti, carte, risparmio, investimenti). Ogni movimento è legato a un conto e ogni conto ha un saldo <strong>calcolato in tempo reale</strong>: apertura + entrate − spese.</p>
+    ${heading(section('conti'))}    <p class="wiki-section-lead">Gestisci <strong>conti multipli</strong> (corrente, contanti, carte, risparmio, investimenti). Ogni movimento è legato a un conto e ogni conto ha un saldo <strong>calcolato in tempo reale</strong>: apertura + entrate − spese.</p>
     <div class="mockup-pane row g-2">
         <div class="col-md-4"><div class="mini-card"><div class="text-muted small"><i class="bi bi-bank me-1"></i>Conto Corrente</div><div class="fs-5 fw-bold mx-num">€ 4.230,80</div></div></div>
         <div class="col-md-4"><div class="mini-card"><div class="text-muted small"><i class="bi bi-credit-card me-1"></i>Carta Prepagata</div><div class="fs-5 fw-bold mx-num">€ 78,50</div></div></div>
@@ -595,7 +589,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── ANAGRAFICHE ─ -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[10])}    <p class="wiki-section-lead">Rubrica dei tuoi <strong>fornitori e controparti</strong>: negozi, professionisti, amici da rimborsare. Ogni movimento può essere collegato a un'anagrafica.</p>
+    ${heading(section('anagrafiche'))}    <p class="wiki-section-lead">Rubrica dei tuoi <strong>fornitori e controparti</strong>: negozi, professionisti, amici da rimborsare. Ogni movimento può essere collegato a un'anagrafica.</p>
     <ul>
         <li><strong>Campi</strong>: Nome, Partita IVA, IBAN, Email, Telefono.</li>
         <li><strong>Quick create inline</strong>: puoi crearne una al volo mentre registri una spesa.</li>
@@ -608,7 +602,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── INVESTIMENTI -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[11])}    <p class="wiki-section-lead">Traccia <strong>strumenti finanziari</strong> (azioni, ETF, fondi, obbligazioni) detenuti su uno o più conti deposito.</p>
+    ${heading(section('investimenti'))}    <p class="wiki-section-lead">Traccia <strong>strumenti finanziari</strong> (azioni, ETF, fondi, obbligazioni) detenuti su uno o più conti deposito.</p>
     <ul>
         <li><strong>Strumenti</strong> (instruments): nome, ticker, ISIN, classe d'asset (con gerarchia), nota.</li>
         <li><strong>Operazioni</strong>: BUY, SELL, DIVIDEND, FEE, SPLIT.</li>
@@ -621,7 +615,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── PAC ───────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[12])}    <p class="wiki-section-lead">Piani di Accumulo Capitale: <strong>versamenti periodici</strong> su fondi/ETF con tracking della performance media.</p>
+    ${heading(section('pac'))}    <p class="wiki-section-lead">Piani di Accumulo Capitale: <strong>versamenti periodici</strong> su fondi/ETF con tracking della performance media.</p>
     <ul>
         <li><strong>Fondi</strong>: anagrafica con storico NAV.</li>
         <li><strong>Piani</strong>: importo, frequenza, data inizio/fine, toggle attivo / sospeso. Il piano dice
@@ -640,7 +634,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── REPORT ────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[13])}    <p class="wiki-section-lead">Vista <strong>annuale</strong> per capire le tendenze di lungo periodo. Selezioni l'anno e vedi tutto consolidato.</p>
+    ${heading(section('report'))}    <p class="wiki-section-lead">Vista <strong>annuale</strong> per capire le tendenze di lungo periodo. Selezioni l'anno e vedi tutto consolidato.</p>
     <ul>
         <li><strong>4 KPI annuali</strong>: spese totali, entrate totali, bilancio anno, media mensile.</li>
         <li><strong>Bar + line chart</strong>: spese mensili (rosso) + entrate mensili (verde) + linea blu del bilancio cumulato.</li>
@@ -653,7 +647,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── RATEIZZAZIONE -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[14])}    <p class="wiki-section-lead">Dividi una spesa importante in <strong>più rate calendarizzate</strong>. Disponibile sia nel form manuale sia nell'esplosione dell'import bancario.</p>
+    ${heading(section('rateizzazione'))}    <p class="wiki-section-lead">Dividi una spesa importante in <strong>più rate calendarizzate</strong>. Disponibile sia nel form manuale sia nell'esplosione dell'import bancario.</p>
     <div class="mockup-pane">
         <div class="text-muted small mb-2">Spesa originale: <strong>€ 600,00</strong> — Lavatrice MediaWorld — diviso in 3 rate mensili a partire dal 05/05:</div>
         <table class="table table-sm mb-0">
@@ -676,7 +670,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── OCR ───────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[15])}    <p class="wiki-section-lead">Scatta una foto allo scontrino, l'app estrae <strong>data e importo</strong> più probabili e precompila il form. Tutto avviene <strong>nel tuo browser</strong> — l'immagine non lascia il dispositivo.</p>
+    ${heading(section('ocr'))}    <p class="wiki-section-lead">Scatta una foto allo scontrino, l'app estrae <strong>data e importo</strong> più probabili e precompila il form. Tutto avviene <strong>nel tuo browser</strong> — l'immagine non lascia il dispositivo.</p>
     <ol>
         <li>In <code>/expenses</code>, clicca "Scansiona scontrino" nel form di creazione.</li>
         <li>Su mobile si apre direttamente la fotocamera (<code>capture=environment</code>); su desktop il file picker.</li>
@@ -694,7 +688,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── IMPORT CSV ── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[16])}    <p class="wiki-section-lead">Sia <code>/expenses</code> sia <code>/incomes</code> permettono <strong>import/export CSV</strong> con un formato semplice e tollerante.</p>
+    ${heading(section('import-csv'))}    <p class="wiki-section-lead">Sia <code>/expenses</code> sia <code>/incomes</code> permettono <strong>import/export CSV</strong> con un formato semplice e tollerante.</p>
     <p><strong>Formato:</strong></p>
     <pre class="bg-body-tertiary p-2 rounded small"><code>Data;Categoria;Descrizione;Importo;Pagamento
 05/05/2026;Spesa;Esselunga;47,80;Carta
@@ -712,7 +706,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── IMPORT BANK ─ -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[17])}    <p class="wiki-section-lead">Importa il file dei movimenti scaricato dalla banca e my-expense crea spese, entrate e trasferimenti. Ogni banca ha il suo <strong>profilo</strong>, cioè l'elenco dei nomi che quella banca dà alle colonne: l'app confronta il file con i profili, ti dice quale ha riconosciuto e dove finisce ogni colonna, e solo dopo la tua conferma scrive qualcosa.</p>
+    ${heading(section('import-bancario'))}    <p class="wiki-section-lead">Importa il file dei movimenti scaricato dalla banca e my-expense crea spese, entrate e trasferimenti. Ogni banca ha il suo <strong>profilo</strong>, cioè l'elenco dei nomi che quella banca dà alle colonne: l'app confronta il file con i profili, ti dice quale ha riconosciuto e dove finisce ogni colonna, e solo dopo la tua conferma scrive qualcosa.</p>
     <ol>
         <li>Su <code>/expenses</code> clicca "Estratto conto bancario".</li>
         <li>Lascia <strong>Banca: riconoscila dal file</strong>, oppure scegli tu la banca dal menu.</li>
@@ -754,7 +748,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── BACKUP ────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[18])}    <p class="wiki-section-lead">Scarica un <strong>backup ZIP completo</strong> dei tuoi dati con un click. Contiene un dump SQL di tutte le tabelle (filtrate sul tuo utente) + la cartella degli allegati.</p>
+    ${heading(section('backup-restore'))}    <p class="wiki-section-lead">Scarica un <strong>backup ZIP completo</strong> dei tuoi dati con un click. Contiene un dump SQL di tutte le tabelle (filtrate sul tuo utente) + la cartella degli allegati.</p>
     <ul>
         <li>Bottone <i class="bi bi-cloud-download"></i> <strong>Backup ZIP</strong> nel menu utente, oppure URL diretto <code>/backup/download</code>.</li>
         <li>Il file scaricato contiene:
@@ -770,7 +764,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── RESET DB ──── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[19])}    <p class="wiki-section-lead">Cancellazione <strong>irreversibile</strong> dei tuoi dati. Pensato per chi vuole "ricominciare da zero" senza reinstallare l'app. Protetto da una sequenza di conferme.</p>
+    ${heading(section('reset-db'))}    <p class="wiki-section-lead">Cancellazione <strong>irreversibile</strong> dei tuoi dati. Pensato per chi vuole "ricominciare da zero" senza reinstallare l'app. Protetto da una sequenza di conferme.</p>
     <p><strong>Tre ambiti possibili:</strong></p>
     <ul>
         <li><strong>Solo movimenti</strong>: cancella spese, entrate, tag, allegati. Mantiene conti, categorie, budget, ricorrenti.</li>
@@ -786,20 +780,10 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
     <div class="wiki-warn"><i class="bi bi-exclamation-octagon"></i><div><strong>Operazione non annullabile.</strong> La cancellazione è in una singola transazione con <code>PRAGMA foreign_keys = OFF</code>; gli allegati su disco vengono rimossi best-effort dopo il commit. Senza backup, i dati sono persi per sempre.</div></div>
 </section>
 
-<!-- ──────────────────────────────────────────────────────────── PWA ───────── -->
-<section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[20])}    <p class="wiki-section-lead">my-expense è una <strong>Progressive Web App</strong>: la installi come fosse un'app nativa e funziona anche offline (sulle pagine già visitate).</p>
-    <ul>
-        <li><strong>Installazione</strong>: in Chrome / Edge clicca l'icona "Installa" nella barra indirizzi. Su iOS Safari: Condividi → Aggiungi a Home.</li>
-        <li><strong>Service Worker</strong>: cache <em>cache-first</em> per gli asset CDN (Bootstrap, Chart.js, font), <em>network-first</em> per HTML e JSON. Quando sei offline vedi l'ultima versione cached delle pagine.</li>
-        <li><strong>Icone</strong>: SVG con gradiente lilac→pesca e simbolo €, supporto maskable.</li>
-        <li><strong>Theme color</strong>: <code>#9B7CD9</code> (lilac), visibile come colore della status bar su Android.</li>
-    </ul>
-</section>
 
 <!-- ──────────────────────────────────────────────────────────── DARK MODE ─── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[21])}    <p class="wiki-section-lead">Tre modalità di tema, scelta persistente nel browser (<code>localStorage[mx-theme]</code>).</p>
+    ${heading(section('dark-mode'))}    <p class="wiki-section-lead">Tre modalità di tema, scelta persistente nel browser (<code>localStorage[mx-theme]</code>).</p>
     <div class="mockup-pane d-flex gap-2 align-items-center justify-content-center">
         <div class="mx-theme-segments" role="group" aria-label="Esempio">
             <button type="button" class="mx-theme-btn active"><i class="bi bi-sun-fill"></i></button>
@@ -818,7 +802,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── SICUREZZA ─── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[22])}    <p class="wiki-section-lead">my-expense gira <strong>completamente sul tuo computer</strong> (un'applicazione installata, con dentro il suo server e il suo database). Nessun dato esce mai dalla macchina.</p>
+    ${heading(section('sicurezza-privacy'))}    <p class="wiki-section-lead">my-expense gira <strong>completamente sul tuo computer</strong> (un'applicazione installata, con dentro il suo server e il suo database). Nessun dato esce mai dalla macchina.</p>
     <ul>
         <li><strong>Niente login</strong>: chi ha acceso il computer ha gi&agrave; accesso al file dei dati, quindi una password in pi&ugrave; non proteggerebbe niente.</li>
         <li><strong>Il server ascolta solo su 127.0.0.1</strong>: dalla rete non &egrave; raggiungibile.</li>
@@ -832,7 +816,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── SCORCIATOIE ─ -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(SECTIONS[23])}    <p class="wiki-section-lead">Riferimento rapido a formati, soglie e nomi che torna utile in giro.</p>
+    ${heading(section('scorciatoie'))}    <p class="wiki-section-lead">Riferimento rapido a formati, soglie e nomi che torna utile in giro.</p>
 
     <h5 class="mt-3"><i class="bi bi-keyboard me-2"></i>Tasti</h5>
     <ul>
