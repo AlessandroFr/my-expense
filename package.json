@@ -11,12 +11,15 @@
     "app": "electron .",
     "dist": "electron-builder --win",
     "test": "node --test --test-reporter=spec \"tests/js/**/*.test.js\"",
-    "test:watch": "node --test --watch --test-reporter=spec \"tests/js/**/*.test.js\""
+    "test:watch": "node --test --watch --test-reporter=spec \"tests/js/**/*.test.js\"",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
     "chart.js": "^4.4.6",

@@ -45,6 +45,7 @@ PHP non c'è più. La migrazione è raccontata in
 npm run app        # la finestra dell'app (Electron)
 npm start          # solo il server, da aprire nel browser
 npm test           # i test
+npm run test:e2e   # i test end-to-end nel browser (Playwright)
 npm run dist       # crea l'installer in dist\
 ```
 
@@ -54,7 +55,7 @@ npm run dist       # crea l'installer in dist\
 |------|------|
 | `electron/main.js` | Il processo principale: dati, server, finestra |
 | `electron/update.js` | L'aggiornamento: cerca un installer piu' recente e lo esegue |
-| `server/index.js` | Il server: file statici, pagine, endpoint; esporta `avvia()` |
+| `server/index.js` | Il server: file statici, pagine, endpoint; esporta `start()` |
 | `server/paths.js` | Dove stanno database, allegati e configurazione |
 | `server/db.js` | Accesso al database e id dell'utente |
 | `server/view.js` | Layout e helper di rendering (`esc`, `asset`, `each`) |
@@ -77,6 +78,7 @@ npm run dist       # crea l'installer in dist\
 | `build/icon.png` | L'icona dell'app |
 | `config/config.json` | Configurazione locale, gitignored |
 | `data/my-expense.sqlite` | I dati da sorgente. Gitignored: il backup è copiarlo |
+| `e2e/` | I test nel browser: `server.js` semina e avvia, le spec provano |
 
 ## Cose da sapere prima di toccare il codice
 
@@ -94,10 +96,10 @@ di installazione, in silenzio.
 considera l'app pronta solo dopo che quel file ha finito di essere valutato: un
 `await app.whenReady()` scritto lì lo tiene in valutazione per sempre, quindi
 «pronta» non arriva mai e la finestra non si apre — senza errori e senza
-messaggi. Per questo l'avvio sta dentro `avviaApplicazione()`, chiamata **senza**
+messaggi. Per questo l'avvio sta dentro `startApplication()`, chiamata **senza**
 await.
 
-**La porta la sceglie il sistema operativo.** `avvia(0)` chiede una porta libera
+**La porta la sceglie il sistema operativo.** `start(0)` chiede una porta libera
 qualunque e restituisce quella assegnata. Nessuna porta fissa da difendere,
 nessun conflitto con quello che gira già sulla macchina.
 
@@ -174,7 +176,7 @@ transazione**, quindi va chiamato prima di aprirla (vedi
 
 **Il rendimento di un PAC non è «valore meno versato».** I soldi versati il
 mese scorso non hanno avuto il tempo di rendere quanto quelli di tre anni fa,
-quindi la percentuale onesta è il TIR (`pac-performance.js::tir`, l'XIRR dei
+quindi la percentuale onesta è il TIR (`pac-performance.js::irr`, l'XIRR dei
 fogli di calcolo), che sconta ogni versamento dalla sua data. Si cerca per
 bisezione e non con Newton: qualche millesimo di secondo in più, ma non diverge
 mai, e su un numero mostrato come «rendimento» questo conta di più. La
@@ -274,4 +276,8 @@ e volute.
   indietro per sempre.
 - Test dove la logica non è banale; sui percorsi che toccano denaro la
   correttezza viene prima della brevità.
+- I test unitari (`npm test`) restano puri: niente database, niente rete. Quello
+  che si vede solo nel browser — una pagina che non si apre, un modale che non
+  salva — sta in `e2e/` (`npm run test:e2e`), su un database usa-e-getta che
+  `e2e/server.js` ricrea e semina a ogni avvio.
 - Ogni pezzo di lavoro finito e verificato va committato su `main`.

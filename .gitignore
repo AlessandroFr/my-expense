@@ -32,3 +32,8 @@ desktop.ini
 
 # Artefatti di build (l'installer prodotto da electron-builder)
 /dist/
+
+# End-to-end: il database usa-e-getta e i referti di Playwright
+/e2e/.tmp/
+/test-results/
+/playwright-report/
