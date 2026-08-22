@@ -64,7 +64,7 @@ const ensurePositiveAmount = (v) => {
 };
 
 const findAccount = (id, userId) =>
-  one('SELECT id, name, type FROM accounts WHERE id = ? AND user_id = ? LIMIT 1', id, userId);
+  one('SELECT id, name, type, bank_profile_id FROM accounts WHERE id = ? AND user_id = ? LIMIT 1', id, userId);
 
 /** Conta i movimenti orfani che un nome collegherebbe, per mostrarlo in anteprima. */
 function previewBackfillCount(userId, name) {
@@ -140,9 +140,12 @@ async function preview(req, res) {
   const autoPairRicariche = fields.auto_pair_ricariche === undefined || int(fields.auto_pair_ricariche) === 1;
   const autoPairPrelievi = fields.auto_pair_prelievi === undefined || int(fields.auto_pair_prelievi) === 1;
 
-  // Profilo scelto a mano, oppure tutti quelli che ci sono e vinca il migliore.
+  // Il profilo lo sceglie l'utente per questo import; se non l'ha scelto vale
+  // quello assegnato al conto, che e' il caso normale — la banca di un conto
+  // non cambia. Senza ne' l'uno ne' l'altro si provano tutti e vince il
+  // migliore, e allora il riconoscimento e' un'ipotesi che l'anteprima dichiara.
   const tuttiProfili = listProfiles(userId);
-  const richiesto = int(fields.profile_id);
+  const richiesto = int(fields.profile_id) || int(sourceAccount.bank_profile_id);
   let daProvare = tuttiProfili;
   if (richiesto > 0) {
     const scelto = findProfile(richiesto, userId);

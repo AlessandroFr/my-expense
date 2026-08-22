@@ -1,6 +1,13 @@
-import { asset, csrfField } from '../view.js';
+import { asset, csrfField, each, esc } from '../view.js';
 
-export const render = ({ csrfToken }) => `
+/**
+ * Le banche fra cui scegliere il tracciato del conto. La voce vuota vale
+ * «riconoscilo dal file», che e' come si comportava l'import prima.
+ */
+const opzioniProfilo = (profiles) => `<option value="">Riconoscimento automatico</option>${
+  each(profiles, (p) => `<option value="${p.id}">${esc(p.name)}</option>`)}`;
+
+export const render = ({ csrfToken, bankProfiles = [] }) => `
 <div class="row mb-3">
     <div class="col-12">
         <h1 class="h3 mb-0"><i class="bi bi-bank me-2"></i>Conti</h1>
@@ -70,6 +77,11 @@ export const render = ({ csrfToken }) => `
                         <div class="col-6">
                             <label class="form-label small mb-1">Banca / Broker</label>
                             <input type="text" name="bank_name" class="form-control" maxlength="128" placeholder="Banca Sella">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Estratto conto di</label>
+                            <select name="bank_profile_id" class="form-select">${opzioniProfilo(bankProfiles)}</select>
+                            <div class="form-text">Chi ha scritto il file che importi: l'import salta la fase «indovina la banca».</div>
                         </div>
                         <div class="col-12">
                             <label class="form-label small mb-1">Intestatario</label>
@@ -168,6 +180,10 @@ export const render = ({ csrfToken }) => `
                     <div class="col-md-3">
                         <label class="form-label small mb-1">Banca / Broker</label>
                         <input type="text" name="bank_name" class="form-control" maxlength="128">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Estratto conto di</label>
+                        <select name="bank_profile_id" class="form-select">${opzioniProfilo(bankProfiles)}</select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small mb-1">Intestatario</label>

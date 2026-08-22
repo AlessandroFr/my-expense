@@ -185,6 +185,12 @@ export function extractCounterparty(tipologia, descrizione, kind) {
   let m = desc.match(/\bFAV\.\s+([A-Z][A-Z\s.']+?)\s+BONIFICO\b/u);
   if (m) return cleanupCounterpartyName(m[1]);
 
+  // "VOSTRA DISPOSIZIONE MARIO ROSSI BONIFICO DISPOSTO IN: INTERNET ...": e'
+  // come Mediolanum scrive un bonifico in uscita, e senza questa riga il nome
+  // finiva per essere tutta la formula.
+  m = desc.match(/\bVOSTRA\s+DISPOSIZIONE\s+(?:A\s+FAV\.\s+)?([A-Z][A-Z\s.']+?)\s+BONIFICO\b/u);
+  if (m) return cleanupCounterpartyName(m[1]);
+
   // "SEPA ISTANTANEO MARIO ROSSI VAL. ..."
   m = desc.match(/\bSEPA\s+(?:ISTANTANEO|ORDINARIO)\s+([A-Z][A-Z\s.']+?)\s+VAL\./u);
   if (m) return cleanupCounterpartyName(m[1]);
@@ -210,9 +216,11 @@ export function extractCounterparty(tipologia, descrizione, kind) {
   if (m) return cleanupCounterpartyName(m[1]);
 
   // Il negozio viene dopo "C/O" e finisce al primo termine tipico
-  // dell'estratto conto, a un indirizzo o a una cifra.
+  // dell'estratto conto, a un indirizzo o a una cifra. L'asterisco e la e
+  // commerciale fanno parte del nome ("ANTHROPIC* CLAUDE", "GIULIA & C"), e
+  // "CARTA" chiude sempre: dopo c'e' il numero della carta, non il negozio.
   m = desc.match(
-    /\bC\/O\s+([A-Z][A-Z0-9\s.']+?)(?:\s+(?:DEL|VAL|COD|CRO|NOTE|DATA|IL|IN|VIA|VIALE|PIAZZA|CORSO|LARGO|VICOLO|GALLERIA)\b|\s+\d|$)/u,
+    /\bC\/O\s+([A-Z][A-Z0-9\s.'*&]+?)(?:\s+(?:DEL|VAL|COD|CRO|NOTE|DATA|IL|IN|CARTA|VIA|VIALE|PIAZZA|CORSO|LARGO|VICOLO|GALLERIA)\b|\s+\d|$)/u,
   );
   if (m) return cleanupCounterpartyName(m[1]);
 
@@ -230,6 +238,9 @@ export function extractCounterparty(tipologia, descrizione, kind) {
   // Movimenti interni e oneri bancari non hanno una controparte.
   if (/RICARICA/i.test(desc) || /RIMBORSO CARTA/i.test(desc)) return null;
   if (/COMMISSIONE/i.test(desc) || /IMPOSTA DI BOLLO/i.test(desc)) return null;
+  // Comprare o vendere titoli e' un movimento del dossier: il fornitore non
+  // c'e', e senza questa riga diventava "Acquisto Titoli Per Contanti".
+  if (/\b(ACQUISTO|VENDITA)\s+TITOLI\b/i.test(desc)) return null;
 
   m = desc.match(/\b([A-Z][A-Z.']{3,}(?:\s+[A-Z][A-Z.']+){0,4})\b/u);
   return m ? cleanupCounterpartyName(m[1]) : null;

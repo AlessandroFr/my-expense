@@ -12,18 +12,40 @@ const COLUMNS = `id, user_id, name, builtin_key, delimiter, encoding, amount_mod
                  date_order, columns_json, notes, sort_order, created_at, updated_at`;
 
 /**
+ * Riscrive un profilo com'e' scritto nel codice, `updated_at` compreso: resta
+ * «mai modificato», quindi continuera' a riallinearsi agli aggiornamenti.
+ */
+const applyBuiltin = (id, userId, p) => run(
+  `UPDATE bank_profiles
+     SET name = ?, delimiter = ?, encoding = ?, amount_mode = ?, date_order = ?,
+         columns_json = ?, notes = ?, sort_order = ?, updated_at = created_at
+   WHERE id = ? AND user_id = ?`,
+  p.name, p.delimiter, p.encoding, p.amount_mode, p.date_order,
+  p.columns_json, p.notes, p.sort_order, id, userId,
+);
+
+/**
  * I preimpostati nascono qui, non da un INSERT nello schema: su database nuovo
  * le migration vengono solo registrate, quindi una semina SQL non girerebbe
  * mai. Un profilo cancellato a mano rinasce, ma i preimpostati non si possono
  * cancellare: si modificano e si ripristinano.
  */
 export function ensureBuiltins(userId) {
-  const presenti = new Set(
-    all('SELECT builtin_key FROM bank_profiles WHERE user_id = ? AND builtin_key IS NOT NULL', userId)
-      .map((r) => r.builtin_key),
+  // Un preimpostato mai modificato si riallinea da solo alla definizione di
+  // questa versione: e' cosi' che la correzione al tracciato di una banca
+  // arriva anche a chi ha gia' il database. Chi l'ha modificato se lo tiene
+  // com'e'; per tornare all'originale c'e' «Ripristina».
+  const presenti = new Map(
+    all(`SELECT id, builtin_key, created_at, updated_at FROM bank_profiles
+         WHERE user_id = ? AND builtin_key IS NOT NULL`, userId)
+      .map((r) => [r.builtin_key, r]),
   );
   for (const p of builtinProfiles()) {
-    if (presenti.has(p.builtin_key)) continue;
+    const esistente = presenti.get(p.builtin_key);
+    if (esistente) {
+      if (esistente.updated_at === esistente.created_at) applyBuiltin(esistente.id, userId, p);
+      continue;
+    }
     try {
       run(
         `INSERT INTO bank_profiles
@@ -168,15 +190,7 @@ async function reset(req, res) {
   const originale = builtinProfiles().find((p) => p.builtin_key === corrente.builtin_key);
   if (!originale) throw HttpError.notFound('Questo profilo preimpostato non esiste piu\' in questa versione.');
 
-  run(
-    `UPDATE bank_profiles
-       SET name = ?, delimiter = ?, encoding = ?, amount_mode = ?, date_order = ?,
-           columns_json = ?, notes = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND user_id = ?`,
-    originale.name, originale.delimiter, originale.encoding, originale.amount_mode,
-    originale.date_order, originale.columns_json, originale.notes, originale.sort_order,
-    id, userId,
-  );
+  applyBuiltin(id, userId, originale);
   ok(res, { profile: findById(id, userId) });
 }
 

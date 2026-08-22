@@ -51,25 +51,31 @@ export function normalizeHeader(raw) {
 
 // ─── I profili che arrivano gia' pronti ─────────────────────────────────────
 //
-// Solo il primo e' verificato su file veri: e' il tracciato che l'import
-// leggeva quando sapeva leggere una banca sola. Gli altri sono compilati sui
-// nomi di colonna tipici di quelle banche e vanno controllati la prima volta
-// che si importa — per questo l'anteprima mostra sempre la mappatura.
+// Quelli con `verified` sono stati provati su un estratto conto vero. Gli
+// altri sono compilati sui nomi di colonna tipici di quelle banche e vanno
+// controllati la prima volta che si importa — per questo l'anteprima mostra
+// sempre la mappatura.
 
 const BUILTIN = [
   {
     key: 'sella', name: 'Banca Sella / Patavina', delimiter: ';', date_order: 'dmy', amount_mode: 'in_out',
+    verified: true,
     columns: {
       op_date: ['operazione'], value_date: ['valuta'], tipologia: ['tipologia operazione'],
       description: ['descrizione'], outflow: ['uscite'], inflow: ['entrate'],
     },
   },
   {
-    key: 'mediolanum', name: 'Banca Mediolanum',
+    // Mediolanum esporta lo stesso tracciato di Sella: «Operazione» e' la data
+    // contabile, non il tipo di movimento. Sui nomi lunghi ('data contabile' e
+    // compagnia) non riconosceva niente e il file finiva letto dal profilo
+    // Sella. Verificato sull'estratto 01/2026-07/2026 del conto MROSSI.
+    key: 'mediolanum', name: 'Banca Mediolanum', delimiter: ';', date_order: 'dmy', amount_mode: 'in_out',
+    verified: true,
     columns: {
-      op_date: ['data contabile', 'data operazione', 'data'],
-      value_date: ['data valuta', 'valuta'],
-      tipologia: ['tipologia', 'tipologia operazione', 'causale'],
+      op_date: ['operazione', 'data contabile', 'data operazione', 'data'],
+      value_date: ['valuta', 'data valuta'],
+      tipologia: ['tipologia operazione', 'tipologia', 'causale'],
       description: ['descrizione', 'descrizione operazione', 'dettagli'],
       outflow: ['uscite', 'addebiti'], inflow: ['entrate', 'accrediti'],
       amount: ['importo'],
@@ -189,7 +195,7 @@ export const builtinProfiles = () => BUILTIN.map((p, i) => ({
   amount_mode: p.amount_mode ?? 'auto',
   date_order: p.date_order ?? 'auto',
   columns_json: JSON.stringify(p.columns),
-  notes: p.key === 'sella' ? null : 'Tracciato preimpostato, non verificato su un file reale: controlla la mappatura in anteprima.',
+  notes: p.verified ? null : 'Tracciato preimpostato, non verificato su un file reale: controlla la mappatura in anteprima.',
   sort_order: i * 10,
 }));
 

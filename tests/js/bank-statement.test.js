@@ -182,3 +182,35 @@ test('la controparte si pesca dalla descrizione, o non si pesca', () => {
   assert.equal(extractCounterparty('Bonifici', 'A FAV. MARIO ROSSI BONIFICO', 'expense'), 'Mario Rossi');
   assert.equal(extractCounterparty('', 'PRELIEVO DI CONTANTE C/O BANCA X', 'expense'), null);
 });
+
+// Le forme che scrive Mediolanum, prese dall'estratto conto vero.
+test('il bonifico in uscita di Mediolanum non e\' intestato alla formula', () => {
+  assert.equal(
+    extractCounterparty('Bonifici', 'VOSTRA DISPOSIZIONE BIANCHI LUIGI BONIFICO DISPOSTO IN: INTERNET COOR.BENEF.: IT38 H030 NOTE: PARCHEGGIO', 'expense'),
+    'Bianchi Luigi',
+  );
+  assert.equal(
+    extractCounterparty('Bonifici', 'VOSTRA DISPOSIZIONE A FAV. ANGELA GOBBI BONIFICO DISPOSTO IN: INTERNET', 'expense'),
+    'Angela Gobbi',
+  );
+});
+
+test('i movimenti del dossier titoli non hanno un fornitore', () => {
+  assert.equal(
+    extractCounterparty('Acquisti - Aggiuntivi', 'ACQUISTO TITOLI PER CONTANTI 30/12 001/41278450/000 QTA: 5 TITOLO : ETFS INVESC GOLD MTF', 'expense'),
+    null,
+  );
+});
+
+test('il negozio finisce dove comincia il numero della carta', () => {
+  const carta = 'CARTA N. 537572******5048 - CIRCUITO MASTERCARD COD. MCC 5542 000010420581';
+  assert.equal(
+    extractCounterparty('Prelievi - Pagamenti', `PAGAMENTI PAESI UE CARTA N. 000 DEL 25/07/26 VALUTA EUR PAESE ITALIA C/O R8 VIGONOVO ${carta}`, 'expense'),
+    'R8 Vigonovo',
+  );
+  // L'asterisco fa parte del nome del negozio, non lo interrompe.
+  assert.equal(
+    extractCounterparty('Prelievi - Pagamenti', `PAGAMENTI PAESI NON UE ... C/O ANTHROPIC* CLAUDE SUB SAN FRANCISCO ${carta}`, 'expense'),
+    'Anthropic* Claude Sub San Francisco',
+  );
+});

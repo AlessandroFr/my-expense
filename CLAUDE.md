@@ -147,9 +147,22 @@ riconoscimento prova ogni profilo su ogni riga di intestazione plausibile e
 vince chi mappa più colonne. I profili preimpostati nascono da
 `ensureBuiltins()` in `routes/bank-profiles.js`, **non** da un `INSERT` nella
 migration: su database nuovo le migration vengono solo registrate, quindi una
-semina SQL non girerebbe mai. Solo il profilo di Banca Sella è verificato su
-file veri — gli altri sono ipotesi, ed è per questo che l'anteprima mostra
-sempre la mappatura prima di scrivere.
+semina SQL non girerebbe mai. Solo Sella e Mediolanum sono verificati su file
+veri — gli altri sono ipotesi, ed è per questo che l'anteprima mostra sempre la
+mappatura prima di scrivere.
+
+**Un preimpostato mai modificato si riallinea da solo** al codice a ogni
+`ensureBuiltins()` (`updated_at = created_at` è il segno che nessuno l'ha
+toccato): è così che la correzione al tracciato di una banca arriva anche a chi
+ha già il database. Chi l'ha modificato se lo tiene, e «Ripristina» lo riporta
+allo stato di «mai toccato».
+
+**Sella e Mediolanum esportano lo stesso identico tracciato**
+(`Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate`, dove
+«Operazione» è la data contabile). Dall'intestazione non si distinguono: per
+questo il conto porta `bank_profile_id`, e quando c'è l'import usa quello senza
+tirare a indovinare (`routes/bank-import.js`). Senza profilo assegnato si torna
+al riconoscimento automatico.
 
 **Il CSRF resta anche senza login.** Non serve a sapere chi sei: impedisce a una
 pagina qualunque aperta nel browser di chiamare `127.0.0.1` a tua insaputa. Il

@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS `accounts` (
     `notes`                  TEXT COLLATE NOCASE,
     `archived`               INTEGER NOT NULL DEFAULT 0,
     `is_default_cash`        INTEGER NOT NULL DEFAULT 0,
+    `bank_profile_id`        INTEGER,
     `sort_order`             INTEGER NOT NULL DEFAULT 0,
     `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `uq_accounts_user_name` UNIQUE (`user_id`, `name`),
-    CONSTRAINT `fk_accounts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+    CONSTRAINT `fk_accounts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_accounts_bank_profile` FOREIGN KEY (`bank_profile_id`) REFERENCES `bank_profiles` (`id`) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS `ix_accounts_user_sort` ON `accounts` (`user_id`, `sort_order`);

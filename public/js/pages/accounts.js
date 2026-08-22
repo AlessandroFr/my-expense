@@ -152,6 +152,9 @@ function openEditModal(a) {
     if (editForm.elements['is_default_cash']) {
         editForm.elements['is_default_cash'].checked = Number(a.is_default_cash) === 1;
     }
+    if (editForm.elements['bank_profile_id']) {
+        editForm.elements['bank_profile_id'].value = a.bank_profile_id ?? '';
+    }
     for (const f of DETAIL_FIELDS) {
         if (editForm.elements[f]) editForm.elements[f].value = a[f] ?? '';
     }
@@ -196,6 +199,9 @@ list.addEventListener('click', async (ev) => {
                 opening_balance: a.opening_balance, sort_order: a.sort_order,
                 archived: Number(a.archived) === 1 ? 0 : 1,
                 is_default_cash: Number(a.is_default_cash) === 1 ? 1 : 0,
+                // Anche i campi che non c'entrano con l'archiviazione: questa
+                // update riscrive la riga intera, e quel che manca si azzera.
+                bank_profile_id: a.bank_profile_id ?? '',
                 ...detailsPayload(a),
             });
             toast.success(Number(a.archived) === 1 ? 'Conto ripristinato.' : 'Conto archiviato.');

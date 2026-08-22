@@ -11,7 +11,7 @@ const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_nu
 
 const LIST_COLUMNS = `id, name, type, color, icon, opening_balance,
                       iban, bic, bank_name, account_holder, account_number, notes,
-                      archived, is_default_cash, sort_order, created_at, updated_at`;
+                      archived, is_default_cash, bank_profile_id, sort_order, created_at, updated_at`;
 
 export const allForUser = (userId, includeArchived = false) => all(
   `SELECT ${LIST_COLUMNS} FROM accounts
@@ -23,7 +23,7 @@ export const allForUser = (userId, includeArchived = false) => all(
 const findForUser = (id, userId) => one(
   `SELECT id, user_id, name, type, color, icon, opening_balance,
           iban, bic, bank_name, account_holder, account_number, notes,
-          archived, is_default_cash, sort_order
+          archived, is_default_cash, bank_profile_id, sort_order
    FROM accounts WHERE id = ? AND user_id = ? LIMIT 1`,
   id, userId,
 );
@@ -91,6 +91,14 @@ function validate(data) {
     throw HttpError.badRequest('Saldo iniziale fuori range.');
   }
 
+  // Il profilo dell'estratto conto dev'essere dell'utente: uno di un altro
+  // utente sarebbe un modo di leggergli i tracciati.
+  const profileId = int(data.bank_profile_id) || null;
+  if (profileId !== null
+      && !one('SELECT id FROM bank_profiles WHERE id = ? AND user_id = ? LIMIT 1', profileId, currentUserId())) {
+    throw HttpError.badRequest('Profilo banca non trovato.');
+  }
+
   return {
     name,
     type,
@@ -99,6 +107,7 @@ function validate(data) {
     opening_balance: value.toFixed(2),
     sort_order: int(data.sort_order, 0),
     is_default_cash: isDefaultCash,
+    bank_profile_id: profileId,
   };
 }
 
@@ -165,12 +174,13 @@ async function create(req, res) {
       const result = run(
         `INSERT INTO accounts
            (user_id, name, type, color, icon, opening_balance, sort_order,
-            iban, bic, bank_name, account_holder, account_number, notes, is_default_cash)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            iban, bic, bank_name, account_holder, account_number, notes, is_default_cash,
+            bank_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         userId, row.name, row.type, row.color, row.icon, row.opening_balance, row.sort_order,
         details.iban, details.bic, details.bank_name,
         details.account_holder, details.account_number, details.notes,
-        row.is_default_cash ? 1 : 0,
+        row.is_default_cash ? 1 : 0, row.bank_profile_id,
       );
       newId = Number(result.lastInsertRowid);
     } catch (err) {
@@ -201,12 +211,12 @@ async function update(req, res) {
         `UPDATE accounts
          SET name = ?, type = ?, color = ?, icon = ?, opening_balance = ?, sort_order = ?,
              archived = ?, iban = ?, bic = ?, bank_name = ?, account_holder = ?,
-             account_number = ?, notes = ?, is_default_cash = ?
+             account_number = ?, notes = ?, is_default_cash = ?, bank_profile_id = ?
          WHERE id = ? AND user_id = ?`,
         row.name, row.type, row.color, row.icon, row.opening_balance, row.sort_order,
         archived ? 1 : 0, details.iban, details.bic, details.bank_name,
         details.account_holder, details.account_number, details.notes,
-        row.is_default_cash ? 1 : 0, id, userId,
+        row.is_default_cash ? 1 : 0, row.bank_profile_id, id, userId,
       );
     } catch (err) {
       throw asConflict(err, row.name);

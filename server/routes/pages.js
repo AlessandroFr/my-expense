@@ -128,7 +128,9 @@ export const pageRoutes = {
     currentMonth: new Date().toISOString().slice(0, 7),
   })),
 
-  'GET /accounts': pagina('Conti', accountsPage),
+  'GET /accounts': pagina('Conti', accountsPage, (userId) => ({
+    bankProfiles: profiliBanca(userId),
+  })),
 
   'GET /bank-profiles': pagina('Profili banca', bankProfilesPage, (userId) => ({
     profiles: profiliBanca(userId),
