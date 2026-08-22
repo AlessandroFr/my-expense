@@ -452,6 +452,46 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
     </div>
 </div>
 
+<!-- Modal: versamento in uno o piu' piani di accumulo -->
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="pac-split-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-piggy-bank me-1"></i>Versamento in un piano di accumulo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Scrivi quanto di questa uscita va su ogni piano: le quote insieme devono
+                    fare l'importo del movimento. I piani che non c'entrano si lasciano vuoti.
+                    Il movimento non conta pi&ugrave; come spesa, ma resta con il suo importo.
+                </p>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div>
+                        <strong id="pac-split-amount">&mdash;</strong>
+                        <span class="text-muted">del <span id="pac-split-date">&mdash;</span></span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="pac-split-fill">
+                        <i class="bi bi-magic me-1"></i>Come dicono i piani
+                    </button>
+                </div>
+                <div class="small text-muted mb-3" id="pac-split-desc"></div>
+                <div id="pac-split-rows" class="d-flex flex-column gap-2"></div>
+                <div id="pac-split-residual" class="mt-2 small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto text-danger" id="pac-split-clear">
+                    <i class="bi bi-x-lg me-1"></i>Non &egrave; un versamento
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="pac-split-apply">
+                    <i class="bi bi-check-lg me-1"></i>Applica
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: edit spesa -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="expense-edit-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">

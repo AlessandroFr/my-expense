@@ -624,9 +624,16 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
     ${intestazione(SEZIONI[12])}    <p class="wiki-section-lead">Piani di Accumulo Capitale: <strong>versamenti periodici</strong> su fondi/ETF con tracking della performance media.</p>
     <ul>
         <li><strong>Fondi</strong>: anagrafica con storico NAV.</li>
-        <li><strong>Piani</strong>: importo, frequenza, data inizio/fine, toggle attivo / sospeso.</li>
-        <li><strong>Versamenti</strong>: generati automaticamente dai piani attivi (come le <a href="#ricorrenti">ricorrenti</a>) oppure manualmente.</li>
-        <li><strong>"Esegui tutti i versamenti scaduti"</strong>: bottone per allineare i piani in ritardo.</li>
+        <li><strong>Piani</strong>: importo, frequenza, data inizio/fine, toggle attivo / sospeso. Il piano dice
+            <em>quanto ci si aspetta</em> su ogni fondo, e serve a proporre la divisione: non crea versamenti da solo.</li>
+        <li><strong>Versamenti</strong>: si segnano sul movimento vero. In <code>/expenses</code>, dal menu della riga,
+            &laquo;Versamento PAC&raquo;; nell'import dell'estratto conto, con il bottone <i class="bi bi-piggy-bank"></i>
+            sulla riga.</li>
+        <li><strong>Un'uscita sola, pi&ugrave; fondi</strong>: i 500&nbsp;&euro; che partono dal conto si dividono in quote
+            (100 + 100 + 300&hellip;) su piani diversi. Le quote devono fare l'importo del movimento, al centesimo.</li>
+        <li>Segnato come versamento, il movimento <strong>non conta pi&ugrave; come spesa</strong> (diventa un
+            trasferimento verso il conto PAC) ma resta con la sua data e il suo importo. Per disfare: dalla scheda del
+            piano, il cestino sul versamento &mdash; la spesa torna in elenco.</li>
         <li><strong>KPI</strong>: patrimonio PAC, versamenti accumulati, performance media.</li>
     </ul>
 </section>

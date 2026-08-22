@@ -387,16 +387,19 @@ CREATE TABLE IF NOT EXISTS `pac_contributions` (
     `nav`                    NUMERIC,
     `units`                  NUMERIC,
     `transfer_id`            INTEGER,
+    `expense_id`             INTEGER,
     `source`                 TEXT COLLATE NOCASE NOT NULL DEFAULT 'manual' CHECK (`source` IN ('auto', 'manual', 'import')),
     `notes`                  TEXT COLLATE NOCASE,
     `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `uq_pac_contrib_plan_date` UNIQUE (`plan_id`, `contribution_date`),
     CONSTRAINT `fk_pac_contrib_plan` FOREIGN KEY (`plan_id`) REFERENCES `pac_plans` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_pac_contrib_transfer` FOREIGN KEY (`transfer_id`) REFERENCES `transfers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_pac_contrib_expense` FOREIGN KEY (`expense_id`) REFERENCES `expenses` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_pac_contrib_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS `ix_pac_contrib_transfer` ON `pac_contributions` (`transfer_id`);
+CREATE INDEX IF NOT EXISTS `ix_pac_contrib_expense` ON `pac_contributions` (`expense_id`);
 CREATE INDEX IF NOT EXISTS `ix_pac_contrib_user_date` ON `pac_contributions` (`user_id`, `contribution_date`);
 
 CREATE TABLE IF NOT EXISTS `pac_fund_navs` (

@@ -23,7 +23,6 @@ const fundForm   = document.getElementById('fund-create-form');
 const fundModal  = document.getElementById('fund-create-modal');
 const listEl     = document.getElementById('pac-plans-list');
 const kpiEl      = document.getElementById('pac-kpi');
-const runBtn     = document.getElementById('pac-run-pending');
 
 let pacAccounts    = [];
 let sourceAccounts = [];
@@ -137,9 +136,6 @@ function renderPlans() {
                 <td class="text-end">${p.current_value !== null ? escapeHtml(fmtMoney(p.current_value)) : '<span class="text-muted">—</span>'}</td>
                 <td class="text-end ${pnlCls}">${p.unrealized_pnl !== null ? escapeHtml(fmtMoney(p.unrealized_pnl)) : '<span class="text-muted">—</span>'}</td>
                 <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="run" data-id="${escapeAttr(p.id)}" title="Genera versamenti pendenti">
-                        <i class="bi bi-play-circle"></i>
-                    </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-action="toggle"
                             data-id="${escapeAttr(p.id)}" data-active="${Number(p.active) === 1 ? 0 : 1}">
                         <i class="bi bi-${Number(p.active) === 1 ? 'pause' : 'play'}-fill"></i>
@@ -186,17 +182,6 @@ listEl.addEventListener('click', async (ev) => {
     const plan = plans.find(x => String(x.id) === String(id));
     if (!plan) return;
 
-    if (btn.dataset.action === 'run') {
-        try {
-            const r = await send(`${BASE}/pac/plans/run`, { id });
-            toast.success(`Versamenti generati: ${r.data?.created ?? 0}.`);
-            await loadPlans();
-        } catch (err) {
-            toast.error(err.message ?? 'Errore generazione.');
-        }
-        return;
-    }
-
     if (btn.dataset.action === 'toggle') {
         try {
             await send(`${BASE}/pac/plans/toggle`, { id, active: btn.dataset.active });
@@ -220,16 +205,6 @@ listEl.addEventListener('click', async (ev) => {
         } catch (err) {
             toast.error(err.message ?? 'Errore eliminazione.');
         }
-    }
-});
-
-runBtn?.addEventListener('click', async () => {
-    try {
-        const r = await send(`${BASE}/pac/run-pending`, {});
-        toast.success(`Versamenti generati: ${r.data?.created ?? 0}.`);
-        await loadPlans();
-    } catch (err) {
-        toast.error(err.message ?? 'Errore generazione pendenti.');
     }
 });
 

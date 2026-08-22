@@ -9,7 +9,6 @@ import { HttpError, int, ok, str } from '../http.js';
 import { roundLikePhp, roundLikePhp as round2 } from '../amount.js';
 import { progressForMonth } from './budgets.js';
 import { holdingsForUser, holdingsByAssetClass } from './securities.js';
-import { generatePendingPac } from './pac.js';
 import { generatePending } from './recurring.js';
 
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -122,8 +121,9 @@ async function dashboardData(req, res) {
   const userId = currentUserId();
 
   // Le ricorrenze arretrate si materializzano qui, come faceva l'index PHP.
+  // I versamenti PAC no: si marcano sui movimenti dell'estratto conto, dove i
+  // soldi sono usciti davvero (routes/pac.js::setExpenseSplit).
   try { generatePending(userId); } catch { /* non deve bloccare la dashboard */ }
-  try { generatePendingPac(userId); } catch { /* idem */ }
 
   const fromIn = str(searchParams.get('from'));
   const toIn = str(searchParams.get('to'));

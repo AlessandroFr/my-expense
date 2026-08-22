@@ -20,6 +20,8 @@ import { parseMultipart } from '../multipart.js';
 import { explodeInstallments, validateSpec } from '../installments.js';
 import { splitCsvLine } from './csv.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
+import { plansForSplit, setExpenseSplit } from './pac.js';
+import { suggestShares } from '../pac-split.js';
 import { FIELD_LABELS, matchProfiles } from '../bank-profiles.js';
 import { findById as findProfile, listForUser as listProfiles } from './bank-profiles.js';
 import {
@@ -213,6 +215,10 @@ async function preview(req, res) {
   if (suggestPrepaidId === accountId) suggestPrepaidId = null;
   if (suggestCashId === accountId) suggestCashId = null;
 
+  // I piani di accumulo servono a proporre quali uscite sono in realta'
+  // versamenti: quelli sul conto che si sta importando non c'entrano.
+  const pacPlans = plansForSplit(userId).filter((p) => p.account_id !== accountId);
+
   const rows = [];
   const parseErrors = [];
   let emptyCnt = 0;
@@ -287,6 +293,9 @@ async function preview(req, res) {
         source: null,
         payment_method: null,
         dest_account_id: null,
+        // La divisione fra i piani, proposta ma mai imposta: la conferma la da'
+        // l'utente riga per riga (campo `pac` nel commit).
+        pac_suggested: kind === KIND_EXPENSE ? suggestShares(pacPlans, amount, descrizione) : null,
       };
 
       if (kind === KIND_TRANSFER_PAIR) row.dest_account_id = suggestPrepaidId;
@@ -399,6 +408,10 @@ async function preview(req, res) {
     profile_alternatives: alternative(esito, profilo),
     header_preview: headerPreview,
     profiles: tuttiProfili.map((p) => ({ id: p.id, name: p.name })),
+    pac_plans: pacPlans.map((p) => ({
+      id: p.id, name: p.name, amount: p.amount, fund_name: p.fund_name,
+      account_id: p.account_id, account_name: p.account_name,
+    })),
   });
 }
 
@@ -514,6 +527,21 @@ async function commit(req, res) {
     }
   }
 
+  // Le righe che l'utente ha marcato come versamento in un piano di accumulo:
+  // {row_idx, shares:[{plan_id, amount}]}. Restano fuori dalle righe perche'
+  // fuori sta gia' la rateizzazione, ed e' lo stesso genere di aggiunta.
+  const pacMap = new Map();
+  const pacRaw = str(body.pac_splits);
+  if (pacRaw !== '') {
+    let decoded;
+    try { decoded = JSON.parse(pacRaw); } catch { decoded = null; }
+    if (!Array.isArray(decoded)) throw HttpError.badRequest('Formato pac_splits non valido (JSON atteso).');
+    for (const entry of decoded) {
+      if (!entry || entry.row_idx === undefined || !Array.isArray(entry.shares)) continue;
+      pacMap.set(int(entry.row_idx), entry.shares);
+    }
+  }
+
   const existingHashes = loadExistingHashes(userId);
   let importedExp = 0;
   let importedInc = 0;
@@ -521,6 +549,7 @@ async function commit(req, res) {
   let dupCnt = 0;
   let skipUser = 0;
   let installmentsExp = 0;
+  let pacCnt = 0;
   const errors = [];
 
   let prepaidAccountId = null;
@@ -672,7 +701,13 @@ async function commit(req, res) {
           description: description !== '' ? description : null,
           payment, opDate, valueDate, hash, transferId: null,
         });
-        if (id === null) dupCnt++; else importedExp++;
+        if (id === null) { dupCnt++; continue; }
+        importedExp++;
+
+        // Se la riga era un versamento, la spesa appena scritta diventa la
+        // faccia in uscita del trasferimento verso il conto PAC.
+        const shares = pacMap.get(idx);
+        if (shares) pacCnt += setExpenseSplit(userId, id, shares, 'import');
         continue;
       }
 
@@ -702,6 +737,7 @@ async function commit(req, res) {
     skipped_duplicate: dupCnt,
     skipped_user: skipUser,
     installments_exploded: installmentsExp,
+    pac_contributions: pacCnt,
     errors,
   });
 }

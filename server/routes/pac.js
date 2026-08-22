@@ -1,16 +1,19 @@
-// Piani di accumulo — contratto identico a PacController + PacService.
+// Piani di accumulo.
 //
 // Un versamento non e' solo una riga in pac_contributions: e' anche un
 // trasferimento dal conto sorgente al conto PAC, con la spesa e l'entrata che
 // ne derivano. Tutto in una transazione, altrimenti i saldi non tornano.
 //
-// Resta a PHP il riconoscimento dei versamenti dentro l'estratto conto
-// (matchRowToPlan): appartiene all'importer bancario.
+// I versamenti non si generano piu' da soli dal piano: i soldi escono davvero
+// dal conto una volta sola, e quella volta si vede sull'estratto conto. Quindi
+// il punto di partenza e' il movimento importato, che viene marcato come
+// versamento e diviso fra i piani (setExpenseSplit). Il piano resta il modello
+// di quella divisione — importo, frequenza, fondo — e serve a proporla.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
-import { avanza } from './recurring.js';
+import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
+import { normalizeShares, sharesMismatch } from '../pac-split.js';
 import { riepilogo } from '../pac-performance.js';
 import { NavError, simboliDaIsin, storico } from '../nav-fetch.js';
 
@@ -25,17 +28,6 @@ const nullableInt = (raw) => {
   if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
   return int(raw);
 };
-
-/** Il PAC ha una frequenza in piu' rispetto alle spese ricorrenti. */
-function avanzaPac(dateStr, frequency) {
-  if (frequency === 'quarterly') {
-    let d = dateStr;
-    for (let i = 0; i < 3; i++) d = avanza(d, 'monthly');
-    return d;
-  }
-  if (!FREQUENCIES.includes(frequency)) throw HttpError.badRequest('Frequenza non valida.');
-  return avanza(dateStr, frequency);
-}
 
 // ─── Fondi ──────────────────────────────────────────────────────────────────
 
@@ -230,7 +222,7 @@ function normalizePlan(userId, data) {
 
 const CONTRIBUTION_SELECT = `
   SELECT c.id, c.user_id, c.plan_id, c.contribution_date, c.amount,
-         c.nav, c.units, c.transfer_id, c.source, c.notes, c.created_at,
+         c.nav, c.units, c.transfer_id, c.expense_id, c.source, c.notes, c.created_at,
          p.name AS plan_name, f.id AS fund_id, f.name AS fund_name
   FROM pac_contributions c
   INNER JOIN pac_plans p ON p.id = c.plan_id
@@ -245,6 +237,7 @@ const contributionToPublic = (r) => ({
   nav: r.nav === null || r.nav === undefined ? null : dec6(r.nav),
   units: r.units === null || r.units === undefined ? null : dec6(r.units),
   transfer_id: r.transfer_id ?? null,
+  expense_id: r.expense_id ?? null,
   source: r.source,
   notes: r.notes ?? null,
   created_at: r.created_at ?? null,
@@ -342,30 +335,143 @@ function createContributionAtomic(userId, plan, date, source, notes = null) {
   });
 }
 
-/** Materializza i versamenti arretrati di tutti i piani attivi. */
-export function generatePendingPac(userId) {
-  const plans = all(`${PLAN_SELECT} WHERE p.user_id = ? AND p.active = 1`, userId).map(planToPublic);
-  const today = oggi();
-  let created = 0;
+// ─── Una spesa divisa fra piu' piani ────────────────────────────────────────
 
-  for (const plan of plans) {
-    if (plan.source_account_id === null) continue;
+/** I piani attivi che possono ricevere quote, nell'ordine in cui si mostrano. */
+export function plansForSplit(userId) {
+  return all(`${PLAN_SELECT} WHERE p.user_id = ? AND p.active = 1 ORDER BY p.name ASC`, userId)
+    .map(planToPublic);
+}
 
-    let cursor = plan.last_generated_date === null
-      ? plan.start_date
-      : avanzaPac(plan.last_generated_date, plan.frequency);
-    let ultima = null;
+/** Le quote gia' registrate su una spesa: vuoto se non e' un versamento. */
+export function splitOfExpense(userId, expenseId) {
+  return all(
+    'SELECT plan_id, amount FROM pac_contributions WHERE user_id = ? AND expense_id = ? ORDER BY id ASC',
+    userId, expenseId,
+  ).map((r) => ({ plan_id: r.plan_id, amount: dec2(r.amount) }));
+}
 
-    while (cursor <= today && (plan.end_date === null || cursor <= plan.end_date)) {
-      if (createContributionAtomic(userId, plan, cursor, 'auto') !== null) created++;
-      ultima = cursor;
-      cursor = avanzaPac(cursor, plan.frequency);
-    }
-    if (ultima !== null) {
-      run('UPDATE pac_plans SET last_generated_date = ? WHERE id = ? AND user_id = ?', ultima, plan.id, userId);
-    }
+/**
+ * Disfa il versamento senza portarsi via la spesa.
+ *
+ * La spesa e' una riga vera dell'estratto conto: cancellarla vorrebbe dire
+ * perdere un movimento successo davvero. Quindi prima si stacca dal
+ * trasferimento (altrimenti la CASCADE se la porterebbe dietro), poi si toglie
+ * il trasferimento — e con lui l'entrata sul conto PAC e i versamenti.
+ * Da chiamare dentro una transazione.
+ */
+function clearSplitRows(userId, expense) {
+  run('DELETE FROM pac_contributions WHERE user_id = ? AND expense_id = ?', userId, expense.id);
+  if (expense.transfer_id === null) return;
+  run('UPDATE expenses SET is_transfer = 0, transfer_id = NULL WHERE id = ? AND user_id = ?', expense.id, userId);
+  run('DELETE FROM transfers WHERE id = ? AND user_id = ?', expense.transfer_id, userId);
+}
+
+/**
+ * Marca una spesa come versamento, diviso in quote fra i piani indicati.
+ *
+ * Con l'elenco vuoto la spesa torna una spesa normale. Ripassare quote nuove
+ * rifa' tutto da capo: e' l'unico modo per correggere una divisione sbagliata
+ * senza dover disfare a mano trasferimento, entrata e versamenti.
+ *
+ * Ritorna quante quote sono state scritte.
+ */
+export function setExpenseSplit(userId, expenseId, rawShares, source = 'manual') {
+  const expense = one(
+    `SELECT id, account_id, amount, expense_date, description, transfer_id
+     FROM expenses WHERE id = ? AND user_id = ? LIMIT 1`,
+    expenseId, userId,
+  );
+  if (!expense) throw HttpError.notFound('Spesa non trovata.');
+
+  let shares;
+  try {
+    shares = normalizeShares(rawShares);
+  } catch (err) {
+    throw HttpError.badRequest(err.message);
   }
-  return created;
+
+  if (shares.length === 0) {
+    transaction(() => clearSplitRows(userId, expense));
+    return 0;
+  }
+
+  const errore = sharesMismatch(shares, Number(expense.amount));
+  if (errore !== null) throw HttpError.badRequest(errore);
+
+  if (expense.account_id === null) {
+    throw HttpError.badRequest('Assegna un conto alla spesa prima di marcarla come versamento.');
+  }
+
+  const piani = shares.map((q) => {
+    const plan = findPlan(q.plan_id, userId);
+    if (!plan) throw HttpError.badRequest('Piano di accumulo non trovato.');
+    return { ...plan, share: q.amount };
+  });
+
+  // Il trasferimento ha una destinazione sola: quote su conti PAC diversi
+  // sarebbero due movimenti, non uno.
+  const conti = new Set(piani.map((p) => p.account_id));
+  if (conti.size > 1) {
+    throw HttpError.badRequest('Le quote devono andare su piani dello stesso conto PAC.');
+  }
+  const destinazione = piani[0].account_id;
+  if (destinazione === expense.account_id) {
+    throw HttpError.badRequest("Il conto della spesa e' lo stesso del conto PAC: non e' un versamento.");
+  }
+
+  const date = expense.expense_date;
+  const totale = roundLikePhp(Number(expense.amount));
+
+  return transaction(() => {
+    clearSplitRows(userId, expense);
+
+    const nomi = piani.map((p) => p.name).join(', ');
+    const t = run(
+      `INSERT INTO transfers
+         (user_id, source_account_id, destination_account_id, amount, transfer_date, description, notes)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+      userId, expense.account_id, destinazione, totale.toFixed(2), date,
+      `Versamento PAC — ${nomi}`.slice(0, 255),
+    );
+    const transferId = Number(t.lastInsertRowid);
+
+    // La spesa non sparisce e non cambia importo: diventa la faccia in uscita
+    // del trasferimento, cosi' smette di contare come spesa nei report.
+    run('UPDATE expenses SET is_transfer = 1, transfer_id = ? WHERE id = ? AND user_id = ?',
+      transferId, expense.id, userId);
+
+    const sorgente = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', expense.account_id, userId);
+    run(
+      `INSERT INTO incomes
+         (user_id, account_id, source, description, amount, payment_method,
+          income_date, is_transfer, transfer_id)
+       VALUES (?, ?, 'Trasferimento', ?, ?, 'transfer', ?, 1, ?)`,
+      userId, destinazione, `Versamento PAC da ${sorgente?.name ?? 'conto'} — ${nomi}`.slice(0, 255),
+      totale.toFixed(2), date, transferId,
+    );
+
+    for (const p of piani) {
+      const nav = navOnOrBefore(p.fund_id, date);
+      const units = nav !== null && nav > 0 ? p.share / nav : null;
+      try {
+        run(
+          `INSERT INTO pac_contributions
+             (user_id, plan_id, contribution_date, amount, nav, units, transfer_id, expense_id, source, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+          userId, p.id, date, p.share.toFixed(2),
+          nav !== null ? dec6(nav) : null, units !== null ? dec6(units) : null,
+          transferId, expense.id, source,
+        );
+      } catch (err) {
+        if (String(err.message).includes('UNIQUE')) {
+          throw HttpError.conflict(`Il piano «${p.name}» ha gia' un versamento in data ${date}.`);
+        }
+        throw err;
+      }
+    }
+    return piani.length;
+  });
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
@@ -571,42 +677,39 @@ async function deletePlan(req, res) {
   ok(res, { deleted: true, id });
 }
 
-async function runPlan(req, res) {
+/** I piani su cui si puo' dividere una spesa, con la divisione gia' presente. */
+async function getExpenseSplit(req, res) {
+  const { searchParams } = new URL(req.url, 'http://localhost');
+  const userId = currentUserId();
+
+  const expenseId = int(searchParams.get('expense_id'));
+  if (expenseId <= 0) throw HttpError.badRequest('ID spesa mancante.');
+
+  ok(res, {
+    plans: plansForSplit(userId).map((p) => ({
+      id: p.id, name: p.name, amount: p.amount, fund_name: p.fund_name,
+      account_id: p.account_id, account_name: p.account_name,
+    })),
+    shares: splitOfExpense(userId, expenseId),
+  });
+}
+
+/** Marca (o smarca, con l'elenco vuoto) una spesa come versamento nei piani. */
+async function saveExpenseSplit(req, res) {
   const body = await readBody(req);
   assertCsrf(req, body);
   const userId = currentUserId();
 
-  const id = int(body.id);
-  const plan = id > 0 ? findPlan(id, userId) : null;
-  if (!plan) throw HttpError.notFound('Piano non trovato.');
-  if (!plan.active) throw HttpError.badRequest("Il piano e' disattivato.");
-  if (plan.source_account_id === null) {
-    throw HttpError.badRequest('Imposta il conto sorgente sul piano prima di generare.');
+  const expenseId = int(body.expense_id);
+  if (expenseId <= 0) throw HttpError.badRequest('ID spesa mancante.');
+
+  let shares = body.shares;
+  if (typeof shares === 'string') {
+    try { shares = JSON.parse(shares); } catch { throw HttpError.badRequest('Formato quote non valido (JSON atteso).'); }
   }
 
-  const today = oggi();
-  let cursor = plan.last_generated_date === null
-    ? plan.start_date
-    : avanzaPac(plan.last_generated_date, plan.frequency);
-  let created = 0;
-  let ultima = null;
-
-  while (cursor <= today && (plan.end_date === null || cursor <= plan.end_date)) {
-    if (createContributionAtomic(userId, plan, cursor, 'auto') !== null) created++;
-    ultima = cursor;
-    cursor = avanzaPac(cursor, plan.frequency);
-  }
-  if (ultima !== null) {
-    run('UPDATE pac_plans SET last_generated_date = ? WHERE id = ? AND user_id = ?', ultima, plan.id, userId);
-  }
-
-  ok(res, { created });
-}
-
-async function runPending(req, res) {
-  const body = await readBody(req);
-  assertCsrf(req, body);
-  ok(res, { created: generatePendingPac(currentUserId()) });
+  const contributions = setExpenseSplit(userId, expenseId, shares ?? []);
+  ok(res, { expense_id: expenseId, contributions, shares: splitOfExpense(userId, expenseId) });
 }
 
 async function listContributions(req, res) {
@@ -805,8 +908,20 @@ async function deleteContribution(req, res) {
   const id = int(body.id);
   if (id <= 0) throw HttpError.badRequest('ID versamento mancante.');
 
-  const row = one('SELECT transfer_id FROM pac_contributions WHERE id = ? AND user_id = ?', id, userId);
+  const row = one('SELECT transfer_id, expense_id FROM pac_contributions WHERE id = ? AND user_id = ?', id, userId);
   if (!row) throw HttpError.notFound('Versamento non trovato.');
+
+  // Se il versamento arriva da un movimento vero, si disfa tutta la divisione
+  // di quel movimento e la spesa torna in elenco: cancellare la riga da sola
+  // lascerebbe sul conto PAC dei soldi che nessun piano dichiara piu'.
+  if (row.expense_id !== null) {
+    const expense = one('SELECT id, transfer_id FROM expenses WHERE id = ? AND user_id = ?', row.expense_id, userId);
+    if (expense) {
+      transaction(() => clearSplitRows(userId, expense));
+      ok(res, { deleted: true, id, restored_expense_id: expense.id });
+      return;
+    }
+  }
 
   transaction(() => {
     run('DELETE FROM pac_contributions WHERE id = ? AND user_id = ?', id, userId);
@@ -817,7 +932,7 @@ async function deleteContribution(req, res) {
     }
   });
 
-  ok(res, { deleted: true, id });
+  ok(res, { deleted: true, id, restored_expense_id: null });
 }
 
 export const pacRoutes = {
@@ -834,10 +949,10 @@ export const pacRoutes = {
   'POST /pac/plans/update': updatePlan,
   'POST /pac/plans/toggle': togglePlan,
   'POST /pac/plans/delete': deletePlan,
-  'POST /pac/plans/run': runPlan,
   'GET /pac/contributions': listContributions,
   'GET /pac/plans/performance': performance,
   'POST /pac/contributions/create': createContribution,
   'POST /pac/contributions/delete': deleteContribution,
-  'POST /pac/run-pending': runPending,
+  'GET /pac/expense-split': getExpenseSplit,
+  'POST /pac/expense-split': saveExpenseSplit,
 };

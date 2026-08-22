@@ -7,12 +7,11 @@ export const render = ({ csrfToken }) => {
     <div class="col-12 d-flex flex-wrap align-items-center gap-2">
         <div>
             <h1 class="h3 mb-0"><i class="bi bi-piggy-bank me-2"></i>Piani di Accumulo</h1>
-            <div class="text-muted small">Versamenti periodici verso fondi/ETF su un conto PAC.</div>
-        </div>
-        <div class="ms-auto">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="pac-run-pending">
-                <i class="bi bi-play-circle me-1"></i>Genera versamenti pendenti
-            </button>
+            <div class="text-muted small">
+                Versamenti verso fondi/ETF su un conto PAC. I versamenti si segnano
+                sui movimenti: in <a href="/expenses">Spese</a>, dal menu della riga,
+                &laquo;Versamento PAC&raquo;.
+            </div>
         </div>
     </div>
 </div>

@@ -7,6 +7,7 @@ import { toast }             from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 import { renderPager }       from '../pager.js';
+import { openPacSplit, wirePacSplitModal } from '../pac-split.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -279,6 +280,7 @@ function renderViewRow(e) {
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                     <li><button type="button" class="dropdown-item" data-action="edit"><i class="bi bi-pencil me-2"></i>Modifica</button></li>
                     <li><button type="button" class="dropdown-item" data-action="attach"><i class="bi bi-paperclip me-2"></i>Allegati</button></li>
+                    <li><button type="button" class="dropdown-item" data-action="pac"><i class="bi bi-piggy-bank me-2"></i>Versamento PAC…</button></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><button type="button" class="dropdown-item text-danger" data-action="delete"><i class="bi bi-trash me-2"></i>Elimina</button></li>
                 </ul>
@@ -726,6 +728,52 @@ function wireCreateForm() {
     });
 }
 
+/**
+ * «Questa uscita e' in realta' un versamento nei piani».
+ *
+ * Applicata, la spesa smette di essere una spesa e passa fra i trasferimenti:
+ * sparisce dall'elenco, ed e' il motivo per cui la riga si toglie a mano invece
+ * di ricaricare tutto.
+ */
+async function openPacSplitForExpense(tr) {
+    const e = tr.dataset.expense ? JSON.parse(tr.dataset.expense) : {};
+    let d;
+    try {
+        const r = await apiGuard(api.get(`${BASE}/pac/expense-split`, { expense_id: tr.dataset.id }));
+        d = r.data ?? {};
+    } catch (err) {
+        toast.error(err.message ?? 'Errore lettura piani.');
+        return;
+    }
+    if (!(d.plans ?? []).length) {
+        toast.warning('Non c\'e\' nessun piano di accumulo attivo su cui versare.');
+        return;
+    }
+
+    openPacSplit({
+        amount: e.amount,
+        date: fmtDate(e.expense_date),
+        description: htmlToPlain(e.description ?? ''),
+        plans: d.plans,
+        shares: d.shares ?? [],
+        onApply: async (shares) => {
+            const params = new URLSearchParams();
+            params.set('expense_id', tr.dataset.id);
+            params.set('shares', JSON.stringify(shares));
+            params.set('_csrf', getCsrfToken());
+            await send(`${BASE}/pac/expense-split`, params);
+            if (shares.length > 0) {
+                removeDetailSibling(tr);
+                tr.remove();
+                updateTotalFromTable();
+                toast.success(`Versamento registrato su ${shares.length} ${shares.length === 1 ? 'piano' : 'piani'}.`);
+            } else {
+                toast.success('La spesa non e\' piu\' un versamento.');
+            }
+        },
+    });
+}
+
 function wireTableActions() {
     const tbody = document.getElementById('expenses-tbody');
     if (!tbody) return;
@@ -754,6 +802,11 @@ function wireTableActions() {
 
         if (action === 'attach') {
             openAttachmentsModal(tr.dataset.id);
+            return;
+        }
+
+        if (action === 'pac') {
+            await openPacSplitForExpense(tr);
             return;
         }
 
@@ -976,6 +1029,7 @@ let bankPreviewState = {
     rows: [],
     categories: [],
     accounts: [],
+    pac_plans: [],
     destSuggestions: { transfer_pair: null, atm_pair: null },
     page: 1,
 };
@@ -1025,6 +1079,10 @@ function bankRenderRow(r) {
     const kindBadge = `<span class="badge ${BANK_KIND_BADGE[r.kind] ?? 'bg-secondary'}">${escHtml(BANK_KIND_LABEL[r.kind] ?? r.kind)}</span>`;
     const installmentBadgeHtml = (r.installment && Number(r.installment.count) >= 2)
         ? `<span class="badge bg-info text-dark ms-1" title="Verra' suddivisa in ${Number(r.installment.count)} rate al commit">→ ${Number(r.installment.count)} rate</span>`
+        : '';
+    const pacBadgeHtml = (r.pac && r.pac.length > 0)
+        ? `<span class="badge bg-primary ms-1" title="Al commit diventa un versamento diviso su ${r.pac.length} piani">
+               <i class="bi bi-piggy-bank me-1"></i>${r.pac.length === 1 ? 'versamento PAC' : `${r.pac.length} quote PAC`}</span>`
         : '';
 
     // Importo grande, segnato e colorato in base al kind
@@ -1085,6 +1143,15 @@ function bankRenderRow(r) {
               <i class="bi bi-card-list"></i>
           </button>`;
 
+    // Il bottone del versamento c'e' solo se esiste un piano su cui versare.
+    const pacBtn = (canInstallment && (bankPreviewState.pac_plans ?? []).length > 0)
+        ? `<button type="button" class="btn btn-sm ${(r.pac && r.pac.length) ? 'btn-primary' : 'btn-outline-secondary'} py-0 px-2"
+                  data-bank-action="pac"
+                  title="${(r.pac && r.pac.length) ? 'Modifica le quote del versamento' : "E' un versamento in un piano di accumulo"}">
+              <i class="bi bi-piggy-bank"></i>
+          </button>`
+        : '';
+
     return `<div data-idx="${r.idx}" class="card ${r.skip ? 'opacity-50 bg-body-tertiary' : 'shadow-sm'} bank-row-card">
         <div class="card-body py-2 px-3">
             <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
@@ -1092,11 +1159,13 @@ function bankRenderRow(r) {
                 ${kindBadge}
                 ${dupBadge}
                 ${installmentBadgeHtml}
+                ${pacBadgeHtml}
                 <span class="text-muted small text-nowrap">
                     <i class="bi bi-calendar3 me-1"></i>${escHtml(fmtDate(r.op_date ?? ''))}
                     ${r.value_date ? `<span class="ms-2"><i class="bi bi-calendar-check"></i> val. ${escHtml(fmtDate(r.value_date))}</span>` : ''}
                 </span>
                 ${installmentBtn}
+                ${pacBtn}
                 <div class="ms-auto fw-semibold ${amountClass}" style="font-size:1.15rem;">
                     ${amountSign} € ${amountFmt}
                 </div>
@@ -1550,8 +1619,12 @@ function wireBankImport() {
                 contact_name: r.contact_name ?? r.contact_suggested_name ?? '',
                 dest_account_id: r.dest_account_id ?? null,
                 installment: null, // {count, frequency, custom_days?} se l'utente rateizza la riga
+                // La divisione fra i piani di accumulo: proposta dal server,
+                // ma modificabile riga per riga prima di confermare.
+                pac: r.pac_suggested ?? null,
             }));
             bankPreviewState.categories      = d.categories ?? [];
+            bankPreviewState.pac_plans       = d.pac_plans ?? [];
             bankPreviewState.accounts        = d.accounts ?? [];
             bankPreviewState.destSuggestions = d.dest_suggestions ?? { transfer_pair: null, atm_pair: null };
             bankPreviewState.page            = 1;
@@ -1616,6 +1689,7 @@ function wireBankImport() {
                 // Pair kinds non sono rateizzabili: scarto eventuale
                 // installment impostato da kind precedente.
                 r.installment = null;
+                r.pac = null;
                 // Seed del conto destinazione col suggerimento globale
                 // SOLO se la riga non ne ha gia' uno (es. l'utente sta
                 // appena passando da expense a transfer_pair).
@@ -1628,7 +1702,7 @@ function wireBankImport() {
             }
             // Income kinds non sono rateizzabili lato UI: scarto installment
             // se l'utente ha cambiato da expense a income.
-            if (r.kind === 'income') r.installment = null;
+            if (r.kind === 'income') { r.installment = null; r.pac = null; }
             // Re-render solo la riga interessata mantenendo posizione in pagina.
             tr.outerHTML = bankRenderRow(r);
             return;
@@ -1658,6 +1732,30 @@ function wireBankImport() {
         // essere stati editati): la modale lavora su quei valori aggiornati.
         bankSyncRowFromTr(tr);
         bankInstallmentOpen(Number(tr.dataset.idx));
+    });
+
+    // Bottone "Versamento PAC" per riga: la divisione resta nella riga e viene
+    // scritta solo al commit, come la rateizzazione.
+    tbody?.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-bank-action="pac"]');
+        if (!btn || btn.disabled) return;
+        const tr = btn.closest('[data-idx]');
+        if (!tr) return;
+        const row = bankSyncRowFromTr(tr);
+        if (!row) return;
+        openPacSplit({
+            amount: row.amount,
+            date: fmtDate(row.op_date ?? ''),
+            description: row.description ?? '',
+            plans: bankPreviewState.pac_plans ?? [],
+            shares: row.pac ?? [],
+            onApply: async (shares) => {
+                row.pac = shares.length > 0 ? shares : null;
+                // Un versamento non e' anche una rata: le due cose si escludono.
+                if (row.pac) row.installment = null;
+                bankRenderRows();
+            },
+        });
     });
 
     // Modale rateizzazione: handler.
@@ -1760,6 +1858,14 @@ function wireBankImport() {
             if (installments.length > 0) {
                 fd.append('installments', JSON.stringify(installments));
             }
+            // Versamenti PAC: {row_idx, shares:[{plan_id, amount}]}. La spesa
+            // viene scritta come sempre e poi marcata come versamento.
+            const pacSplits = rows
+                .filter(r => Array.isArray(r.pac) && r.pac.length > 0 && r.kind === 'expense' && !r.skip)
+                .map(r => ({ row_idx: r.idx, shares: r.pac }));
+            if (pacSplits.length > 0) {
+                fd.append('pac_splits', JSON.stringify(pacSplits));
+            }
             const r = await fetch(`${BASE}/import/bank-statement/commit`, {
                 method: 'POST',
                 body: fd,
@@ -1772,10 +1878,13 @@ function wireBankImport() {
             const explodedLine = d.installments_exploded
                 ? `<br>Espanse <strong>${d.installments_exploded}</strong> rate da righe rateizzate.`
                 : '';
+            const pacLine = d.pac_contributions
+                ? `<br>Registrate <strong>${d.pac_contributions}</strong> quote sui piani di accumulo.`
+                : '';
             let html = `<div class="alert alert-success small mb-2">
                 <strong>${d.imported_expenses}</strong> spese, <strong>${d.imported_incomes}</strong> entrate importate.<br>
                 <strong>${d.transfers_paired}</strong> ricariche con partita doppia.
-                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_user}</strong> deselezionate dall'utente.${explodedLine}
+                Saltate <strong>${d.skipped_duplicate}</strong> duplicate, <strong>${d.skipped_user}</strong> deselezionate dall'utente.${explodedLine}${pacLine}
             </div>`;
             if (errs.length) {
                 html += `<div class="small text-muted">Errori (${(d.errors ?? []).length}):</div>
@@ -1928,6 +2037,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireTableActions();
     wireCsvButtons();
     wireBankImport();
+    wirePacSplitModal();
     wireOcr();
     loadTags();
     loadSavedFilters();

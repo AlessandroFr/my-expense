@@ -20,7 +20,6 @@ const contribForm = document.getElementById('contribution-create-form');
 const navForm     = document.getElementById('nav-update-form');
 const contribsEl  = document.getElementById('contributions-list');
 const navHistEl   = document.getElementById('nav-history');
-const runNowBtn   = document.getElementById('plan-run-now');
 
 let contributions = [];
 
@@ -279,14 +278,21 @@ contribsEl.addEventListener('click', async (ev) => {
     const id = btn.dataset.id;
     const c = contributions.find(x => String(x.id) === String(id));
     if (!c) return;
+    // Se il versamento arriva da un movimento, si disfa tutta la divisione di
+    // quel movimento: la spesa torna in elenco, con il suo importo intero.
+    const messaggio = c.expense_id !== null
+        ? `Il versamento del ${c.contribution_date} (${fmtMoney(c.amount)}) arriva da una spesa. `
+          + 'Togliendolo, la spesa torna fra le spese con il suo importo intero, '
+          + 'e spariscono anche le quote sugli altri piani dello stesso movimento.'
+        : `Eliminare il versamento del ${c.contribution_date} (${fmtMoney(c.amount)})? Il Transfer collegato verra' rimosso.`;
     const ok = await confirmDialog(
-        `Eliminare il versamento del ${c.contribution_date} (${fmtMoney(c.amount)})? Il Transfer collegato verra' rimosso.`,
-        { confirmText: 'Elimina', confirmClass: 'btn-danger' }
+        messaggio,
+        { confirmText: c.expense_id !== null ? 'Togli' : 'Elimina', confirmClass: 'btn-danger' }
     );
     if (!ok) return;
     try {
-        await send(`${BASE}/pac/contributions/delete`, { id });
-        toast.success('Versamento eliminato.');
+        const r = await send(`${BASE}/pac/contributions/delete`, { id });
+        toast.success(r.data?.restored_expense_id ? 'Versamento tolto: la spesa e\' tornata in elenco.' : 'Versamento eliminato.');
         await loadContributions();
     } catch (err) {
         toast.error(err.message ?? 'Errore eliminazione.');
@@ -305,16 +311,6 @@ navHistEl.addEventListener('click', async (ev) => {
         await loadNavHistory();
     } catch (err) {
         toast.error(err.message ?? 'Errore eliminazione.');
-    }
-});
-
-runNowBtn?.addEventListener('click', async () => {
-    try {
-        const r = await send(`${BASE}/pac/plans/run`, { id: PLAN.id });
-        toast.success(`Versamenti generati: ${r.data?.created ?? 0}.`);
-        await loadContributions();
-    } catch (err) {
-        toast.error(err.message ?? 'Errore generazione.');
     }
 });
 

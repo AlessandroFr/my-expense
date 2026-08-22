@@ -16,11 +16,9 @@ export const render = ({ csrfToken, plan, freqLabel }) => {
                 ` : ``}                ${(plan.active === 0) ? `                    · <span class="badge bg-secondary">disattivato</span>
                 ` : ``}            </div>
         </div>
-        <div class="ms-auto">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="plan-run-now"
-                    data-id="${plan.id}">
-                <i class="bi bi-play-circle me-1"></i>Genera ora
-            </button>
+        <div class="ms-auto text-end small text-muted" style="max-width:22rem">
+            I versamenti si segnano sul movimento: in
+            <a href="/expenses">Spese</a>, dal menu della riga, &laquo;Versamento PAC&raquo;.
         </div>
     </div>
 </div>

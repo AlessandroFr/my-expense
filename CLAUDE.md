@@ -67,6 +67,7 @@ npm run dist       # crea l'installer in dist\
 | `server/bank-profiles.js` | Il tracciato di ogni banca e il suo riconoscimento |
 | `server/contact-dedup.js` | Quali anagrafiche sono la stessa cosa scritta in due modi |
 | `server/pac-performance.js` | Andamento e rendimento di un piano di accumulo |
+| `server/pac-split.js` | Come una spesa sola si divide in quote fra piu' piani |
 | `server/nav-fetch.js` | Le quotazioni dei fondi prese da Internet |
 | `public/js/` | Il frontend, un modulo per pagina |
 | `public/js/modal-guard.js` | Le finestre non si chiudono per sbaglio e non perdono quel che c'era scritto |
@@ -189,6 +190,27 @@ stesso, ma chi legge deve saperlo.
 entrati, e da solo non sale mai. `accounts.withBalances` aggiunge
 `market_value`/`market_gain` per i conti che ospitano un piano — `null` per
 tutti gli altri, dove non significherebbero niente.
+
+**I versamenti PAC non si generano da soli: si segnano sui movimenti.** I soldi
+escono dal conto una volta sola, e quella volta si vede sull'estratto conto:
+generarli anche dal piano voleva dire contarli due volte. Quindi il punto di
+partenza è la spesa importata, che si marca come versamento — dall'elenco spese
+o dall'anteprima dell'import — e si divide in quote fra i piani
+(`routes/pac.js::setExpenseSplit`, conto della divisione in `pac-split.js`, che
+è puro e testato). Il piano resta il *modello* di quella divisione: importo,
+frequenza e fondo servono a proporla (`suggestShares` propone solo se gli
+importi dei piani fanno esattamente quello del movimento — una divisione
+inventata in mezzo a dei soldi è peggio di nessuna divisione).
+
+Segnata, la spesa **diventa la faccia in uscita di un trasferimento** verso il
+conto PAC (`is_transfer = 1`, quindi sparisce dall'elenco spese e dai totali) ma
+non cambia importo né data, e non viene mai ricreata: è una riga vera
+dell'estratto. Per questo `clearSplitRows` la stacca **prima** di cancellare il
+trasferimento — la `CASCADE` se la porterebbe dietro — e per questo il cestino
+su un versamento con `expense_id` disfa tutta la divisione invece di cancellare
+la riga da sola: sul conto PAC resterebbero soldi che nessun piano dichiara.
+`expense_id` (migration `0004`) è la differenza fra un versamento nato da un
+movimento vero e quelli che il piano si generava da solo.
 
 **Gli importi sono float.** SQLite non ha un tipo decimale. Ogni aggregazione va
 arrotondata, e gli arrotondamenti passano da `roundLikePhp` in `amount.js`:
