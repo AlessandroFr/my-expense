@@ -7,6 +7,7 @@
 import { all, one, run, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, str } from '../http.js';
 import { parseMultipart } from '../multipart.js';
+import { nextColor } from './categories.js';
 
 const HEADERS = ['Data', 'Categoria', 'Descrizione', 'Importo', 'Pagamento'];
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
@@ -207,7 +208,7 @@ async function importCsv(req, res) {
         } else if (createMissing) {
           const r = run(
             'INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, NULL, 0)',
-            userId, catName, '#6c757d',
+            userId, catName, nextColor(userId),
           );
           categoryId = Number(r.lastInsertRowid);
           catCache.set(key, categoryId);

@@ -20,7 +20,7 @@ import { parseMultipart } from '../multipart.js';
 import { explodeInstallments, validateSpec } from '../installments.js';
 import { splitCsvLine } from './csv.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
-import { transfersCategoryId } from './categories.js';
+import { nextColor, transfersCategoryId } from './categories.js';
 import { plansForSplit, setExpenseSplit } from './pac.js';
 import { suggestShares } from '../pac-split.js';
 import { FIELD_LABELS, matchProfiles } from '../bank-profiles.js';
@@ -189,12 +189,13 @@ async function preview(req, res) {
   const ensureCategory = (name) => {
     const key = name.toLowerCase();
     if (catByName.has(key)) return catByName.get(key);
+    const color = nextColor(userId);
     const r = run(
       'INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, NULL, 0)',
-      userId, name, '#6c757d',
+      userId, name, color,
     );
     const id = Number(r.lastInsertRowid);
-    categories.push({ id, name, color: '#6c757d' });
+    categories.push({ id, name, color });
     catByName.set(key, id);
     return id;
   };

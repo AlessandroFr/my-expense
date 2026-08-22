@@ -9,6 +9,36 @@ const COLUMNS = 'id, user_id, name, color, icon, sort_order, created_at, updated
 
 export const TRANSFERS_CATEGORY = 'Trasferimento';
 
+/** Il grigio delle categorie di sistema, quelle che nei grafici non entrano. */
+export const NEUTRAL_COLOR = '#6c757d';
+
+/**
+ * I colori delle categorie, in ordine di assegnazione.
+ *
+ * Sono dodici, scelti perche' si distinguano l'uno dall'altro anche accostati
+ * in una fetta di torta e anche da chi confonde rosso e verde: quindi niente
+ * due tonalita' vicine di seguito. Il grigio non c'e' apposta, e' quello delle
+ * categorie di sistema.
+ */
+const PALETTE = [
+  '#0d6efd', '#fd7e14', '#20c997', '#d63384', '#6610f2', '#ffc107',
+  '#0dcaf0', '#dc3545', '#198754', '#6f42c1', '#795548', '#e83e8c',
+];
+
+/**
+ * Il colore per la prossima categoria: si va avanti nella tavolozza e si
+ * ricomincia da capo quando finisce.
+ *
+ * Il conto delle categorie che ci sono gia' basta: cosi' due create una dopo
+ * l'altra non escono mai dello stesso colore, che era il difetto di sceglierlo
+ * dal nome. Con piu' di dodici categorie i colori si ripetono, ma mai vicini
+ * nella lista.
+ */
+export function nextColor(userId) {
+  const n = one('SELECT COUNT(*) AS n FROM categories WHERE user_id = ?', userId)?.n ?? 0;
+  return PALETTE[n % PALETTE.length];
+}
+
 /** Stesso ordinamento di CategoryRepository::listForUser. */
 export const listForUser = (userId) =>
   all(`SELECT ${COLUMNS} FROM categories WHERE user_id = ? ORDER BY sort_order ASC, name ASC`, userId);
@@ -29,19 +59,24 @@ export function transfersCategoryId(userId) {
   if (existing) return existing.id;
   const res = run(
     'INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)',
-    userId, TRANSFERS_CATEGORY, '#6c757d', 'arrow-left-right', 100,
+    userId, TRANSFERS_CATEGORY, NEUTRAL_COLOR, 'arrow-left-right', 100,
   );
   return Number(res.lastInsertRowid);
 }
 
-/** Traduce CategoryService::normalize, messaggi d'errore compresi. */
-export function normalize(data) {
+/**
+ * Traduce CategoryService::normalize, messaggi d'errore compresi.
+ *
+ * `fallback` e' il colore da usare quando il form non ne manda uno: chi crea
+ * passa il prossimo della tavolozza, chi modifica passa quello che c'era.
+ */
+export function normalize(data, fallback = NEUTRAL_COLOR) {
   const name = str(data.name);
   if (name === '' || [...name].length > 64) {
     throw HttpError.badRequest("Il nome e' obbligatorio (max 64 caratteri).");
   }
 
-  let color = str(data.color) || '#6c757d';
+  let color = str(data.color) || fallback;
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
     throw HttpError.badRequest('Colore non valido. Usa un hex tipo #0d6efd.');
   }
@@ -76,7 +111,7 @@ async function create(req, res) {
   const body = await readBody(req);
   assertCsrf(req, body);
   const userId = currentUserId();
-  const id = insert(userId, normalize(body));
+  const id = insert(userId, normalize(body, nextColor(userId)));
   ok(res, { category: findById(id, userId) });
 }
 
@@ -86,9 +121,11 @@ async function update(req, res) {
   const userId = currentUserId();
 
   const id = int(body.id);
-  if (id <= 0 || !findById(id, userId)) throw HttpError.notFound('Categoria non trovata.');
+  const esistente = id > 0 ? findById(id, userId) : null;
+  if (!esistente) throw HttpError.notFound('Categoria non trovata.');
 
-  const row = normalize(body);
+  // Senza colore nel form si tiene quello che aveva, non si torna al grigio.
+  const row = normalize(body, esistente.color);
   try {
     run(
       'UPDATE categories SET name = ?, color = ?, icon = ?, sort_order = ? WHERE id = ? AND user_id = ?',
