@@ -1370,13 +1370,13 @@ function bankRenderProfile(d, onCambia) {
     const ignorate = (d.header_preview ?? []).filter(h => !h.field).map(h => h.column).filter(Boolean);
     const alternative = d.profile_alternatives ?? [];
 
-    const colonne = mappate.map(h => `
+    const columns = mappate.map(h => `
         <span class="badge bg-light text-dark border me-1 mb-1">
             ${escHtml(h.column)} <i class="bi bi-arrow-right mx-1 text-muted"></i>
             <strong>${escHtml(h.field_label)}</strong>
         </span>`).join('');
 
-    const scelta = (d.profiles ?? []).map(o =>
+    const choice = (d.profiles ?? []).map(o =>
         `<option value="${o.id}"${o.id === p.id ? ' selected' : ''}>${escHtml(o.name)}</option>`).join('');
 
     box.innerHTML = `
@@ -1394,10 +1394,10 @@ function bankRenderProfile(d, onCambia) {
                 </span>
                 <span class="ms-auto d-flex align-items-center gap-1">
                     <label class="text-muted" for="bank-profile-switch">Non è lei?</label>
-                    <select id="bank-profile-switch" class="form-select form-select-sm" style="width:auto">${scelta}</select>
+                    <select id="bank-profile-switch" class="form-select form-select-sm" style="width:auto">${choice}</select>
                 </span>
             </div>
-            <div>${colonne}</div>
+            <div>${columns}</div>
             ${ignorate.length ? `<div class="text-muted mt-1">Colonne del file non usate: ${escHtml(ignorate.join(', '))}.</div>` : ''}
             ${alternative.length ? `<div class="text-muted mt-1">
                 Queste stesse colonne le leggerebbero anche

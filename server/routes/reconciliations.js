@@ -31,8 +31,8 @@ function parseAmount(raw) {
 }
 
 const balanceFor = (userId, accountId) => {
-  const conto = withBalances(userId, true).find((a) => a.id === accountId);
-  return conto ? conto.balance : 0;
+  const account = withBalances(userId, true).find((a) => a.id === accountId);
+  return account ? account.balance : 0;
 };
 
 const adjustmentCategoryId = (userId) => {
@@ -75,7 +75,7 @@ async function reconcile(req, res) {
 
   const calculated = balanceFor(userId, accountId);
   const difference = roundLikePhp(declared - calculated, 2);
-  const descrizione = notes ? `Rettifica da riconciliazione — ${notes}` : 'Rettifica da riconciliazione';
+  const description = notes ? `Rettifica da riconciliazione — ${notes}` : 'Rettifica da riconciliazione';
 
   const row = transaction(() => {
     let adjustmentType = 'none';
@@ -87,7 +87,7 @@ async function reconcile(req, res) {
       const r = run(
         `INSERT INTO incomes (user_id, account_id, source, description, amount, income_date)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        userId, accountId, ADJUSTMENT_LABEL, descrizione, Math.abs(difference).toFixed(2), reconciledAt,
+        userId, accountId, ADJUSTMENT_LABEL, description, Math.abs(difference).toFixed(2), reconciledAt,
       );
       incomeId = Number(r.lastInsertRowid);
       adjustmentType = 'income';
@@ -97,7 +97,7 @@ async function reconcile(req, res) {
            (user_id, category_id, account_id, amount, description, payment_method, expense_date)
          VALUES (?, ?, ?, ?, ?, 'other', ?)`,
         userId, adjustmentCategoryId(userId), accountId,
-        Math.abs(difference).toFixed(2), descrizione, reconciledAt,
+        Math.abs(difference).toFixed(2), description, reconciledAt,
       );
       expenseId = Number(r.lastInsertRowid);
       adjustmentType = 'expense';

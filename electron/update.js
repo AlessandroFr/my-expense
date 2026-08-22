@@ -23,10 +23,10 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Dove `npm run dist` lascia gli installer. MY_EXPENSE_UPDATE_DIR ha la precedenza. */
-const cartellaPredefinita = 'C:\\dev\\my-expense\\dist';
+const defaultFolder = 'C:\\dev\\my-expense\\dist';
 
 /** Il nome che electron-builder da' agli installer (`artifactName` in package.json). */
-const NOME_INSTALLER = /^MyExpense-Setup-(\d+(?:\.\d+)*)\.exe$/;
+const INSTALLER_NAME = /^MyExpense-Setup-(\d+(?:\.\d+)*)\.exe$/;
 
 /** Confronta due versioni tipo `1.2.10`: maggiore di zero se `a` e' piu' recente di `b`. */
 export function compareVersions(a, b) {
@@ -44,16 +44,16 @@ export function compareVersions(a, b) {
  * versione corrente. Gli installer vecchi restano nella cartella e vengono
  * semplicemente ignorati, non c'e' niente da ripulire.
  */
-export function newestInstaller(nomi, versioneCorrente) {
-  let scelto = null;
-  for (const nome of nomi) {
-    const trovato = NOME_INSTALLER.exec(nome);
-    if (!trovato) continue;
-    const versione = trovato[1];
-    if (compareVersions(versione, versioneCorrente) <= 0) continue;
-    if (!scelto || compareVersions(versione, scelto.versione) > 0) scelto = { nome, versione };
+export function newestInstaller(names, currentVersion) {
+  let chosen = null;
+  for (const name of names) {
+    const found = INSTALLER_NAME.exec(name);
+    if (!found) continue;
+    const version = found[1];
+    if (compareVersions(version, currentVersion) <= 0) continue;
+    if (!chosen || compareVersions(version, chosen.version) > 0) chosen = { name, version };
   }
-  return scelto;
+  return chosen;
 }
 
 /**
@@ -61,26 +61,26 @@ export function newestInstaller(nomi, versioneCorrente) {
  *
  * Da sorgente non fa niente: li' l'aggiornamento e' `git pull`.
  */
-export async function checkForUpdates(app, dialog, nota) {
+export async function checkForUpdates(app, dialog, note) {
   if (!app.isPackaged) return;
 
-  const cartella = process.env.MY_EXPENSE_UPDATE_DIR || cartellaPredefinita;
-  let nomi;
+  const folder = process.env.MY_EXPENSE_UPDATE_DIR || defaultFolder;
+  let names;
   try {
-    nomi = readdirSync(cartella);
+    names = readdirSync(folder);
   } catch {
-    nota(`aggiornamenti: nessuna cartella ${cartella}`);
+    note(`aggiornamenti: nessuna cartella ${folder}`);
     return;
   }
 
-  const nuovo = newestInstaller(nomi, app.getVersion());
-  if (!nuovo) return;
-  nota(`aggiornamenti: trovata la versione ${nuovo.versione}`);
+  const newer = newestInstaller(names, app.getVersion());
+  if (!newer) return;
+  note(`aggiornamenti: trovata la versione ${newer.version}`);
 
   const { response } = await dialog.showMessageBox({
     type: 'question',
     title: 'Aggiornamento',
-    message: `C'e' la versione ${nuovo.versione}. Adesso hai la ${app.getVersion()}.`,
+    message: `C'e' la versione ${newer.version}. Adesso hai la ${app.getVersion()}.`,
     detail: 'L\'app si chiude, si aggiorna e si riapre da sola. Le tue spese restano dove sono.',
     buttons: ['Aggiorna adesso', 'Piu\' tardi'],
     defaultId: 0,
@@ -91,7 +91,7 @@ export async function checkForUpdates(app, dialog, nota) {
   // `/S` e' l'installazione silenziosa: nessuna domanda, stessa cartella di
   // prima, e alla fine l'app riparte da sola. L'installer chiude lui la copia
   // in esecuzione, ma tanto vale uscire subito e lasciargli il campo libero.
-  spawn(join(cartella, nuovo.nome), ['/S'], { detached: true, stdio: 'ignore' }).unref();
-  nota('aggiornamenti: installer avviato, chiudo');
+  spawn(join(folder, newer.name), ['/S'], { detached: true, stdio: 'ignore' }).unref();
+  note('aggiornamenti: installer avviato, chiudo');
   app.quit();
 }

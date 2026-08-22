@@ -48,7 +48,7 @@ const NOME_APP = 'My Expense';
  * `electron/update.js`). Letta una volta sola all'avvio: dentro il pacchetto
  * il file non cambia mentre l'app gira.
  */
-const VERSIONE = (() => {
+const VERSION = (() => {
   try {
     return JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8')).version ?? '';
   } catch {
@@ -179,7 +179,7 @@ ${o.head ?? ''}</head>
                     <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2"></i>Impostazioni</a></li>
                     <li><a class="dropdown-item" href="/wiki"><i class="bi bi-question-circle me-2"></i>Guida</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><span class="dropdown-item-text text-body-secondary small">Versione ${esc(VERSIONE)}</span></li>
+                    <li><span class="dropdown-item-text text-body-secondary small">Versione ${esc(VERSION)}</span></li>
                 </ul>
             </div>
         </div>

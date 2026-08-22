@@ -1,7 +1,7 @@
 import { esc, asset, csrfField, isEmpty } from '../view.js';
 
 export const render = ({ csrfToken, contact, year }) => {
-  const anni = Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - i);
+  const years = Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - i);
   return `
 ${(contact === null) ? `    <div class="alert alert-warning">
         <i class="bi bi-exclamation-triangle me-2"></i>Anagrafica non trovata.
@@ -30,7 +30,7 @@ ${(contact === null) ? `    <div class="alert alert-warning">
             </button>
             <label class="form-label small mb-0 me-1">Anno</label>
             <select id="year-picker" class="form-select form-select-sm d-inline-block w-auto">
-                ${anni.map((y) => `                    <option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>
+                ${years.map((y) => `                    <option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>
                 `).join('')}            </select>
         </div>
     </div>

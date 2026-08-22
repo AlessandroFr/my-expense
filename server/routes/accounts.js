@@ -39,28 +39,28 @@ const round2 = (n) => roundLikePhp(n, 2);
  * davvero sono le quote comprate per il NAV di oggi, ed e' un altro numero.
  */
 function pacValues(userId) {
-  const piani = all('SELECT id, account_id, fund_id FROM pac_plans WHERE user_id = ?', userId);
+  const plans = all('SELECT id, account_id, fund_id FROM pac_plans WHERE user_id = ?', userId);
   const perConto = new Map();
 
-  for (const piano of piani) {
+  for (const plan of plans) {
     const contributi = all(
       `SELECT contribution_date, amount, nav, units FROM pac_contributions
        WHERE user_id = ? AND plan_id = ? ORDER BY contribution_date ASC`,
-      userId, piano.id,
+      userId, plan.id,
     );
     if (contributi.length === 0) continue;
 
     const navs = all(
       'SELECT nav_date, nav FROM pac_fund_navs WHERE fund_id = ? ORDER BY nav_date ASC',
-      piano.fund_id,
+      plan.fund_id,
     );
     const r = summary(contributi, navs, new Date().toISOString().slice(0, 10));
-    if (r.valore === null) continue;
+    if (r.value === null) continue;
 
-    const acc = perConto.get(piano.account_id) ?? { valore: 0, versato: 0 };
-    acc.valore += r.valore;
-    acc.versato += r.versato;
-    perConto.set(piano.account_id, acc);
+    const acc = perConto.get(plan.account_id) ?? { value: 0, contributed: 0 };
+    acc.value += r.value;
+    acc.contributed += r.contributed;
+    perConto.set(plan.account_id, acc);
   }
   return perConto;
 }
@@ -98,8 +98,8 @@ export function withBalances(userId, includeArchived = false) {
       incomes_total: round2(inc),
       balance: round2(Number(a.opening_balance) + inc - exp),
       // Solo per i conti con un piano di accumulo: altrove non significa niente.
-      market_value: investito === null ? null : round2(investito.valore),
-      market_gain: investito === null ? null : round2(investito.valore - investito.versato),
+      market_value: investito === null ? null : round2(investito.value),
+      market_gain: investito === null ? null : round2(investito.value - investito.contributed),
     };
   });
 }

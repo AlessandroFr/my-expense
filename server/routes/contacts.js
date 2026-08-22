@@ -36,9 +36,9 @@ const findByNormalizedName = (userId, nameNorm) =>
     userId, nameNorm);
 
 /** Traduce Contact::validate. */
-function validate(name, type, details) {
-  const nome = str(name);
-  if (nome === '' || [...nome].length > 120) {
+function validate(rawName, type, details) {
+  const name = str(rawName);
+  if (name === '' || [...name].length > 120) {
     throw HttpError.badRequest('Nome anagrafica obbligatorio (max 120 caratteri).');
   }
   if (!TYPES.includes(type)) throw HttpError.badRequest('Tipo anagrafica non valido.');
@@ -68,8 +68,8 @@ function validate(name, type, details) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw HttpError.badRequest('Colore non valido.');
 
   return {
-    name: nome,
-    name_norm: normalizeName(nome),
+    name,
+    name_norm: normalizeName(name),
     type,
     vat_number: vat === '' ? null : vat,
     iban: iban === '' ? null : iban,
@@ -79,9 +79,9 @@ function validate(name, type, details) {
   };
 }
 
-const asConflict = (err, nome) => {
+const asConflict = (err, name) => {
   if (String(err.message).includes('UNIQUE')) {
-    return HttpError.conflict(`Esiste gia' un'anagrafica '${nome}'.`);
+    return HttpError.conflict(`Esiste gia' un'anagrafica '${name}'.`);
   }
   return err;
 };
@@ -92,10 +92,10 @@ const asConflict = (err, nome) => {
  * aggancerebbero mezzo archivio.
  */
 function applyBackfill(userId, contactId, name) {
-  const nome = str(name);
-  if ([...nome].length < 4) return { expenses: 0, incomes: 0, recurring: 0 };
+  const trimmed = str(name);
+  if ([...name].length < 4) return { expenses: 0, incomes: 0, recurring: 0 };
 
-  const like = `%${escapeLike(nome)}%`;
+  const like = `%${escapeLike(name)}%`;
   const e = run(
     'UPDATE expenses SET contact_id = ? WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?',
     contactId, userId, like);
@@ -130,10 +130,10 @@ function insert(userId, row) {
 
 /** Cerca per nome normalizzato, altrimenti crea. Usato dai campi a testo libero. */
 export function findOrCreate(userId, name) {
-  const nome = str(name);
-  if (nome === '') throw HttpError.badRequest('Nome anagrafica obbligatorio.');
+  const trimmed = str(name);
+  if (name === '') throw HttpError.badRequest('Nome anagrafica obbligatorio.');
 
-  const existing = findByNormalizedName(userId, normalizeName(nome));
+  const existing = findByNormalizedName(userId, normalizeName(name));
   if (existing) {
     // Chi era solo cliente o solo fornitore diventa entrambi.
     if (existing.type !== 'both') {
@@ -141,15 +141,15 @@ export function findOrCreate(userId, name) {
     }
     return existing.id;
   }
-  return insert(userId, validate(nome, 'both', {}));
+  return insert(userId, validate(name, 'both', {}));
 }
 
 function usageCount(id, userId) {
-  const conta = (table) =>
+  const count = (table) =>
     one(`SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ? AND user_id = ?`, id, userId).n;
-  const expenses = conta('expenses');
-  const incomes = conta('incomes');
-  const recurring = conta('recurring_expenses');
+  const expenses = count('expenses');
+  const incomes = count('incomes');
+  const recurring = count('recurring_expenses');
   return { expenses, incomes, recurring, total: expenses + incomes + recurring };
 }
 
@@ -251,7 +251,7 @@ const movementsForUser = (userId, contactId, limit, offset) => all(
   last_generated_date: r.last_generated_date ?? null,
 }));
 
-const dettagli = (body) => ({
+const details = (body) => ({
   vat_number: body.vat_number, iban: body.iban, email: body.email,
   notes: body.notes, color: body.color,
 });
@@ -368,7 +368,7 @@ async function create(req, res) {
   assertCsrf(req, body);
   const userId = currentUserId();
   // Cliente e fornitore coincidono: il type passato dal form viene ignorato.
-  ok(res, { id: insert(userId, validate(body.name, 'both', dettagli(body))) });
+  ok(res, { id: insert(userId, validate(body.name, 'both', details(body))) });
 }
 
 async function quickCreate(req, res) {
@@ -395,7 +395,7 @@ async function update(req, res) {
   if (id <= 0) throw HttpError.badRequest('ID anagrafica mancante.');
 
   const type = TYPES.includes(str(body.type)) ? str(body.type) : 'both';
-  const row = validate(body.name, type, dettagli(body));
+  const row = validate(body.name, type, details(body));
   const archived = int(body.archived) === 1 ? 1 : 0;
 
   try {
@@ -559,10 +559,10 @@ async function reassign(req, res) {
 
   const targets = [...targetIds];
   const placeholders = targets.map(() => '?').join(',');
-  const trovati = new Set(all(
+  const found = new Set(all(
     `SELECT id FROM contacts WHERE user_id = ? AND id IN (${placeholders})`, userId, ...targets,
   ).map((r) => r.id));
-  if (targets.some((t) => !trovati.has(t))) {
+  if (targets.some((t) => !found.has(t))) {
     throw HttpError.badRequest('Una o più anagrafiche di destinazione non esistono o non sono accessibili.');
   }
 

@@ -50,12 +50,12 @@ const addDays = (date, days) => {
  */
 function addMonthsClamped(date, months) {
   const [y, m, d] = date.split('-').map(Number);
-  const totale = y * 12 + (m - 1) + months;
-  const nuovoAnno = Math.floor(totale / 12);
-  const nuovoMese = (totale % 12) + 1;
+  const total = y * 12 + (m - 1) + months;
+  const nuovoAnno = Math.floor(total / 12);
+  const nuovoMese = (total % 12) + 1;
   const ultimoGiorno = new Date(Date.UTC(nuovoAnno, nuovoMese, 0)).getUTCDate();
-  const giorno = Math.min(d, ultimoGiorno);
-  return `${String(nuovoAnno).padStart(4, '0')}-${String(nuovoMese).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`;
+  const day = Math.min(d, ultimoGiorno);
+  return `${String(nuovoAnno).padStart(4, '0')}-${String(nuovoMese).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function dateForSeq(start, seq, frequency, customDays) {
@@ -77,8 +77,8 @@ export function explodeInstallments(totalAmount, count, startDate, frequency, cu
     throw HttpError.badRequest('Data iniziale non valida (atteso YYYY-MM-DD).');
   }
 
-  const totale = Number.parseFloat(String(totalAmount).replace(',', '.')) || 0;
-  const centesimi = Math.round(totale * 100);
+  const total = Number.parseFloat(String(totalAmount).replace(',', '.')) || 0;
+  const centesimi = Math.round(total * 100);
   if (centesimi < count) {
     throw HttpError.badRequest(`Importo troppo piccolo per ${count} rate (minimo 0.01€/rata).`);
   }
@@ -86,14 +86,14 @@ export function explodeInstallments(totalAmount, count, startDate, frequency, cu
   const perRata = Math.floor(centesimi / count);
   const resto = centesimi - perRata * count;
 
-  const rate = [];
+  const installments = [];
   for (let i = 1; i <= count; i++) {
-    const importo = perRata + (i === 1 ? resto : 0);
-    rate.push({
+    const amount = perRata + (i === 1 ? resto : 0);
+    installments.push({
       seq: i,
       date: dateForSeq(startDate, i, frequency, customDays),
-      amount: (importo / 100).toFixed(2),
+      amount: (amount / 100).toFixed(2),
     });
   }
-  return rate;
+  return installments;
 }

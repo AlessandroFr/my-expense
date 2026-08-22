@@ -10,7 +10,7 @@ import { parseMultipart } from '../multipart.js';
 
 const HEADERS = ['Data', 'Categoria', 'Descrizione', 'Importo', 'Pagamento'];
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
-const PAY_LABELS_IT = { contanti: 'cash', carta: 'card', bonifico: 'transfer', altro: 'other' };
+const PAY_LABELS_IT = { contanti: 'cash', carta: 'card', bonifico: 'transfer', other: 'other' };
 
 /**
  * Quota un campo come fputcsv di PHP, che e' piu' generoso di quanto ci si
@@ -26,36 +26,36 @@ function quote(value) {
 /** Divide una riga CSV tenendo conto delle virgolette. */
 export function splitCsvLine(line, delimiter) {
   const out = [];
-  let campo = '';
+  let field = '';
   let inQuotes = false;
 
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (inQuotes) {
       if (c === '"') {
-        if (line[i + 1] === '"') { campo += '"'; i++; } else inQuotes = false;
-      } else campo += c;
+        if (line[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
+      } else field += c;
       continue;
     }
     if (c === '"') { inQuotes = true; continue; }
-    if (c === delimiter) { out.push(campo); campo = ''; continue; }
-    campo += c;
+    if (c === delimiter) { out.push(field); field = ''; continue; }
+    field += c;
   }
-  out.push(campo);
+  out.push(field);
   return out;
 }
 
 /** Il separatore si deduce dalla prima riga: chi esporta da Excel usa ';'. */
 export function detectDelimiter(sample) {
   const testa = sample.replace(/^﻿/, '').split(/\r?\n/)[0] ?? '';
-  const candidati = [';', ',', '\t', '|'];
-  let migliore = ';';
+  const candidates = [';', ',', '\t', '|'];
+  let best = ';';
   let massimo = 0;
-  for (const c of candidati) {
+  for (const c of candidates) {
     const n = testa.split(c).length - 1;
-    if (n > massimo) { massimo = n; migliore = c; }
+    if (n > massimo) { massimo = n; best = c; }
   }
-  return massimo > 0 ? migliore : ';';
+  return massimo > 0 ? best : ';';
 }
 
 export function parseDate(raw) {
@@ -123,9 +123,9 @@ async function exportCsv(req, res) {
     ...params,
   );
 
-  const righe = [HEADERS.map(quote).join(';')];
+  const lines = [HEADERS.map(quote).join(';')];
   for (const r of rows) {
-    righe.push([
+    lines.push([
       r.expense_date ?? '',
       r.category_name ?? '',
       r.description ?? '',
@@ -136,7 +136,7 @@ async function exportCsv(req, res) {
   }
 
   // Il BOM dice a Excel che il file e' UTF-8, altrimenti storpia gli accenti.
-  const body = Buffer.from(`﻿${righe.join('\n')}\n`, 'utf8');
+  const body = Buffer.from(`﻿${rows.join('\n')}\n`, 'utf8');
   const filename = `expenses_${new Date().toISOString().slice(0, 10)}.csv`;
 
   res.writeHead(200, {
@@ -157,12 +157,12 @@ async function importCsv(req, res) {
   if (!file) throw HttpError.badRequest('Nessun file caricato.');
   if (!/\.csv$/i.test(file.filename)) throw HttpError.badRequest('Sono accettati solo file .csv.');
 
-  const testo = file.data.toString('utf8').replace(/^﻿/, '');
-  const righe = testo.split(/\r?\n/);
-  if (righe.length === 0 || righe[0].trim() === '') throw HttpError.badRequest('CSV vuoto o illeggibile.');
+  const text = file.data.toString('utf8').replace(/^﻿/, '');
+  const rows = text.split(/\r?\n/);
+  if (rows.length === 0 || rows[0].trim() === '') throw HttpError.badRequest('CSV vuoto o illeggibile.');
 
-  const delimiter = detectDelimiter(testo);
-  const header = splitCsvLine(righe[0], delimiter).map((c) => str(c).toLowerCase());
+  const delimiter = detectDelimiter(text);
+  const header = splitCsvLine(rows[0], delimiter).map((c) => str(c).toLowerCase());
 
   const idx = {
     date: columnIndex(header, ['data', 'date']),
@@ -188,12 +188,12 @@ async function importCsv(req, res) {
   let skipped = 0;
   const errors = [];
 
-  for (let n = 1; n < righe.length; n++) {
-    const linea = righe[n];
-    if (linea.trim() === '') continue;
+  for (let n = 1; n < rows.length; n++) {
+    const line = rows[n];
+    if (line.trim() === '') continue;
 
     try {
-      const row = splitCsvLine(linea, delimiter);
+      const row = splitCsvLine(line, delimiter);
       const date = parseDate(row[idx.date] ?? '');
       const amount = parseAmount(row[idx.amount] ?? '');
       const payment = parsePayment(idx.payment !== -1 ? row[idx.payment] ?? '' : '');

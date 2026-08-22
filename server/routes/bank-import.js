@@ -70,14 +70,14 @@ const findAccount = (id, userId) =>
   one('SELECT id, name, type, bank_profile_id FROM accounts WHERE id = ? AND user_id = ? LIMIT 1', id, userId);
 
 /** Conta i movimenti orfani che un nome collegherebbe, per mostrarlo in anteprima. */
-function previewBackfillCount(userId, name) {
-  const nome = str(name);
-  if ([...nome].length < 4) return 0;
-  const like = `%${nome.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
-  const conta = (sql, ...params) => one(sql, ...params).n;
-  return conta('SELECT COUNT(*) AS n FROM expenses WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?', userId, like)
-    + conta('SELECT COUNT(*) AS n FROM incomes WHERE user_id = ? AND contact_id IS NULL AND (description LIKE ? OR source LIKE ?)', userId, like, like)
-    + conta('SELECT COUNT(*) AS n FROM recurring_expenses WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?', userId, like);
+function previewBackfillCount(userId, rawName) {
+  const name = str(rawName);
+  if ([...name].length < 4) return 0;
+  const like = `%${name.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+  const count = (sql, ...params) => one(sql, ...params).n;
+  return count('SELECT COUNT(*) AS n FROM expenses WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?', userId, like)
+    + count('SELECT COUNT(*) AS n FROM incomes WHERE user_id = ? AND contact_id IS NULL AND (description LIKE ? OR source LIKE ?)', userId, like, like)
+    + count('SELECT COUNT(*) AS n FROM recurring_expenses WHERE user_id = ? AND contact_id IS NULL AND description LIKE ?', userId, like);
 }
 
 /**
@@ -98,13 +98,13 @@ export function resolveAmountMode(configurato, mapping) {
  * vincitore: se sono tanti, il nome della banca riconosciuta e' un'ipotesi e
  * l'interfaccia lo dice invece di far finta di essere sicura.
  */
-function alternative(esito, vincitore) {
-  const migliore = esito.best.score;
-  const visti = new Set([vincitore.id]);
+function alternative(outcome, winner) {
+  const best = outcome.best.score;
+  const seen = new Set([winner.id]);
   const out = [];
-  for (const e of esito.candidates) {
-    if (e.score < migliore || visti.has(e.profile.id)) continue;
-    visti.add(e.profile.id);
+  for (const e of outcome.candidates) {
+    if (e.score < best || seen.has(e.profile.id)) continue;
+    seen.add(e.profile.id);
     out.push({ id: e.profile.id, name: e.profile.name });
   }
   return out;
@@ -112,15 +112,15 @@ function alternative(esito, vincitore) {
 
 /** Quando nessun profilo riconosce il file, l'errore dice cosa c'era dentro. */
 function noProfileError(headersSeen, profiloScelto) {
-  const viste = headersSeen.map((h) => h.join(' | ')).slice(0, 3);
-  const dettaglio = viste.length > 0
-    ? ` Intestazioni trovate nel file: ${viste.map((v) => `«${v}»`).join('; ')}.`
+  const seenHeadings = headersSeen.map((h) => h.join(' | ')).slice(0, 3);
+  const detail = seenHeadings.length > 0
+    ? ` Intestazioni trovate nel file: ${seenHeadings.map((v) => `«${v}»`).join('; ')}.`
     : ' Nel file non si vede nessuna riga di intestazione.';
   const chi = profiloScelto
     ? `Il profilo «${profiloScelto.name}» non riconosce le colonne di questo file.`
     : 'Nessun profilo banca riconosce le colonne di questo file.';
   return HttpError.badRequest(
-    `${chi}${dettaglio} Apri «Profili banca», crea o correggi il profilo incollando la riga di intestazione, poi riprova.`,
+    `${chi}${detail} Apri «Profili banca», crea o correggi il profilo incollando la riga di intestazione, poi riprova.`,
   );
 }
 
@@ -151,28 +151,28 @@ async function preview(req, res) {
   const richiesto = int(fields.profile_id) || int(sourceAccount.bank_profile_id);
   let daProvare = tuttiProfili;
   if (richiesto > 0) {
-    const scelto = findProfile(richiesto, userId);
-    if (!scelto) throw HttpError.badRequest('Profilo banca non trovato.');
-    daProvare = [scelto];
+    const chosen = findProfile(richiesto, userId);
+    if (!chosen) throw HttpError.badRequest('Profilo banca non trovato.');
+    daProvare = [chosen];
   }
   if (daProvare.length === 0) throw HttpError.badRequest('Nessun profilo banca configurato.');
 
   let lines = loadAndDecode(file.data).split(/\r\n|\n|\r/);
-  const esito = matchProfiles(lines, daProvare);
-  if (!esito.best) throw noProfileError(esito.headersSeen, richiesto > 0 ? daProvare[0] : null);
+  const outcome = matchProfiles(lines, daProvare);
+  if (!outcome.best) throw noProfileError(outcome.headersSeen, richiesto > 0 ? daProvare[0] : null);
 
-  const profilo = esito.best.profile;
+  const profile = outcome.best.profile;
   // La codifica del profilo vince sull'indovinata, ma solo dopo aver
   // riconosciuto il profilo: prima non si sa di chi sia il file.
-  if (profilo.encoding !== 'auto') {
-    lines = loadAndDecode(file.data, profilo.encoding).split(/\r\n|\n|\r/);
+  if (profile.encoding !== 'auto') {
+    lines = loadAndDecode(file.data, profile.encoding).split(/\r\n|\n|\r/);
   }
 
-  const headerIdx = esito.best.headerIdx;
-  const delimiter = esito.best.delimiter;
-  const mapping = esito.best.mapping;
-  const amountMode = resolveAmountMode(profilo.amount_mode, mapping);
-  const dateOrder = profilo.date_order;
+  const headerIdx = outcome.best.headerIdx;
+  const delimiter = outcome.best.delimiter;
+  const mapping = outcome.best.mapping;
+  const amountMode = resolveAmountMode(profile.amount_mode, mapping);
+  const dateOrder = profile.date_order;
 
   const cell = (cols, i) => (i === undefined ? '' : str(cols[i]));
   const descrizioneDi = (cols) => (mapping.description ?? [])
@@ -237,7 +237,7 @@ async function preview(req, res) {
 
     try {
       const tipologia = cell(cols, mapping.tipologia);
-      const descrizione = descrizioneDi(cols);
+      const description = descrizioneDi(cols);
 
       const opDate = parseStatementDate(cell(cols, mapping.op_date), dateOrder);
       const valGrezza = cell(cols, mapping.value_date);
@@ -248,34 +248,34 @@ async function preview(req, res) {
       if (amountMode === 'signed') {
         const grezzo = cell(cols, mapping.amount);
         if (grezzo === '') { emptyCnt++; continue; }
-        const importo = parseBankAmountSigned(grezzo);
-        if (importo.value === 0) { emptyCnt++; continue; }
-        isExpense = importo.negative;
-        amount = importo.value;
+        const amount = parseBankAmountSigned(grezzo);
+        if (amount.value === 0) { emptyCnt++; continue; }
+        isExpense = amount.negative;
+        amount = amount.value;
       } else {
         const uscita = cell(cols, mapping.outflow);
-        const entrata = cell(cols, mapping.inflow);
-        if (uscita === '' && entrata === '') { emptyCnt++; continue; }
-        if (uscita !== '' && entrata !== '') {
+        const income = cell(cols, mapping.inflow);
+        if (uscita === '' && income === '') { emptyCnt++; continue; }
+        if (uscita !== '' && income !== '') {
           throw HttpError.badRequest('Riga con sia Uscita che Entrata: non supportato.');
         }
         isExpense = uscita !== '';
-        amount = parseBankAmountSigned(isExpense ? uscita : entrata).value;
+        amount = parseBankAmountSigned(isExpense ? uscita : income).value;
       }
       if (amount <= 0) throw HttpError.badRequest('Importo non valido (zero o negativo dopo parsing).');
 
       // Ricarica di una prepagata e prelievo bancomat non sono spese: sono
       // soldi che si spostano fra due conti dell'utente.
       const isPrepaidRecharge = isExpense
-        && /Ricariche/i.test(tipologia) && /RICARICA\/RIMBORSO/i.test(descrizione);
-      const isAtm = isExpense && isAtmWithdrawalDescription(descrizione);
+        && /Ricariche/i.test(tipologia) && /RICARICA\/RIMBORSO/i.test(description);
+      const isAtm = isExpense && isAtmWithdrawalDescription(description);
 
       let kind;
       if (isPrepaidRecharge && autoPairRicariche) kind = KIND_TRANSFER_PAIR;
       else if (isAtm && autoPairPrelievi) kind = KIND_ATM_PAIR;
       else kind = isExpense ? KIND_EXPENSE : KIND_INCOME;
 
-      const hash = computeImportHash(accountId, opDate, isExpense ? -amount : amount, descrizione);
+      const hash = computeImportHash(accountId, opDate, isExpense ? -amount : amount, description);
       const duplicato = existingHashes.has(hash);
 
       const row = {
@@ -285,7 +285,7 @@ async function preview(req, res) {
         op_date: opDate,
         value_date: valDate,
         tipologia,
-        description: descrizione,
+        description: description,
         amount: Math.round(amount * 100) / 100,
         is_duplicate: duplicato,
         skip: duplicato,
@@ -296,7 +296,7 @@ async function preview(req, res) {
         dest_account_id: null,
         // La divisione fra i piani, proposta ma mai imposta: la conferma la da'
         // l'utente riga per riga (campo `pac` nel commit).
-        pac_suggested: kind === KIND_EXPENSE ? suggestShares(pacPlans, amount, descrizione) : null,
+        pac_suggested: kind === KIND_EXPENSE ? suggestShares(pacPlans, amount, description) : null,
       };
 
       if (kind === KIND_TRANSFER_PAIR) row.dest_account_id = suggestPrepaidId;
@@ -305,12 +305,12 @@ async function preview(req, res) {
       if (kind !== KIND_INCOME) {
         const catName = kind === KIND_TRANSFER_PAIR ? 'Trasferimenti interni'
           : kind === KIND_ATM_PAIR ? 'Prelievo contante'
-            : classifyExpense(tipologia, descrizione);
+            : classifyExpense(tipologia, description);
         row.category_suggested = catName;
         row.category_id = ensureCategory(catName);
-        row.payment_method = kind === KIND_ATM_PAIR ? 'cash' : guessPaymentMethod(tipologia, descrizione);
+        row.payment_method = kind === KIND_ATM_PAIR ? 'cash' : guessPaymentMethod(tipologia, description);
       } else {
-        row.source = classifyIncomeSource(tipologia, descrizione);
+        row.source = classifyIncomeSource(tipologia, description);
         row.payment_method = guessIncomePaymentMethod(tipologia);
       }
 
@@ -318,7 +318,7 @@ async function preview(req, res) {
       row.contact_id_matched = null;
       row.contact_propagated = false;
       if (kind === KIND_EXPENSE || kind === KIND_INCOME) {
-        const suggerito = extractCounterparty(tipologia, descrizione, kind === KIND_EXPENSE ? 'expense' : 'income');
+        const suggerito = extractCounterparty(tipologia, description, kind === KIND_EXPENSE ? 'expense' : 'income');
         if (suggerito !== null) {
           row.contact_suggested_name = suggerito;
           const match = one('SELECT id FROM contacts WHERE user_id = ? AND name_norm = ? LIMIT 1',
@@ -375,11 +375,11 @@ async function preview(req, res) {
   // Le colonne del file con il campo in cui sono finite: e' quello che
   // l'utente guarda per accorgersi che il riconoscimento ha sbagliato.
   const perColonna = new Map();
-  for (const [campo, indici] of Object.entries(mapping)) {
-    for (const i of [indici].flat()) perColonna.set(i, campo);
+  for (const [field, indici] of Object.entries(mapping)) {
+    for (const i of [indici].flat()) perColonna.set(i, field);
   }
-  const headerPreview = esito.best.cells.map((testo, i) => ({
-    column: testo.trim(),
+  const headerPreview = outcome.best.cells.map((text, i) => ({
+    column: text.trim(),
     field: perColonna.get(i) ?? null,
     field_label: perColonna.has(i) ? FIELD_LABELS[perColonna.get(i)] : null,
   }));
@@ -394,11 +394,11 @@ async function preview(req, res) {
     parse_errors: parseErrors,
     rows,
     profile_used: {
-      id: profilo.id,
-      name: profilo.name,
-      builtin_key: profilo.builtin_key,
+      id: profile.id,
+      name: profile.name,
+      builtin_key: profile.builtin_key,
       auto: richiesto <= 0,
-      notes: profilo.notes,
+      notes: profile.notes,
       delimiter: delimiter === '\t' ? 'tab' : delimiter,
       amount_mode: amountMode,
       date_order: dateOrder,
@@ -406,7 +406,7 @@ async function preview(req, res) {
       matched_columns: headerPreview.filter((h) => h.field !== null).length,
     },
     // Gli altri profili che leggerebbero comunque questo file, per il menu.
-    profile_alternatives: alternative(esito, profilo),
+    profile_alternatives: alternative(outcome, profile),
     header_preview: headerPreview,
     profiles: tuttiProfili.map((p) => ({ id: p.id, name: p.name })),
     pac_plans: pacPlans.map((p) => ({
@@ -448,8 +448,8 @@ function ensureDefaultCash(userId) {
 const resolveContactFromRow = (userId, rowIn) => {
   const cid = int(rowIn.contact_id);
   if (cid > 0) return cid;
-  const nome = str(rowIn.contact_name);
-  return nome !== '' ? findOrCreateContact(userId, nome) : null;
+  const name = str(rowIn.contact_name);
+  return name !== '' ? findOrCreateContact(userId, name) : null;
 };
 
 /** INSERT che tollera il duplicato: ritorna null se l'impronta esiste gia'. */
@@ -592,7 +592,7 @@ async function commit(req, res) {
         const baseHash = computeImportHash(accountId, opDate, -amount, description);
         if (existingHashes.has(baseHash)) { dupCnt++; continue; }
 
-        const esito = transaction(() => {
+        const outcome = transaction(() => {
           const t = run(
             `INSERT INTO transfers
                (user_id, source_account_id, destination_account_id, amount, transfer_date, description, notes)
@@ -636,7 +636,7 @@ async function commit(req, res) {
           return true;
         });
 
-        if (esito === true) {
+        if (outcome === true) {
           existingHashes.add(baseHash);
           pairedCnt++;
           importedExp++;
@@ -655,12 +655,12 @@ async function commit(req, res) {
         if (spec) {
           if (existingHashes.has(hash)) { dupCnt++; continue; }
           const clean = validateSpec(spec);
-          const rate = explodeInstallments(amount.toFixed(2), clean.count, opDate, clean.frequency, clean.custom_days);
+          const installments = explodeInstallments(amount.toFixed(2), clean.count, opDate, clean.frequency, clean.custom_days);
 
           const inserite = transaction(() => {
             const ids = [];
-            for (const r of rate) {
-              const primo = r.seq === 1;
+            for (const r of installments) {
+              const first = r.seq === 1;
               const id = insertIgnoringDuplicate(
                 `INSERT INTO expenses
                    (user_id, category_id, contact_id, account_id, amount, description, payment_method,
@@ -671,10 +671,10 @@ async function commit(req, res) {
                 description !== '' ? description : null, payment, r.date,
                 // Solo la prima rata porta impronta e data valuta: e' quella
                 // che corrisponde al movimento sull'estratto conto.
-                primo ? valueDate : null, primo ? hash : null,
-                r.seq, clean.count, primo ? null : ids[0],
+                first ? valueDate : null, first ? hash : null,
+                r.seq, clean.count, first ? null : ids[0],
               );
-              if (primo && id === null) throw new DuplicateHalf();
+              if (first && id === null) throw new DuplicateHalf();
               ids.push(id);
             }
             return ids.length;

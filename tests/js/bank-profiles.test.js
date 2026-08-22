@@ -26,54 +26,54 @@ const ESTRATTO = [
 /** Il file come arriva dalla banca: UTF-8 con il BOM davanti. */
 const file = () => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(ESTRATTO, 'utf8')]);
 
-const righe = () => loadAndDecode(file()).split(/\r\n|\n|\r/);
+const rows = () => loadAndDecode(file()).split(/\r\n|\n|\r/);
 
-const profilo = (key) => builtinProfiles().filter((p) => p.builtin_key === key);
+const profile = (key) => builtinProfiles().filter((p) => p.builtin_key === key);
 
 test('il profilo Mediolanum riconosce tutte e sei le colonne', () => {
-  const esito = matchProfiles(righe(), profilo('mediolanum'));
-  assert.ok(esito.best, 'nessun profilo ha riconosciuto il file');
+  const outcome = matchProfiles(rows(), profile('mediolanum'));
+  assert.ok(outcome.best, 'nessun profilo ha riconosciuto il file');
 
-  assert.equal(esito.best.headerIdx, 7);
-  assert.equal(esito.best.delimiter, ';');
-  assert.deepEqual(esito.best.mapping, {
+  assert.equal(outcome.best.headerIdx, 7);
+  assert.equal(outcome.best.delimiter, ';');
+  assert.deepEqual(outcome.best.mapping, {
     op_date: 0, value_date: 1, tipologia: 2, description: [3], outflow: 4, inflow: 5,
   });
 });
 
 test('l\'IBAN del conto si legge dalle righe prima dell\'intestazione', () => {
-  const lines = righe();
+  const lines = rows();
   assert.equal(extractIban(lines.slice(0, 7)), 'IT60X0542811101000000123456');
 });
 
 test('le righe si leggono con date, segno e importi giusti', () => {
-  const lines = righe();
-  const { mapping, delimiter } = matchProfiles(lines, profilo('mediolanum')).best;
+  const lines = rows();
+  const { mapping, delimiter } = matchProfiles(lines, profile('mediolanum')).best;
 
-  const leggi = (i) => {
+  const readForm = (i) => {
     const cols = splitCsvLine(lines[i], delimiter);
     const uscita = cols[mapping.outflow] ?? '';
-    const entrata = cols[mapping.inflow] ?? '';
-    const spesa = uscita.trim() !== '';
+    const income = cols[mapping.inflow] ?? '';
+    const expense = uscita.trim() !== '';
     return {
       data: parseStatementDate(cols[mapping.op_date], 'dmy'),
-      spesa,
-      importo: parseBankAmountSigned(spesa ? uscita : entrata).value,
+      expense,
+      amount: parseBankAmountSigned(expense ? uscita : income).value,
     };
   };
 
-  assert.deepEqual(leggi(8), { data: '2026-07-31', spesa: true, importo: 2.3 });
-  assert.deepEqual(leggi(9), { data: '2026-07-20', spesa: false, importo: 15 });
+  assert.deepEqual(readForm(8), { data: '2026-07-31', expense: true, amount: 2.3 });
+  assert.deepEqual(readForm(9), { data: '2026-07-20', expense: false, amount: 15 });
   // Il punto qui e' decimale, non separatore delle migliaia: 1800.25, non 180025.
-  assert.deepEqual(leggi(10), { data: '2026-01-02', spesa: true, importo: 1800.25 });
+  assert.deepEqual(readForm(10), { data: '2026-01-02', expense: true, amount: 1800.25 });
 });
 
 test('il tracciato di Mediolanum e Sella e\' lo stesso: entrambi leggono il file', () => {
   // Nessuna delle due si distingue dall'intestazione, ed e' il motivo per cui
   // il profilo si assegna al conto invece di indovinarlo a ogni import.
   for (const key of ['mediolanum', 'sella']) {
-    const esito = matchProfiles(righe(), profilo(key));
-    assert.ok(esito.best, `il profilo ${key} non riconosce il file`);
-    assert.equal(esito.best.score, 6);
+    const outcome = matchProfiles(rows(), profile(key));
+    assert.ok(outcome.best, `il profilo ${key} non riconosce il file`);
+    assert.equal(outcome.best.score, 6);
   }
 });

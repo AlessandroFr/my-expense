@@ -41,9 +41,9 @@ export function ensureBuiltins(userId) {
       .map((r) => [r.builtin_key, r]),
   );
   for (const p of builtinProfiles()) {
-    const esistente = presenti.get(p.builtin_key);
-    if (esistente) {
-      if (esistente.updated_at === esistente.created_at) applyBuiltin(esistente.id, userId, p);
+    const existing = presenti.get(p.builtin_key);
+    if (existing) {
+      if (existing.updated_at === existing.created_at) applyBuiltin(existing.id, userId, p);
       continue;
     }
     try {
@@ -79,15 +79,15 @@ function normalizeColumns(input) {
   const out = {};
   for (const f of FIELDS) {
     const grezzo = src[f];
-    const elenco = Array.isArray(grezzo)
+    const list = Array.isArray(grezzo)
       ? grezzo
       : String(grezzo ?? '').split(/[\n,;]+/);
-    const nomi = [];
-    for (const v of elenco) {
+    const names = [];
+    for (const v of list) {
       const n = normalizeHeader(v);
-      if (n !== '' && !nomi.includes(n)) nomi.push(n);
+      if (n !== '' && !names.includes(n)) names.push(n);
     }
-    if (nomi.length > 0) out[f] = nomi;
+    if (names.length > 0) out[f] = names;
   }
   if (out.op_date === undefined) {
     throw HttpError.badRequest('Serve almeno il nome della colonna della data operazione.');
@@ -100,9 +100,9 @@ function normalizeColumns(input) {
 
 const safeJson = (s) => { try { return JSON.parse(s); } catch { return {}; } };
 
-const uno = (valore, ammessi, campo) => {
-  const v = str(valore);
-  if (!ammessi.includes(v)) throw HttpError.badRequest(`Valore non ammesso per ${campo}: '${v}'.`);
+const uno = (value, allowed, field) => {
+  const v = str(value);
+  if (!allowed.includes(v)) throw HttpError.badRequest(`Valore non ammesso per ${field}: '${v}'.`);
   return v;
 };
 
@@ -183,11 +183,11 @@ async function reset(req, res) {
   const userId = currentUserId();
 
   const id = int(body.id);
-  const corrente = id > 0 ? findById(id, userId) : null;
-  if (!corrente) throw HttpError.notFound('Profilo non trovato.');
-  if (!corrente.builtin_key) throw HttpError.badRequest('Solo i profili preimpostati si ripristinano.');
+  const current = id > 0 ? findById(id, userId) : null;
+  if (!current) throw HttpError.notFound('Profilo non trovato.');
+  if (!current.builtin_key) throw HttpError.badRequest('Solo i profili preimpostati si ripristinano.');
 
-  const originale = builtinProfiles().find((p) => p.builtin_key === corrente.builtin_key);
+  const originale = builtinProfiles().find((p) => p.builtin_key === current.builtin_key);
   if (!originale) throw HttpError.notFound('Questo profilo preimpostato non esiste piu\' in questa versione.');
 
   applyBuiltin(id, userId, originale);
@@ -200,9 +200,9 @@ async function remove(req, res) {
   const userId = currentUserId();
 
   const id = int(body.id);
-  const profilo = id > 0 ? findById(id, userId) : null;
-  if (!profilo) throw HttpError.notFound('Profilo non trovato.');
-  if (profilo.builtin_key) {
+  const profile = id > 0 ? findById(id, userId) : null;
+  if (!profile) throw HttpError.notFound('Profilo non trovato.');
+  if (profile.builtin_key) {
     throw HttpError.badRequest('Un profilo preimpostato non si cancella: modificalo o ripristinalo.');
   }
 

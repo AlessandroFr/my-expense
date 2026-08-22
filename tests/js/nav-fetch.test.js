@@ -48,7 +48,7 @@ test('le quotazioni escono come data e valore', () => {
   ));
   assert.equal(r.symbol, 'SWDA.MI');
   assert.equal(r.currency, 'EUR');
-  assert.deepEqual(r.punti, [
+  assert.deepEqual(r.points, [
     { nav_date: '2026-01-02', nav: 126.98 },
     { nav_date: '2026-01-05', nav: 127.5 },
   ]);
@@ -59,7 +59,7 @@ test('i giorni senza scambi si buttano invece di valere zero', () => {
     [Date.UTC(2026, 0, 2) / 1000, Date.UTC(2026, 0, 3) / 1000, Date.UTC(2026, 0, 4) / 1000],
     [126.98, null, 0],
   ));
-  assert.deepEqual(r.punti.map((p) => p.nav_date), ['2026-01-02']);
+  assert.deepEqual(r.points.map((p) => p.nav_date), ['2026-01-02']);
 });
 
 test('una risposta senza dati e\' un errore parlante, non un elenco vuoto', () => {

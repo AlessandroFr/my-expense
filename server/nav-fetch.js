@@ -39,17 +39,17 @@ export { NavError };
 export function symbolCandidates(quotes, valuta = 'EUR') {
   const utili = (quotes ?? []).filter((q) => q && q.symbol);
   const perValuta = utili.filter((q) => !q.currency || q.currency.toUpperCase() === valuta.toUpperCase());
-  const lista = perValuta.length > 0 ? perValuta : utili;
+  const list = perValuta.length > 0 ? perValuta : utili;
 
   // La ricerca non dice sempre la valuta, ma dice la borsa: vale come indizio.
   const punteggio = (q) => {
-    const simbolo = String(q.symbol).toUpperCase();
-    const i = BORSE_PREFERITE.findIndex((s) => simbolo.endsWith(s));
+    const symbol = String(q.symbol).toUpperCase();
+    const i = BORSE_PREFERITE.findIndex((s) => symbol.endsWith(s));
     if (i >= 0) return i;
     const m = MERCATI_PREFERITI.indexOf(String(q.exchange ?? '').toUpperCase());
     return m >= 0 ? m : 90;
   };
-  return [...lista]
+  return [...list]
     .sort((a, b) => punteggio(a) - punteggio(b))
     .map((q) => q.symbol);
 }
@@ -66,38 +66,38 @@ export const pickSymbol = (quotes, valuta = 'EUR') => symbolCandidates(quotes, v
 export function seriesFromChart(json) {
   const res = json?.chart?.result?.[0];
   if (!res) {
-    const errore = json?.chart?.error?.description;
-    throw new NavError(errore ? `La borsa risponde: ${errore}` : 'Risposta della borsa non leggibile.');
+    const error = json?.chart?.error?.description;
+    throw new NavError(error ? `La borsa risponde: ${error}` : 'Risposta della borsa non leggibile.');
   }
   const tempi = res.timestamp ?? [];
   const chiusure = res.indicators?.quote?.[0]?.close ?? [];
 
-  const punti = [];
+  const points = [];
   for (let i = 0; i < tempi.length; i++) {
-    const valore = chiusure[i];
-    if (valore === null || valore === undefined || !Number.isFinite(valore) || valore <= 0) continue;
-    punti.push({
+    const value = chiusure[i];
+    if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) continue;
+    points.push({
       nav_date: new Date(tempi[i] * 1000).toISOString().slice(0, 10),
-      nav: Number(valore.toFixed(6)),
+      nav: Number(value.toFixed(6)),
     });
   }
   return {
     symbol: res.meta?.symbol ?? null,
     currency: (res.meta?.currency ?? '').toUpperCase() || null,
-    punti,
+    points,
   };
 }
 
 async function readJson(url) {
-  let risposta;
+  let response;
   try {
-    risposta = await fetch(url, { headers: TESTATE, signal: AbortSignal.timeout(15000) });
+    response = await fetch(url, { headers: TESTATE, signal: AbortSignal.timeout(15000) });
   } catch (err) {
     throw new NavError(`Internet non raggiungibile (${err.message}).`);
   }
-  if (!risposta.ok) throw new NavError(`La borsa risponde ${risposta.status}.`);
+  if (!response.ok) throw new NavError(`La borsa risponde ${response.status}.`);
   try {
-    return await risposta.json();
+    return await response.json();
   } catch {
     throw new NavError('La borsa ha risposto qualcosa che non e\' leggibile.');
   }
@@ -114,23 +114,23 @@ export async function symbolsFromIsin(isin, valuta = 'EUR') {
   const cerca = async (q) => (await readJson(`${CERCA}?q=${encodeURIComponent(q)}&quotesCount=10&newsCount=0`))?.quotes ?? [];
 
   const perIsin = await cerca(isin);
-  const trovati = symbolCandidates(perIsin, valuta);
-  if (trovati.length === 0) throw new NavError(`Nessun titolo trovato per l'ISIN ${isin}.`);
+  const found = symbolCandidates(perIsin, valuta);
+  if (found.length === 0) throw new NavError(`Nessun titolo trovato per l'ISIN ${isin}.`);
 
   // Cercando l'ISIN spesso esce una borsa sola, e non e' detto sia quella
   // giusta: dell'iShares Core MSCI World, per dire, viene fuori solo Londra in
   // dollari. Il nome esteso invece le trova tutte, Milano compresa — quindi si
   // cerca una seconda volta per nome e si accodano gli altri listini.
-  const nome = perIsin.find((q) => q.longname || q.shortname);
-  if (nome) {
+  const name = perIsin.find((q) => q.longname || q.shortname);
+  if (name) {
     try {
-      const perNome = symbolCandidates(await cerca(nome.longname ?? nome.shortname), valuta);
-      for (const s of perNome) if (!trovati.includes(s)) trovati.push(s);
+      const perNome = symbolCandidates(await cerca(name.longname ?? name.shortname), valuta);
+      for (const s of perNome) if (!found.includes(s)) found.push(s);
       // Il piu' probabile torna in testa: l'ordine per borsa vale su tutti.
-      return symbolCandidates(trovati.map((symbol) => ({ symbol })), valuta);
+      return symbolCandidates(found.map((symbol) => ({ symbol })), valuta);
     } catch { /* la seconda ricerca e' un di piu': se fallisce restano i primi */ }
   }
-  return trovati;
+  return found;
 }
 
 /**

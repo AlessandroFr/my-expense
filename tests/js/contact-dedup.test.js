@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { duplicateGroups, coreName, whyDuplicate } from '../../server/contact-dedup.js';
 
 const c = (id, name, usage_total = 0) => ({ id, name, usage_total });
-const nomi = (gruppo) => gruppo.members.map((m) => m.name).sort();
+const names = (gruppo) => gruppo.members.map((m) => m.name).sort();
 
 test('il nocciolo del nome ignora sigle societarie e punteggiatura', () => {
   assert.equal(coreName('Centro Nuoto Riva S.R.L.'), 'centro nuoto riva');
@@ -48,22 +48,22 @@ test('nomi corti e nomi diversi restano separati', () => {
 });
 
 test('i nomi che si somigliano finiscono in un gruppo solo', () => {
-  const gruppi = duplicateGroups([
+  const groups = duplicateGroups([
     c(1, 'Anthropic', 3),
     c(2, 'Anthropic* Claude Sub San Francisco', 12),
     c(3, 'ANTHROPIC*CLAUDE'),
     c(4, 'Verdi Anna', 5),
   ]);
 
-  assert.equal(gruppi.length, 1);
-  assert.deepEqual(nomi(gruppi[0]), ['ANTHROPIC*CLAUDE', 'Anthropic', 'Anthropic* Claude Sub San Francisco']);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(names(groups[0]), ['ANTHROPIC*CLAUDE', 'Anthropic', 'Anthropic* Claude Sub San Francisco']);
   // Vince chi ha piu' movimenti: e' l'anagrafica gia' in uso.
-  assert.equal(gruppi[0].suggested_winner_id, 2);
+  assert.equal(groups[0].suggested_winner_id, 2);
 });
 
 test('a pari movimenti vince il nome piu\' corto', () => {
-  const gruppi = duplicateGroups([c(1, 'Forno Aurora Centro Centro'), c(2, 'Forno Aurora Centro')]);
-  assert.equal(gruppi[0].suggested_winner_id, 2);
+  const groups = duplicateGroups([c(1, 'Forno Aurora Centro Centro'), c(2, 'Forno Aurora Centro')]);
+  assert.equal(groups[0].suggested_winner_id, 2);
 });
 
 test('chi non ha doppioni non compare', () => {

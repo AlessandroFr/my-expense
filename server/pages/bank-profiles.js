@@ -24,53 +24,53 @@ const AIUTO_CAMPI = {
   amount: 'solo se la banca usa una colonna sola',
 };
 
-const opzioni = (valori, etichette, scelto) => valori.map((v) =>
-  `<option value="${esc(v)}"${v === scelto ? ' selected' : ''}>${esc(etichette[v] ?? v)}</option>`).join('');
+const options = (values, labels, chosen) => values.map((v) =>
+  `<option value="${esc(v)}"${v === chosen ? ' selected' : ''}>${esc(labels[v] ?? v)}</option>`).join('');
 
-const columnsOfProfile = (profilo) => {
-  try { return JSON.parse(profilo?.columns_json ?? '{}'); } catch { return {}; }
+const columnsOfProfile = (profile) => {
+  try { return JSON.parse(profile?.columns_json ?? '{}'); } catch { return {}; }
 };
 
 /** Il form del profilo: identico per il nuovo e per la modifica. */
-const form = (profilo) => {
-  const cols = columnsOfProfile(profilo);
-  const nuovo = profilo === null;
-  const id = nuovo ? 'new' : String(profilo.id);
+const form = (profile) => {
+  const cols = columnsOfProfile(profile);
+  const newer = profile === null;
+  const id = newer ? 'new' : String(profile.id);
   return `
-<form class="row g-2 bank-profile-form" data-id="${nuovo ? '' : esc(id)}" autocomplete="off">
+<form class="row g-2 bank-profile-form" data-id="${newer ? '' : esc(id)}" autocomplete="off">
     <div class="col-12 col-md-6">
         <label class="form-label small fw-semibold" for="bp-name-${esc(id)}">Nome della banca</label>
         <input type="text" class="form-control form-control-sm" id="bp-name-${esc(id)}" name="name"
-               maxlength="64" required value="${esc(profilo?.name ?? '')}" placeholder="es. Banca Mediolanum">
+               maxlength="64" required value="${esc(profile?.name ?? '')}" placeholder="es. Banca Mediolanum">
     </div>
     <div class="col-6 col-md-3">
         <label class="form-label small fw-semibold" for="bp-delim-${esc(id)}">Separatore delle colonne</label>
         <select class="form-select form-select-sm" id="bp-delim-${esc(id)}" name="delimiter">
-            ${opzioni(DELIMITERS, ETICHETTE_SEPARATORE, profilo?.delimiter ?? 'auto')}
+            ${options(DELIMITERS, ETICHETTE_SEPARATORE, profile?.delimiter ?? 'auto')}
         </select>
     </div>
     <div class="col-6 col-md-3">
         <label class="form-label small fw-semibold" for="bp-enc-${esc(id)}">Codifica del testo</label>
         <select class="form-select form-select-sm" id="bp-enc-${esc(id)}" name="encoding">
-            ${opzioni(ENCODINGS, ETICHETTE_CODIFICA, profilo?.encoding ?? 'auto')}
+            ${options(ENCODINGS, ETICHETTE_CODIFICA, profile?.encoding ?? 'auto')}
         </select>
     </div>
     <div class="col-12 col-md-5">
         <label class="form-label small fw-semibold" for="bp-mode-${esc(id)}">Come sono scritti gli importi</label>
         <select class="form-select form-select-sm" id="bp-mode-${esc(id)}" name="amount_mode">
-            ${opzioni(AMOUNT_MODES, ETICHETTE_IMPORTO, profilo?.amount_mode ?? 'auto')}
+            ${options(AMOUNT_MODES, ETICHETTE_IMPORTO, profile?.amount_mode ?? 'auto')}
         </select>
     </div>
     <div class="col-6 col-md-4">
         <label class="form-label small fw-semibold" for="bp-date-${esc(id)}">Come sono scritte le date</label>
         <select class="form-select form-select-sm" id="bp-date-${esc(id)}" name="date_order">
-            ${opzioni(DATE_ORDERS, ETICHETTE_DATE, profilo?.date_order ?? 'auto')}
+            ${options(DATE_ORDERS, ETICHETTE_DATE, profile?.date_order ?? 'auto')}
         </select>
     </div>
     <div class="col-6 col-md-3">
         <label class="form-label small fw-semibold" for="bp-sort-${esc(id)}">Ordine nell'elenco</label>
         <input type="number" class="form-control form-control-sm" id="bp-sort-${esc(id)}" name="sort_order"
-               value="${esc(String(profilo?.sort_order ?? 500))}">
+               value="${esc(String(profile?.sort_order ?? 500))}">
     </div>
 
     <div class="col-12">
@@ -98,14 +98,14 @@ const form = (profilo) => {
     <div class="col-12">
         <label class="form-label small fw-semibold" for="bp-notes-${esc(id)}">Note</label>
         <input type="text" class="form-control form-control-sm" id="bp-notes-${esc(id)}" name="notes"
-               maxlength="500" value="${esc(profilo?.notes ?? '')}">
+               maxlength="500" value="${esc(profile?.notes ?? '')}">
     </div>
 
     <div class="col-12 d-flex gap-2 mt-3">
         <button type="submit" class="btn btn-primary btn-sm">
-            <i class="bi bi-check-lg me-1"></i>${nuovo ? 'Crea profilo' : 'Salva'}
+            <i class="bi bi-check-lg me-1"></i>${newer ? 'Crea profilo' : 'Salva'}
         </button>
-        ${nuovo ? '' : (profilo.builtin_key
+        ${newer ? '' : (profile.builtin_key
     ? `<button type="button" class="btn btn-outline-secondary btn-sm" data-action="reset">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Rimetti com'era
         </button>`

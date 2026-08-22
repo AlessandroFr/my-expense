@@ -33,13 +33,13 @@ const generico = (() => {
 
 /** Il separatore della riga incollata: quello che la spezza in più pezzi. */
 function detectDelimiter(line) {
-    let migliore = ';';
+    let best = ';';
     let massimo = 0;
     for (const c of [';', ',', '\t', '|']) {
         const n = line.split(c).length - 1;
-        if (n > massimo) { massimo = n; migliore = c; }
+        if (n > massimo) { massimo = n; best = c; }
     }
-    return migliore;
+    return best;
 }
 
 /**
@@ -47,19 +47,19 @@ function detectDelimiter(line) {
  * ogni colonna finisce nel campo di cui porta un nome conosciuto.
  */
 function compilaDaIntestazione(form) {
-    const riga = form.querySelector('.bp-header-paste')?.value ?? '';
-    if (riga.trim() === '') { toast.warning('Incolla prima la riga con i nomi delle colonne.'); return; }
+    const row = form.querySelector('.bp-header-paste')?.value ?? '';
+    if (row.trim() === '') { toast.warning('Incolla prima la riga con i nomi delle colonne.'); return; }
 
-    const celle = riga.split(detectDelimiter(riga)).map((c) => normalizeHeader(c.replace(/^"|"$/g, '')));
+    const cells = row.split(detectDelimiter(row)).map((c) => normalizeHeader(c.replace(/^"|"$/g, '')));
     const presi = new Set();
     const assegnate = {};
 
     for (const field of FIELDS) {
-        for (const nome of (generico[field] ?? [])) {
-            const i = celle.findIndex((c, idx) => !presi.has(idx) && c === nome);
+        for (const name of (generico[field] ?? [])) {
+            const i = cells.findIndex((c, idx) => !presi.has(idx) && c === name);
             if (i === -1) continue;
             presi.add(i);
-            (assegnate[field] ??= []).push(celle[i]);
+            (assegnate[field] ??= []).push(cells[i]);
             break;
         }
     }
@@ -69,7 +69,7 @@ function compilaDaIntestazione(form) {
         if (input) input.value = (assegnate[field] ?? []).join(', ');
     }
 
-    const avanzate = celle.filter((c, i) => c !== '' && !presi.has(i));
+    const avanzate = cells.filter((c, i) => c !== '' && !presi.has(i));
     const trovate = Object.keys(assegnate).length;
     if (trovate === 0) {
         toast.warning('Nessuna colonna riconosciuta: scrivi tu i nomi nei campi qui sotto.');
@@ -96,7 +96,7 @@ function raccogli(form) {
     return params;
 }
 
-async function salva(form) {
+async function saveDraft(form) {
     const id = form.dataset.id;
     const params = raccogli(form);
     if (id) params.set('id', id);
@@ -113,7 +113,7 @@ function wire() {
             const btn = form.querySelector('button[type="submit"]');
             btn.disabled = true;
             try {
-                const p = await salva(form);
+                const p = await saveDraft(form);
                 toast.success(`Profilo "${p.name}" salvato.`);
                 // La pagina si ricarica: l'elenco, i titoli e i conteggi
                 // vengono dal server e riscriverli qui sarebbe copiarlo.

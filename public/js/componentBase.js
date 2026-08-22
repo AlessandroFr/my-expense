@@ -415,10 +415,10 @@ export function confirmDialog(message, opts = {}) {
 
         // Chi chiama aspetta una risposta: la promise si risolve sempre, e la
         // finestra si toglie di mezzo invece di restare appesa al documento.
-        const rispondi = (esito) => {
+        const rispondi = (outcome) => {
             dlg.close();
             dlg.remove();
-            resolve(esito);
+            resolve(outcome);
         };
         dlg.querySelector('[data-action="confirm"]').addEventListener('click', () => rispondi(true));
         dlg.querySelector('[data-action="cancel"]').addEventListener('click', () => rispondi(false));

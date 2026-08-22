@@ -68,32 +68,32 @@ function sqlValue(v) {
 }
 
 export function generateSqlDump(userId, now = new Date()) {
-  const righe = [
+  const rows = [
     `-- my-expense backup user_id=${userId} generated ${now.toISOString()}`,
     'PRAGMA foreign_keys = OFF;',
     '',
   ];
 
   for (const [table, userColumn] of TABLES) {
-    righe.push(`-- Table: ${table}`);
+    rows.push(`-- Table: ${table}`);
     const rows = VIA_PARENT[table]
       ? all(VIA_PARENT[table], userId)
       : all(`SELECT * FROM ${table} WHERE ${userColumn} = ?`, userId);
 
     if (rows.length === 0) {
-      righe.push('-- (no rows)', '');
+      rows.push('-- (no rows)', '');
       continue;
     }
     const cols = Object.keys(rows[0]);
     const colList = cols.map((c) => `\`${c}\``).join(', ');
     for (const r of rows) {
-      righe.push(`INSERT INTO \`${table}\` (${colList}) VALUES (${cols.map((c) => sqlValue(r[c])).join(', ')});`);
+      rows.push(`INSERT INTO \`${table}\` (${colList}) VALUES (${cols.map((c) => sqlValue(r[c])).join(', ')});`);
     }
-    righe.push('');
+    rows.push('');
   }
 
-  righe.push('PRAGMA foreign_keys = ON;');
-  return righe.join('\n');
+  rows.push('PRAGMA foreign_keys = ON;');
+  return rows.join('\n');
 }
 
 const readme = (userId, now) =>

@@ -69,21 +69,21 @@ const server = createServer(async (req, res) => {
  * La porta 0 significa «scegline una libera tu»: e' quello che usa Electron,
  * e toglie di mezzo sia i conflitti sia la ricerca di una porta libera.
  *
- * @param {number} porta 0 per una porta qualunque
- * @returns {Promise<{porta: number, url: string, chiudi: () => void}>}
+ * @param {number} requestedPort 0 per una porta qualunque
+ * @returns {Promise<{port: number, url: string, close: () => void}>}
  */
-export function start(porta = 0) {
+export function start(requestedPort = 0) {
   migrate(databasePath());
   ensureUser();
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(porta, '127.0.0.1', () => {
+    server.listen(requestedPort, '127.0.0.1', () => {
       const { port } = server.address();
       resolve({
-        porta: port,
+        port,
         url: `http://127.0.0.1:${port}/`,
-        chiudi: () => server.close(),
+        close: () => server.close(),
       });
     });
   });

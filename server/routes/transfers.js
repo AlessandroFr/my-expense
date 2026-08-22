@@ -90,10 +90,10 @@ function normalize(userId, data) {
   const date = str(data.transfer_date);
   if (!isValidDate(date)) throw HttpError.badRequest('Data non valida (formato YYYY-MM-DD).');
 
-  const testo = (raw, etichetta) => {
+  const text = (raw, label) => {
     let v = raw === undefined || raw === null ? null : str(raw);
     if (v === '') v = null;
-    if (v !== null && [...v].length > 255) throw HttpError.badRequest(etichetta);
+    if (v !== null && [...v].length > 255) throw HttpError.badRequest(label);
     return v;
   };
 
@@ -102,8 +102,8 @@ function normalize(userId, data) {
     destination_account_id: destId,
     amount: amount.toFixed(2),
     transfer_date: date,
-    description: testo(data.description, 'Descrizione troppo lunga (max 255 caratteri).'),
-    notes: testo(data.notes, 'Note troppo lunghe (max 255 caratteri).'),
+    description: text(data.description, 'Descrizione troppo lunga (max 255 caratteri).'),
+    notes: text(data.notes, 'Note troppo lunghe (max 255 caratteri).'),
     source_name: source.name,
     destination_name: dest.name,
   };
@@ -111,10 +111,10 @@ function normalize(userId, data) {
 
 /** Le due descrizioni mostrate sulle righe collegate. */
 const descrizioni = (row) => ({
-  spesa: row.description
+  expense: row.description
     ? `Trasferimento verso ${row.destination_name} — ${row.description}`
     : `Trasferimento verso ${row.destination_name}`,
-  entrata: row.description
+  income: row.description
     ? `Trasferimento da ${row.source_name} — ${row.description}`
     : `Trasferimento da ${row.source_name}`,
 });
@@ -150,7 +150,7 @@ async function create(req, res) {
   const userId = currentUserId();
 
   const row = normalize(userId, body);
-  const testi = descrizioni(row);
+  const texts = descrizioni(row);
 
   const id = transaction(() => {
     const result = run(
@@ -168,14 +168,14 @@ async function create(req, res) {
          (user_id, category_id, account_id, amount, description, payment_method,
           expense_date, is_transfer, transfer_id)
        VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1, ?)`,
-      userId, categoryId, row.source_account_id, row.amount, testi.spesa, row.transfer_date, transferId,
+      userId, categoryId, row.source_account_id, row.amount, texts.expense, row.transfer_date, transferId,
     );
     run(
       `INSERT INTO incomes
          (user_id, account_id, source, description, amount, payment_method,
           income_date, is_transfer, transfer_id)
        VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1, ?)`,
-      userId, row.destination_account_id, INCOME_SOURCE, testi.entrata,
+      userId, row.destination_account_id, INCOME_SOURCE, texts.income,
       row.amount, row.transfer_date, transferId,
     );
     return transferId;
@@ -193,7 +193,7 @@ async function update(req, res) {
   if (id <= 0 || !findById(id, userId)) throw HttpError.notFound('Trasferimento non trovato.');
 
   const row = normalize(userId, body);
-  const testi = descrizioni(row);
+  const texts = descrizioni(row);
 
   transaction(() => {
     run(
@@ -209,12 +209,12 @@ async function update(req, res) {
     run(
       `UPDATE expenses SET account_id = ?, amount = ?, description = ?, expense_date = ?
        WHERE user_id = ? AND transfer_id = ?`,
-      row.source_account_id, row.amount, testi.spesa, row.transfer_date, userId, id,
+      row.source_account_id, row.amount, texts.expense, row.transfer_date, userId, id,
     );
     run(
       `UPDATE incomes SET account_id = ?, amount = ?, description = ?, income_date = ?
        WHERE user_id = ? AND transfer_id = ?`,
-      row.destination_account_id, row.amount, testi.entrata, row.transfer_date, userId, id,
+      row.destination_account_id, row.amount, texts.income, row.transfer_date, userId, id,
     );
   });
 

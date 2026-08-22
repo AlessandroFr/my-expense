@@ -23,8 +23,8 @@ const RUMORE = new Set([
 ]);
 
 /** Minuscolo, senza accenti, senza punteggiatura, spazi collassati. */
-export function normalizeForDedup(nome) {
-  return String(nome ?? '')
+export function normalizeForDedup(name) {
+  return String(name ?? '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
@@ -32,7 +32,7 @@ export function normalizeForDedup(nome) {
 }
 
 /** Il nome ridotto a quel che lo distingue davvero. */
-export const coreName = (nome) => normalizeForDedup(nome)
+export const coreName = (name) => normalizeForDedup(name)
   .split(' ')
   .filter((t) => t !== '' && !RUMORE.has(t))
   .join(' ');
@@ -103,7 +103,7 @@ export function duplicateGroups(contatti) {
     perRadice.get(r).push(c);
   });
 
-  const gruppi = [];
+  const groups = [];
   for (const [r, membri] of perRadice) {
     if (membri.length < 2) continue;
     // Vince chi ha piu' movimenti: e' l'anagrafica che l'utente usa davvero.
@@ -111,7 +111,7 @@ export function duplicateGroups(contatti) {
     const ordinati = [...membri].sort((a, b) => (b.usage_total ?? 0) - (a.usage_total ?? 0)
       || a.name.length - b.name.length
       || a.id - b.id);
-    gruppi.push({
+    groups.push({
       members: ordinati,
       suggested_winner_id: ordinati[0].id,
       reason: motivi.get(r) ?? 'stesso nome',
@@ -119,9 +119,9 @@ export function duplicateGroups(contatti) {
   }
 
   // Prima i gruppi che pesano di piu': piu' anagrafiche, poi piu' movimenti.
-  gruppi.sort((a, b) => b.members.length - a.members.length
+  groups.sort((a, b) => b.members.length - a.members.length
     || b.members.reduce((s, m) => s + (m.usage_total ?? 0), 0)
      - a.members.reduce((s, m) => s + (m.usage_total ?? 0), 0)
     || a.members[0].name.localeCompare(b.members[0].name));
-  return gruppi;
+  return groups;
 }

@@ -222,13 +222,13 @@ function mapColumns(cells, wanted) {
   const mapping = {};
 
   for (const field of FIELDS) {
-    const nomi = wanted[field];
-    if (nomi.length === 0) continue;
+    const names = wanted[field];
+    if (names.length === 0) continue;
     const trovate = [];
     // Il primo nome dell'elenco vince sul secondo: sono in ordine di preferenza.
-    for (const nome of nomi) {
+    for (const name of names) {
       for (let i = 0; i < cells.length; i++) {
-        if (taken.has(i) || cells[i] !== nome) continue;
+        if (taken.has(i) || cells[i] !== name) continue;
         taken.add(i);
         trovate.push(i);
         break;
@@ -242,7 +242,7 @@ function mapColumns(cells, wanted) {
   return mapping;
 }
 
-const conta = (mapping) => Object.values(mapping).flat().length;
+const count = (mapping) => Object.values(mapping).flat().length;
 
 /** Un tracciato serve a qualcosa solo se c'e' la data e c'e' un importo. */
 const isUsable = (mapping) => mapping.op_date !== undefined
@@ -260,8 +260,8 @@ export function matchProfiles(lines, profiles) {
   const limite = Math.min(lines.length, MAX_HEADER_SCAN);
 
   for (let i = 0; i < limite; i++) {
-    const riga = lines[i] ?? '';
-    if (riga.trim() === '') continue;
+    const row = lines[i] ?? '';
+    if (row.trim() === '') continue;
 
     for (const profile of profiles) {
       const wanted = columnsOf(profile);
@@ -269,7 +269,7 @@ export function matchProfiles(lines, profiles) {
         ? DELIMITER_CANDIDATES : [delimiterChar(profile.delimiter)];
 
       for (const d of delimiters) {
-        const grezze = splitHeader(riga, d);
+        const grezze = splitHeader(row, d);
         if (grezze.length < 2) continue;
         const cells = grezze.map(normalizeHeader);
         const mapping = mapColumns(cells, wanted);
@@ -277,8 +277,8 @@ export function matchProfiles(lines, profiles) {
 
         esiti.push({
           profile, headerIdx: i, delimiter: d, mapping, cells: grezze,
-          score: conta(mapping),
-          avanzate: cells.filter((c) => c !== '').length - conta(mapping),
+          score: count(mapping),
+          avanzate: cells.filter((c) => c !== '').length - count(mapping),
         });
       }
     }
@@ -293,11 +293,11 @@ export function matchProfiles(lines, profiles) {
 
   // Le intestazioni viste servono al messaggio d'errore quando non matcha niente.
   for (let i = 0; i < limite; i++) {
-    const riga = lines[i] ?? '';
-    if (riga.trim() === '') continue;
-    const d = DELIMITER_CANDIDATES.map((c) => [c, splitHeader(riga, c).length])
+    const row = lines[i] ?? '';
+    if (row.trim() === '') continue;
+    const d = DELIMITER_CANDIDATES.map((c) => [c, splitHeader(row, c).length])
       .sort((a, b) => b[1] - a[1])[0];
-    if (d[1] >= 1) headersSeen.push(splitHeader(riga, d[0]).map((s) => s.trim()).filter((s) => s !== ''));
+    if (d[1] >= 1) headersSeen.push(splitHeader(row, d[0]).map((s) => s.trim()).filter((s) => s !== ''));
   }
 
   return { best: esiti[0] ?? null, candidates: esiti, headersSeen: headersSeen.slice(0, 5) };

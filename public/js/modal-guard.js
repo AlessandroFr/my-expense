@@ -19,7 +19,7 @@
 import { toast } from './toast.js';
 
 /** Quel che l'utente aveva scritto, per finestra e per record. */
-const appunti = new Map();
+const drafts = new Map();
 
 /** Campi che non ha senso conservare: token, file, bottoni. */
 const DA_SALTARE = new Set(['_csrf', 'submit', 'button', 'reset', 'file']);
@@ -31,46 +31,46 @@ const formDi = (modale) => modale?.querySelector('form') ?? null;
  * Senza il record, riaprire la scheda di un'altra spesa rimetterebbe dentro
  * i dati della precedente.
  */
-function chiave(modale, form) {
+function key(modale, form) {
   const id = form?.elements?.id?.value ?? '';
   return `${modale.id}|${id}`;
 }
 
-function leggi(form) {
-  const valori = {};
-  for (const campo of form.elements) {
-    const nome = campo.name;
-    if (!nome || DA_SALTARE.has(nome) || DA_SALTARE.has(campo.type)) continue;
-    if (campo.dataset.noRestore !== undefined) continue;
-    if (campo.type === 'checkbox' || campo.type === 'radio') {
-      valori[`${nome}:${campo.value}`] = campo.checked;
+function readForm(form) {
+  const values = {};
+  for (const field of form.elements) {
+    const name = field.name;
+    if (!name || DA_SALTARE.has(name) || DA_SALTARE.has(field.type)) continue;
+    if (field.dataset.noRestore !== undefined) continue;
+    if (field.type === 'checkbox' || field.type === 'radio') {
+      values[`${name}:${field.value}`] = field.checked;
     } else {
-      valori[nome] = campo.value;
+      values[name] = field.value;
     }
   }
-  return valori;
+  return values;
 }
 
-function scrivi(form, valori) {
-  for (const campo of form.elements) {
-    const nome = campo.name;
-    if (!nome) continue;
+function writeForm(form, values) {
+  for (const field of form.elements) {
+    const name = field.name;
+    if (!name) continue;
     let cambiato = false;
-    if (campo.type === 'checkbox' || campo.type === 'radio') {
-      const v = valori[`${nome}:${campo.value}`];
-      if (v !== undefined && campo.checked !== v) { campo.checked = v; cambiato = true; }
-    } else if (valori[nome] !== undefined && campo.value !== valori[nome]) {
-      campo.value = valori[nome];
+    if (field.type === 'checkbox' || field.type === 'radio') {
+      const v = values[`${name}:${field.value}`];
+      if (v !== undefined && field.checked !== v) { field.checked = v; cambiato = true; }
+    } else if (values[name] !== undefined && field.value !== values[name]) {
+      field.value = values[name];
       cambiato = true;
     }
     // Le pagine reagiscono ai campi con `change` (il tipo di conto mostra o
     // nasconde la cassa, la categoria ridisegna…): senza avvisarle il modulo
     // rimetterebbe i valori lasciando l'interfaccia com'era.
-    if (cambiato) campo.dispatchEvent(new Event('change', { bubbles: true }));
+    if (cambiato) field.dispatchEvent(new Event('change', { bubbles: true }));
   }
 }
 
-const uguali = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const sameValues = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const isEmpty = (v) => Object.values(v).every((x) => x === '' || x === false);
 
 /** Chiusa la finestra: se c'era qualcosa di scritto, se lo tiene da parte. */
@@ -78,18 +78,18 @@ function alleChiusura(modale) {
   const form = formDi(modale);
   if (!form) return;
 
-  const k = chiave(modale, form);
+  const k = key(modale, form);
   // Salvata: non c'e' piu' niente da riprendere, e riprenderlo darebbe una
   // scheda nuova gia' compilata con la roba di prima.
   if (form.dataset.mxSalvato !== undefined) {
     delete form.dataset.mxSalvato;
-    appunti.delete(k);
+    drafts.delete(k);
     return;
   }
 
-  const valori = leggi(form);
-  if (isEmpty(valori)) appunti.delete(k);
-  else appunti.set(k, valori);
+  const values = readForm(form);
+  if (isEmpty(values)) drafts.delete(k);
+  else drafts.set(k, values);
 }
 
 /**
@@ -101,13 +101,13 @@ function allApertura(modale) {
   const form = formDi(modale);
   if (!form) return;
 
-  const k = chiave(modale, form);
-  const salvati = appunti.get(k);
-  if (!salvati) return;
+  const k = key(modale, form);
+  const saved = drafts.get(k);
+  if (!saved) return;
 
-  if (uguali(salvati, leggi(form))) { appunti.delete(k); return; }
-  scrivi(form, salvati);
-  appunti.delete(k);
+  if (sameValues(saved, readForm(form))) { drafts.delete(k); return; }
+  writeForm(form, saved);
+  drafts.delete(k);
   toast.info('Ho rimesso quello che stavi scrivendo.');
 }
 

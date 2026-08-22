@@ -63,11 +63,11 @@ function pacSummary(userId) {
     const lastNav = plan.last_nav === null || plan.last_nav === undefined ? null : Number(plan.last_nav);
 
     invested += totalAmount;
-    let valore = null;
+    let value = null;
     if (lastNav !== null && totalUnits > 0) {
-      valore = totalUnits * lastNav;
-      current += valore;
-      pnl += valore - totalAmount;
+      value = totalUnits * lastNav;
+      current += value;
+      pnl += value - totalAmount;
       hasMarked = true;
     }
 
@@ -82,7 +82,7 @@ function pacSummary(userId) {
     }
     const g = byClass.get(key);
     g.invested += totalAmount;
-    if (valore !== null) { g.current += valore; g.hasMarked = true; }
+    if (value !== null) { g.current += value; g.hasMarked = true; }
   }
 
   return { invested, current, pnl, hasMarked, byClass };
@@ -135,15 +135,15 @@ async function dashboardData(req, res) {
     to = toIn;
   } else {
     const today = new Date();
-    const primo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-    const ultimo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
-    from = primo.toISOString().slice(0, 10);
-    to = ultimo.toISOString().slice(0, 10);
+    const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const last = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
+    from = first.toISOString().slice(0, 10);
+    to = last.toISOString().slice(0, 10);
   }
 
-  const giorni = Math.max(1, Math.floor((Date.parse(to) - Date.parse(from)) / 86400000) + 1);
+  const days = Math.max(1, Math.floor((Date.parse(to) - Date.parse(from)) / 86400000) + 1);
   const prevTo = new Date(Date.parse(from) - 86400000).toISOString().slice(0, 10);
-  const prevFrom = new Date(Date.parse(prevTo) - (giorni - 1) * 86400000).toISOString().slice(0, 10);
+  const prevFrom = new Date(Date.parse(prevTo) - (days - 1) * 86400000).toISOString().slice(0, 10);
   const meseCorrente = new Date().toISOString().slice(0, 7);
 
   const totalCurrent = totalForRange('expenses', 'expense_date', userId, from, to);
@@ -168,7 +168,7 @@ async function dashboardData(req, res) {
   }));
 
   ok(res, {
-    range: { from, to, days: giorni, prev_from: prevFrom, prev_to: prevTo },
+    range: { from, to, days: days, prev_from: prevFrom, prev_to: prevTo },
     current_month: meseCorrente,
     totals: {
       current: round2(totalCurrent),

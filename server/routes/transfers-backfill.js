@@ -17,7 +17,7 @@ async function backfillImported(req, res) {
   // ':exp' o ':exp-atm', e quello vecchio, dove la colonna troncava il
   // suffisso e le due meta' condividevano la stessa impronta — li' l'unico
   // indizio e' la descrizione generata dall'importer.
-  const candidati = all(
+  const candidates = all(
     `SELECT id, account_id, amount, expense_date, value_date, description, import_hash
      FROM expenses
      WHERE user_id = ? AND transfer_id IS NULL AND import_hash IS NOT NULL
@@ -33,7 +33,7 @@ async function backfillImported(req, res) {
   let skippedNoPair = 0;
   let skippedMismatch = 0;
 
-  for (const exp of candidati) {
+  for (const exp of candidates) {
     const expHash = String(exp.import_hash);
     const incHash = expHash.endsWith(':exp-atm') ? `${expHash.slice(0, -':exp-atm'.length)}:inc-atm`
       : expHash.endsWith(':exp') ? `${expHash.slice(0, -':exp'.length)}:inc`

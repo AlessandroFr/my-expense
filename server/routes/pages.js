@@ -78,22 +78,22 @@ function sendHtml(res, html, csrfToken) {
  * Costruisce la funzione che serve una pagina.
  * `dati` riceve (userId, req) e restituisce quel che serve al template.
  */
-const pagina = (title, modulo, dati = () => ({})) => async (req, res) => {
+const pageHandler = (title, pageModule, dati = () => ({})) => async (req, res) => {
   const userId = currentUserId();
   const { pathname } = new URL(req.url, 'http://localhost');
   const csrfToken = req.csrfToken;
 
-  const content = modulo.render({ csrfToken, ...dati(userId, req) });
+  const content = pageModule.render({ csrfToken, ...dati(userId, req) });
   sendHtml(res, page({ title, path: pathname, username: username(), csrfToken, content }), csrfToken);
 };
 
-const dashboard = pagina('Dashboard', dashboardPage, () => ({ username: username() }));
+const dashboard = pageHandler('Dashboard', dashboardPage, () => ({ username: username() }));
 
 export const pageRoutes = {
   'GET /': dashboard,
   'GET /dashboard': dashboard,
 
-  'GET /expenses': pagina('Spese', expensesPage, (userId) => ({
+  'GET /expenses': pageHandler('Spese', expensesPage, (userId) => ({
     categories: categoriesForUser(userId),
     accounts: activeAccounts(userId),
     bankProfiles: profiliBanca(userId),
@@ -104,17 +104,17 @@ export const pageRoutes = {
     paymentLabels: PAYMENT_LABELS,
   })),
 
-  'GET /incomes': pagina('Entrate', incomesPage, (userId) => ({
+  'GET /incomes': pageHandler('Entrate', incomesPage, (userId) => ({
     accounts: activeAccounts(userId),
     contacts: contactsForUser(userId),
     today: today(),
   })),
 
-  'GET /categories': pagina('Categorie', categoriesPage, (userId) => ({
+  'GET /categories': pageHandler('Categorie', categoriesPage, (userId) => ({
     categories: categoriesForUser(userId),
   })),
 
-  'GET /categories/edit': pagina('Modifica categoria', categoriesEditPage, (userId, req) => {
+  'GET /categories/edit': pageHandler('Modifica categoria', categoriesEditPage, (userId, req) => {
     const id = int(new URL(req.url, 'http://localhost').searchParams.get('id'));
     return {
       cat: one(
@@ -124,29 +124,29 @@ export const pageRoutes = {
     };
   }),
 
-  'GET /budgets': pagina('Budget mensili', budgetsPage, () => ({
+  'GET /budgets': pageHandler('Budget mensili', budgetsPage, () => ({
     currentMonth: new Date().toISOString().slice(0, 7),
   })),
 
-  'GET /accounts': pagina('Conti', accountsPage, (userId) => ({
+  'GET /accounts': pageHandler('Conti', accountsPage, (userId) => ({
     bankProfiles: profiliBanca(userId),
   })),
 
-  'GET /bank-profiles': pagina('Profili banca', bankProfilesPage, (userId) => ({
+  'GET /bank-profiles': pageHandler('Profili banca', bankProfilesPage, (userId) => ({
     profiles: profiliBanca(userId),
     genericColumns: GENERIC_COLUMNS,
   })),
-  'GET /transfers': pagina('Trasferimenti', transfersPage, (userId) => ({
+  'GET /transfers': pageHandler('Trasferimenti', transfersPage, (userId) => ({
     accounts: activeAccounts(userId),
   })),
 
-  'GET /recurring': pagina('Spese ricorrenti', recurringPage, (userId) => ({
+  'GET /recurring': pageHandler('Spese ricorrenti', recurringPage, (userId) => ({
     contacts: contactsForUser(userId),
     today: today(),
   })),
 
-  'GET /contacts': pagina('Anagrafiche', contactsPage),
-  'GET /contacts/detail': pagina('Anagrafica', contactsDetailPage, (userId, req) => {
+  'GET /contacts': pageHandler('Anagrafiche', contactsPage),
+  'GET /contacts/detail': pageHandler('Anagrafica', contactsDetailPage, (userId, req) => {
     const params = new URL(req.url, 'http://localhost').searchParams;
     const id = int(params.get('id'));
     const year = int(params.get('year'), new Date().getFullYear());
@@ -160,8 +160,8 @@ export const pageRoutes = {
     };
   }),
 
-  'GET /securities': pagina('Investimenti', securitiesPage),
-  'GET /securities/instrument': pagina('Strumento', securitiesInstrumentPage, (userId, req) => {
+  'GET /securities': pageHandler('Investimenti', securitiesPage),
+  'GET /securities/instrument': pageHandler('Strumento', securitiesInstrumentPage, (userId, req) => {
     const id = int(new URL(req.url, 'http://localhost').searchParams.get('id'));
     const instrument = one(
       `SELECT s.id, s.name, s.isin, s.ticker, s.currency, s.notes, s.archived,
@@ -177,8 +177,8 @@ export const pageRoutes = {
     return { instrument };
   }),
 
-  'GET /pac': pagina('Piani di Accumulo', pacPage),
-  'GET /pac/plan': pagina('Piano di Accumulo', pacPlanPage, (userId, req) => {
+  'GET /pac': pageHandler('Piani di Accumulo', pacPage),
+  'GET /pac/plan': pageHandler('Piano di Accumulo', pacPlanPage, (userId, req) => {
     const id = int(new URL(req.url, 'http://localhost').searchParams.get('id'));
     const plan = one(
       `SELECT p.id, p.name, p.frequency, p.amount, p.fund_id, p.source_account_id,
@@ -190,14 +190,14 @@ export const pageRoutes = {
        WHERE p.id = ? AND p.user_id = ? LIMIT 1`, id, userId,
     );
     if (!plan) throw HttpError.notFound('Piano non trovato.');
-    const etichette = { weekly: 'Settimanale', monthly: 'Mensile', quarterly: 'Trimestrale', yearly: 'Annuale' };
-    return { plan, freqLabel: etichette[plan.frequency] ?? plan.frequency };
+    const labels = { weekly: 'Settimanale', monthly: 'Mensile', quarterly: 'Trimestrale', yearly: 'Annuale' };
+    return { plan, freqLabel: labels[plan.frequency] ?? plan.frequency };
   }),
 
-  'GET /reports': pagina('Report annuale', reportsPage, () => ({
+  'GET /reports': pageHandler('Report annuale', reportsPage, () => ({
     thisYear: new Date().getFullYear(),
   })),
 
-  'GET /settings': pagina('Impostazioni', settingsPage),
-  'GET /wiki': pagina('Guida', wikiPage),
+  'GET /settings': pageHandler('Impostazioni', settingsPage),
+  'GET /wiki': pageHandler('Guida', wikiPage),
 };

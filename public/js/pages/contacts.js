@@ -440,7 +440,7 @@ function renderDedupGroups(groups, scanned) {
     }
 
     box.innerHTML = groups.map((g, gi) => {
-        const righe = g.members.map((m) => `
+        const rows = g.members.map((m) => `
             <label class="list-group-item d-flex align-items-center gap-2 py-1">
                 <input type="radio" class="form-check-input m-0" name="dedup-winner-${gi}" value="${m.id}"
                        ${m.id === g.suggested_winner_id ? 'checked' : ''}>
@@ -457,7 +457,7 @@ function renderDedupGroups(groups, scanned) {
                             <i class="bi bi-bezier2 me-1"></i>Unisci
                         </button>
                     </div>
-                    <div class="list-group list-group-flush">${righe}</div>
+                    <div class="list-group list-group-flush">${rows}</div>
                 </div>
             </div>`;
     }).join('');

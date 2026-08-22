@@ -74,15 +74,15 @@ async function loadContributions() {
 }
 
 /** Una casella dei numeri in cima alla pagina. */
-const kpi = (titolo, valore, dettaglio = '', classe = '') => `
+const kpi = (title, value, detail = '', classe = '') => `
     <div class="col-6 col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
-        <div class="small text-muted">${escapeHtml(titolo)}</div>
-        <div class="h5 mb-0 ${classe}">${valore}</div>
-        ${dettaglio ? `<div class="small text-muted">${dettaglio}</div>` : ''}
+        <div class="small text-muted">${escapeHtml(title)}</div>
+        <div class="h5 mb-0 ${classe}">${value}</div>
+        ${detail ? `<div class="small text-muted">${detail}</div>` : ''}
     </div></div></div>`;
 
-const segno = (n) => (Number(n) > 0 ? 'text-success' : Number(n) < 0 ? 'text-danger' : '');
-const conSegno = (n, testo) => `${Number(n) > 0 ? '+' : ''}${testo}`;
+const sign = (n) => (Number(n) > 0 ? 'text-success' : Number(n) < 0 ? 'text-danger' : '');
+const conSegno = (n, text) => `${Number(n) > 0 ? '+' : ''}${text}`;
 
 function renderKpi() {
     let total = 0, units = 0;
@@ -94,23 +94,23 @@ function renderKpi() {
     // Finche' l'andamento non e' arrivato (o non e' calcolabile) si mostra
     // quello che si sa con certezza: quanto e' stato versato.
     const p = performanceData;
-    const valore = p?.valore ?? null;
+    const value = p?.value ?? null;
 
     kpiEl.innerHTML = [
         kpi('Versato totale', escapeHtml(fmtMoney(total)), `${contributions.length} versamenti`),
         kpi(
             'Valore oggi',
-            valore === null ? '<span class="text-muted">—</span>' : escapeHtml(fmtMoney(valore)),
-            valore === null ? 'serve un NAV del fondo' : `col NAV del ${escapeHtml(p.nav_al ?? p.valore_al)}`,
+            value === null ? '<span class="text-muted">—</span>' : escapeHtml(fmtMoney(value)),
+            value === null ? 'serve un NAV del fondo' : `col NAV del ${escapeHtml(p.nav_at ?? p.value_at)}`,
         ),
         kpi(
             'Guadagno',
-            p?.guadagno === null || p?.guadagno === undefined
+            p?.gain === null || p?.gain === undefined
                 ? '<span class="text-muted">—</span>'
-                : escapeHtml(conSegno(p.guadagno, fmtMoney(p.guadagno))),
-            p?.guadagno_pct === null || p?.guadagno_pct === undefined
-                ? '' : `${escapeHtml(conSegno(p.guadagno_pct, `${fmtNum(p.guadagno_pct, 2)}%`))} sul versato`,
-            segno(p?.guadagno),
+                : escapeHtml(conSegno(p.gain, fmtMoney(p.gain))),
+            p?.gain_pct === null || p?.gain_pct === undefined
+                ? '' : `${escapeHtml(conSegno(p.gain_pct, `${fmtNum(p.gain_pct, 2)}%`))} sul versato`,
+            sign(p?.gain),
         ),
         kpi(
             'Rendimento annuo',
@@ -118,7 +118,7 @@ function renderKpi() {
                 ? '<span class="text-muted">—</span>'
                 : escapeHtml(conSegno(p.irr, `${fmtNum(p.irr, 2)}%`)),
             'tiene conto di quando hai versato',
-            segno(p?.irr),
+            sign(p?.irr),
         ),
     ].join('');
 }
@@ -128,7 +128,7 @@ function renderKpi() {
 const navFetchBtn = document.getElementById('nav-fetch-btn');
 
 navFetchBtn?.addEventListener('click', async () => {
-    const testo = navFetchBtn.innerHTML;
+    const text = navFetchBtn.innerHTML;
     navFetchBtn.disabled = true;
     navFetchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scarico…';
     try {
@@ -143,7 +143,7 @@ navFetchBtn?.addEventListener('click', async () => {
         toast.error(err.message ?? 'Non sono riuscito a scaricare le quotazioni.');
     } finally {
         navFetchBtn.disabled = false;
-        navFetchBtn.innerHTML = testo;
+        navFetchBtn.innerHTML = text;
     }
 });
 
@@ -161,31 +161,31 @@ async function loadPerformance() {
 
 function renderPerformance() {
     const canvas = document.getElementById('plan-chart');
-    const nota   = document.getElementById('plan-chart-note');
+    const note   = document.getElementById('plan-chart-note');
     if (!canvas || typeof Chart === 'undefined') return;
 
-    const serie = performanceData?.serie ?? [];
+    const series = performanceData?.series ?? [];
     if (performanceChart) performanceChart.destroy();
 
-    if (serie.length === 0) {
-        if (nota) nota.textContent = 'nessun versamento da mostrare';
+    if (series.length === 0) {
+        if (note) note.textContent = 'nessun versamento da mostrare';
         return;
     }
-    const conValore = serie.filter(p => p.valore !== null).length;
-    if (nota) {
-        nota.textContent = conValore === 0
+    const conValore = series.filter(p => p.value !== null).length;
+    if (note) {
+        note.textContent = conValore === 0
             ? 'manca il NAV del fondo: si vede solo quanto hai versato'
-            : `${serie.length} punti, dal ${serie[0].date}`;
+            : `${series.length} punti, dal ${series[0].date}`;
     }
 
     performanceChart = new Chart(canvas, {
         type: 'line',
         data: {
-            labels: serie.map(p => p.date),
+            labels: series.map(p => p.date),
             datasets: [
                 {
                     label: 'Valore',
-                    data: serie.map(p => p.valore),
+                    data: series.map(p => p.value),
                     borderColor: '#198754',
                     backgroundColor: 'rgba(25,135,84,.12)',
                     fill: true,
@@ -196,7 +196,7 @@ function renderPerformance() {
                 },
                 {
                     label: 'Versato',
-                    data: serie.map(p => p.versato),
+                    data: series.map(p => p.contributed),
                     borderColor: '#6c757d',
                     borderDash: [5, 4],
                     pointRadius: 0,

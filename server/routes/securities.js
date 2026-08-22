@@ -242,25 +242,25 @@ export function holdingsForUser(userId, accountId = null) {
 
 /** Riassunto per classe di attivo, usato dal widget della dashboard. */
 export function holdingsByAssetClass(userId) {
-  const gruppi = new Map();
+  const groups = new Map();
   for (const h of holdingsForUser(userId)) {
     const key = h.asset_class_id ?? 0;
-    if (!gruppi.has(key)) {
-      gruppi.set(key, {
+    if (!groups.has(key)) {
+      groups.set(key, {
         asset_class_id: h.asset_class_id,
         asset_class_name: h.asset_class_name ?? 'Senza classe',
         asset_class_color: h.asset_class_color ?? '#6c757d',
         invested: 0, current: 0, hasMarked: false, dividends: 0, pnl: 0,
       });
     }
-    const g = gruppi.get(key);
+    const g = groups.get(key);
     g.invested += h.qty * h.avg_cost;
     if (h.mark_value !== null) { g.current += h.mark_value; g.hasMarked = true; }
     g.dividends += h.dividends;
     g.pnl += h.total_pnl;
   }
 
-  return [...gruppi.values()].map((g) => ({
+  return [...groups.values()].map((g) => ({
     asset_class_id: g.asset_class_id,
     asset_class_name: g.asset_class_name,
     asset_class_color: g.asset_class_color,
@@ -532,8 +532,8 @@ async function createTransaction(req, res) {
   const id = transaction(() => {
     const categoryId = investmentsCategoryId(userId);
     const suffisso = row.fee > 0 ? ` (fee ${dec2(row.fee)})` : '';
-    const descrizione = `${row.kind} ${trimZeros(row.quantity)} ${row.instrument_name} @ ${trimZeros(row.price)}${suffisso}`;
-    const testo = descrizione + (row.notes !== null ? ` — ${row.notes}` : '');
+    const description = `${row.kind} ${trimZeros(row.quantity)} ${row.instrument_name} @ ${trimZeros(row.price)}${suffisso}`;
+    const text = description + (row.notes !== null ? ` — ${row.notes}` : '');
 
     let expenseId = null;
     let incomeId = null;
@@ -543,7 +543,7 @@ async function createTransaction(req, res) {
         `INSERT INTO expenses
            (user_id, category_id, account_id, amount, description, payment_method, expense_date, is_investment)
          VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1)`,
-        userId, categoryId, row.account_id, dec2(row.net_amount), testo, row.trade_date,
+        userId, categoryId, row.account_id, dec2(row.net_amount), text, row.trade_date,
       );
       expenseId = Number(r.lastInsertRowid);
     } else if (row.kind === 'SELL' || row.kind === 'DIVIDEND') {
@@ -552,7 +552,7 @@ async function createTransaction(req, res) {
            (user_id, account_id, source, description, amount, payment_method, income_date)
          VALUES (?, ?, ?, ?, ?, 'transfer', ?)`,
         userId, row.account_id, row.kind === 'DIVIDEND' ? 'Dividendo' : 'Vendita titolo',
-        testo, dec2(row.net_amount), row.trade_date,
+        text, dec2(row.net_amount), row.trade_date,
       );
       incomeId = Number(r.lastInsertRowid);
     }

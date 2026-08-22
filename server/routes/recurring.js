@@ -58,8 +58,8 @@ const ownedExists = (userId, table, id) =>
 /** Un fornitore scritto a mano e non ancora in rubrica viene creato al volo. */
 function resolveContact(userId, data) {
   if (nullableInt(data.contact_id)) return data;
-  const nome = str(data.contact_name);
-  return { ...data, contact_id: nome === '' ? null : findOrCreateContact(userId, nome) };
+  const name = str(data.contact_name);
+  return { ...data, contact_id: name === '' ? null : findOrCreateContact(userId, name) };
 }
 
 /** Traduce RecurringExpense::validate. */
@@ -129,7 +129,7 @@ export function generatePending(userId) {
       let cursor = t.last_generated_date === null
         ? t.start_date
         : avanza(t.last_generated_date, t.frequency);
-      let ultima = null;
+      let last = null;
 
       while (cursor <= today && (t.end_date === null || cursor <= t.end_date)) {
         run(
@@ -139,13 +139,13 @@ export function generatePending(userId) {
           userId, t.category_id, t.contact_id, t.amount, t.description, t.payment_method, cursor,
         );
         created++;
-        ultima = cursor;
+        last = cursor;
         cursor = avanza(cursor, t.frequency);
       }
 
-      if (ultima !== null) {
+      if (last !== null) {
         run('UPDATE recurring_expenses SET last_generated_date = ? WHERE id = ? AND user_id = ?',
-          ultima, t.id, userId);
+          last, t.id, userId);
       }
     }
   });

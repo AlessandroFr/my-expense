@@ -113,8 +113,8 @@ function normalize(userId, data) {
 /** Come per le spese: un cliente scritto a mano e non ancora in rubrica viene creato. */
 function resolveContact(userId, data) {
   if (nullableInt(data.contact_id)) return data;
-  const nome = str(data.contact_name);
-  return { ...data, contact_id: nome === '' ? null : findOrCreateContact(userId, nome) };
+  const name = str(data.contact_name);
+  return { ...data, contact_id: name === '' ? null : findOrCreateContact(userId, name) };
 }
 
 async function list(req, res) {

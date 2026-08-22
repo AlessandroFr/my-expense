@@ -56,7 +56,7 @@ async function dbReset(req, res) {
     throw HttpError.badRequest('Frase di conferma errata. Digita esattamente "ELIMINA TUTTO".');
   }
 
-  const conta = {
+  const count = {
     expense_attachments_deleted: 0, expense_tags_deleted: 0, expenses_deleted: 0,
     incomes_deleted: 0, recurring_reset: 0, recurring_deleted: 0, budgets_deleted: 0,
     saved_filters_deleted: 0, tags_deleted: 0, accounts_deleted: 0, contacts_deleted: 0,
@@ -65,7 +65,7 @@ async function dbReset(req, res) {
     pac_plans_deleted: 0, pac_funds_deleted: 0, attachment_files_deleted: 0,
   };
 
-  const perUtente = (tabella) => run(`DELETE FROM ${tabella} WHERE user_id = ?`, userId).changes;
+  const perUtente = (tableName) => run(`DELETE FROM ${tableName} WHERE user_id = ?`, userId).changes;
 
   // Le foreign key si spengono per non dover cancellare nell'ordine giusto; il
   // pragma non ha effetto dentro una transazione, quindi va prima.
@@ -73,45 +73,45 @@ async function dbReset(req, res) {
   try {
     transaction(() => {
       if (scope === 'investments') {
-        conta.pac_contrib_deleted = perUtente('pac_contributions');
-        conta.pac_plans_deleted = perUtente('pac_plans');
-        conta.pac_funds_deleted = perUtente('pac_funds');
-        conta.securities_tx_deleted = perUtente('securities_transactions');
-        conta.securities_instr_deleted = perUtente('securities_instruments');
-        conta.asset_classes_deleted = perUtente('asset_classes');
-        conta.transfers_deleted = perUtente('transfers');
+        count.pac_contrib_deleted = perUtente('pac_contributions');
+        count.pac_plans_deleted = perUtente('pac_plans');
+        count.pac_funds_deleted = perUtente('pac_funds');
+        count.securities_tx_deleted = perUtente('securities_transactions');
+        count.securities_instr_deleted = perUtente('securities_instruments');
+        count.asset_classes_deleted = perUtente('asset_classes');
+        count.transfers_deleted = perUtente('transfers');
         return;
       }
 
-      conta.expense_attachments_deleted = perUtente('expense_attachments');
-      conta.expense_tags_deleted = run(
+      count.expense_attachments_deleted = perUtente('expense_attachments');
+      count.expense_tags_deleted = run(
         'DELETE FROM expense_tags WHERE expense_id IN (SELECT id FROM expenses WHERE user_id = ?)',
         userId,
       ).changes;
-      conta.expenses_deleted = perUtente('expenses');
-      conta.incomes_deleted = perUtente('incomes');
+      count.expenses_deleted = perUtente('expenses');
+      count.incomes_deleted = perUtente('incomes');
 
       if (scope === 'movements_recurring') {
-        conta.recurring_reset = run(
+        count.recurring_reset = run(
           'UPDATE recurring_expenses SET last_generated_date = NULL WHERE user_id = ?', userId,
         ).changes;
       }
 
       if (scope === 'all') {
-        conta.pac_contrib_deleted = perUtente('pac_contributions');
-        conta.pac_plans_deleted = perUtente('pac_plans');
-        conta.pac_funds_deleted = perUtente('pac_funds');
-        conta.securities_tx_deleted = perUtente('securities_transactions');
-        conta.securities_instr_deleted = perUtente('securities_instruments');
-        conta.asset_classes_deleted = perUtente('asset_classes');
-        conta.transfers_deleted = perUtente('transfers');
-        conta.saved_filters_deleted = perUtente('saved_filters');
-        conta.budgets_deleted = perUtente('budgets');
-        conta.recurring_deleted = perUtente('recurring_expenses');
-        conta.tags_deleted = perUtente('tags');
-        conta.accounts_deleted = perUtente('accounts');
-        conta.contacts_deleted = perUtente('contacts');
-        conta.categories_deleted = perUtente('categories');
+        count.pac_contrib_deleted = perUtente('pac_contributions');
+        count.pac_plans_deleted = perUtente('pac_plans');
+        count.pac_funds_deleted = perUtente('pac_funds');
+        count.securities_tx_deleted = perUtente('securities_transactions');
+        count.securities_instr_deleted = perUtente('securities_instruments');
+        count.asset_classes_deleted = perUtente('asset_classes');
+        count.transfers_deleted = perUtente('transfers');
+        count.saved_filters_deleted = perUtente('saved_filters');
+        count.budgets_deleted = perUtente('budgets');
+        count.recurring_deleted = perUtente('recurring_expenses');
+        count.tags_deleted = perUtente('tags');
+        count.accounts_deleted = perUtente('accounts');
+        count.contacts_deleted = perUtente('contacts');
+        count.categories_deleted = perUtente('categories');
       }
       // L'utente non viene mai cancellato: e' l'aggancio di tutti i dati.
     });
@@ -121,9 +121,9 @@ async function dbReset(req, res) {
 
   // I file su disco dopo il commit: se qualcosa va storto restano solo file
   // orfani, non un database incoerente.
-  conta.attachment_files_deleted = clearAttachments(userId);
+  count.attachment_files_deleted = clearAttachments(userId);
 
-  ok(res, { scope, counters: conta });
+  ok(res, { scope, counters: count });
 }
 
 /** Divide i valori di una INSERT tenendo conto delle stringhe quotate. */
@@ -164,7 +164,7 @@ async function backupRestore(req, res) {
   if (file.data.length > 64 * 1024 * 1024) throw HttpError.badRequest('File troppo grande (max 64 MB).');
 
   let dump = '';
-  const allegati = [];
+  const attachments = [];
 
   if (/\.zip$/i.test(file.filename)) {
     let voci;
@@ -173,10 +173,10 @@ async function backupRestore(req, res) {
       if (v.name === 'dump.sql') { dump = v.data.toString('utf8'); continue; }
       if (v.name === 'README.txt') continue;
       if (v.name.startsWith('uploads/')) {
-        const nome = v.name.slice('uploads/'.length);
+        const name = v.name.slice('uploads/'.length);
         // Un nome con percorso dentro scriverebbe fuori dalla cartella.
-        if (nome === '' || nome.includes('/') || nome.includes('\\')) continue;
-        allegati.push({ nome, dati: v.data });
+        if (name === '' || name.includes('/') || name.includes('\\')) continue;
+        attachments.push({ name, dati: v.data });
       }
     }
     if (dump === '') throw HttpError.badRequest('Lo ZIP non contiene dump.sql.');
@@ -195,29 +195,29 @@ async function backupRestore(req, res) {
   db().exec('PRAGMA foreign_keys = OFF');
   try {
     transaction(() => {
-      for (const riga of dump.split(/\r?\n/)) {
-        const l = riga.trim();
+      for (const row of dump.split(/\r?\n/)) {
+        const l = row.trim();
         if (l === '' || l.startsWith('--') || /^PRAGMA/i.test(l)) continue;
         if (!/^INSERT INTO/i.test(l)) continue;
 
         const m = l.match(/^INSERT INTO `([^`]+)` \(([^)]+)\) VALUES \((.*)\);\s*$/s);
         if (!m) { scartate++; continue; }
 
-        const [, tabella, colonneRaw, valoriRaw] = m;
-        if (!TABELLE_RIPRISTINO.includes(tabella)) { scartate++; continue; }
+        const [, tableName, colonneRaw, valoriRaw] = m;
+        if (!TABELLE_RIPRISTINO.includes(tableName)) { scartate++; continue; }
 
-        const colonne = colonneRaw.split(',').map((c) => c.trim().replace(/^`|`$/g, ''));
-        const valori = tokenizza(valoriRaw);
-        if (colonne.length !== valori.length) {
-          throw new Error(`Colonne e valori non combaciano su ${tabella} (${colonne.length} contro ${valori.length}).`);
+        const columns = colonneRaw.split(',').map((c) => c.trim().replace(/^`|`$/g, ''));
+        const values = tokenizza(valoriRaw);
+        if (columns.length !== values.length) {
+          throw new Error(`Colonne e valori non combaciano su ${tableName} (${columns.length} contro ${values.length}).`);
         }
 
         // L'utente del backup può avere un id diverso da quello locale.
-        const idx = colonne.indexOf('user_id');
-        if (idx !== -1) valori[idx] = String(userId);
+        const idx = columns.indexOf('user_id');
+        if (idx !== -1) values[idx] = String(userId);
 
-        db().exec(`INSERT INTO \`${tabella}\` (\`${colonne.join('`,`')}\`) VALUES (${valori.join(',')})`);
-        righePerTabella[tabella]++;
+        db().exec(`INSERT INTO \`${tableName}\` (\`${columns.join('`,`')}\`) VALUES (${values.join(',')})`);
+        righePerTabella[tableName]++;
       }
     });
   } finally {
@@ -225,9 +225,9 @@ async function backupRestore(req, res) {
   }
 
   let fileEstratti = 0;
-  if (allegati.length > 0) {
+  if (attachments.length > 0) {
     const dir = uploadsDir(userId, true);
-    for (const a of allegati) {
+    for (const a of attachments) {
       try { writeFileSync(join(dir, a.nome), a.dati); fileEstratti++; } catch { /* best-effort */ }
     }
   }

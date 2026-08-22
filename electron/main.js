@@ -29,10 +29,10 @@ import { checkForUpdates } from './update.js';
  * Va deciso adesso, prima di caricare il server, che legge questa variabile nel
  * momento in cui viene importato.
  */
-const cartellaDati = process.env.MY_EXPENSE_DATA_DIR
+const dataFolder = process.env.MY_EXPENSE_DATA_DIR
   || (app.isPackaged ? app.getPath('userData') : join(import.meta.dirname, '..'));
 
-process.env.MY_EXPENSE_DATA_DIR = cartellaDati;
+process.env.MY_EXPENSE_DATA_DIR = dataFolder;
 
 /**
  * Diario dell'avvio.
@@ -41,35 +41,35 @@ process.env.MY_EXPENSE_DATA_DIR = cartellaDati;
  * se qualcosa va storto prima che compaia la finestra, senza questo file non
  * resta traccia di niente e il sintomo e' soltanto «non si apre».
  */
-function nota(messaggio) {
+function note(message) {
   try {
-    const dir = join(cartellaDati, 'logs');
+    const dir = join(dataFolder, 'logs');
     mkdirSync(dir, { recursive: true });
-    appendFileSync(join(dir, 'avvio.log'), `${new Date().toISOString()}  ${messaggio}\n`);
+    appendFileSync(join(dir, 'avvio.log'), `${new Date().toISOString()}  ${message}\n`);
   } catch { /* se non si puo' scrivere, pazienza: non e' questo a dover fermare l'avvio */ }
 }
 
 process.on('uncaughtException', (err) => {
-  nota(`errore non gestito: ${err?.stack ?? err}`);
+  note(`errore non gestito: ${err?.stack ?? err}`);
   dialog.showErrorBox('My Expense si e\' fermata', String(err?.message ?? err));
   app.exit(1);
 });
 
-nota(`avvio, versione ${app.getVersion()}`);
+note(`avvio, versione ${app.getVersion()}`);
 
 // Due copie aperte scriverebbero sullo stesso database. La seconda cede il
 // posto alla prima e se ne va subito: `app.quit()` non basterebbe, perche'
 // chiude con calma e intanto il resto del file continuerebbe a girare,
 // avviando un secondo server.
 if (!app.requestSingleInstanceLock()) {
-  nota('c\'e\' gia\' una copia aperta: cedo il posto a quella');
+  note('c\'e\' gia\' una copia aperta: cedo il posto a quella');
   app.exit(0);
 }
 
-let finestra = null;
+let mainWindow = null;
 
 function createWindow(url) {
-  finestra = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
     minWidth: 900,
@@ -88,7 +88,7 @@ function createWindow(url) {
 
   // Mostrata solo quando c'e' qualcosa da vedere, per non aprire un rettangolo
   // bianco mentre la pagina carica.
-  finestra.once('ready-to-show', () => finestra.show());
+  mainWindow.once('ready-to-show', () => mainWindow.show());
 
   // I link esterni (documentazione, siti delle banche) si aprono nel browser
   // dell'utente: dentro l'app non avrebbero ne' barra indirizzi ne' ritorno.
@@ -97,21 +97,21 @@ function createWindow(url) {
     shell.openExternal(target);
     return true;
   };
-  finestra.webContents.setWindowOpenHandler(({ url: target }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
     esterno(target);
     return { action: 'deny' };
   });
-  finestra.webContents.on('will-navigate', (evento, target) => {
+  mainWindow.webContents.on('will-navigate', (evento, target) => {
     if (esterno(target)) evento.preventDefault();
   });
 
-  finestra.loadURL(url);
+  mainWindow.loadURL(url);
 }
 
 app.on('second-instance', () => {
-  if (!finestra) return;
-  if (finestra.isMinimized()) finestra.restore();
-  finestra.focus();
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
 });
 
 app.on('window-all-closed', () => app.quit());
@@ -128,7 +128,7 @@ app.on('window-all-closed', () => app.quit());
  */
 async function startApplication() {
   await app.whenReady();
-  nota('pronta');
+  note('pronta');
 
   // Solo le voci che servono davvero: ricarica, zoom, strumenti di sviluppo. Il
   // resto del menu standard parla di finestre e schede che qui non esistono.
@@ -150,24 +150,24 @@ async function startApplication() {
   // Importato qui e non in cima perche' la cartella dei dati dev'essere gia'
   // decisa: il server la legge nel momento in cui viene caricato.
   const { start } = await import('../server/index.js');
-  const { url, porta } = await start(0);
-  nota(`server in ascolto sulla porta ${porta}`);
+  const { url, port } = await start(0);
+  note(`server in ascolto sulla porta ${port}`);
   createWindow(url);
-  nota('finestra aperta');
+  note('finestra aperta');
 
   // Dopo la finestra, non prima: un aggiornamento che non arriva non deve
   // ritardare l'avvio, e se qualcosa va storto l'app e' gia' utilizzabile.
-  checkForUpdates(app, dialog, nota)
-    .catch((err) => nota(`aggiornamenti: ${err?.stack ?? err}`));
+  checkForUpdates(app, dialog, note)
+    .catch((err) => note(`aggiornamenti: ${err?.stack ?? err}`));
 }
 
 startApplication().catch((err) => {
   // Senza server non c'e' niente da mostrare: meglio dirlo che aprire una
   // finestra che non funziona.
-  nota(`avvio fallito: ${err?.stack ?? err}`);
+  note(`avvio fallito: ${err?.stack ?? err}`);
   dialog.showErrorBox(
     'My Expense non riesce ad avviarsi',
-    `${err.message}\n\nI dettagli sono in:\n${join(cartellaDati, 'logs', 'avvio.log')}`,
+    `${err.message}\n\nI dettagli sono in:\n${join(dataFolder, 'logs', 'avvio.log')}`,
   );
   app.exit(1);
 });

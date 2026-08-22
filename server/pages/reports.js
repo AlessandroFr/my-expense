@@ -1,7 +1,7 @@
 import { esc, asset } from '../view.js';
 
 export const render = ({ thisYear }) => {
-  const anni = Array.from({ length: 10 }, (_, i) => thisYear - i);
+  const years = Array.from({ length: 10 }, (_, i) => thisYear - i);
   return `
 <div class="row mb-3 align-items-center">
     <div class="col-md-8">
@@ -10,7 +10,7 @@ export const render = ({ thisYear }) => {
     </div>
     <div class="col-md-4 text-md-end">
         <select id="report-year" class="form-select d-inline-block" style="width:auto">
-            ${anni.map((y) => `                <option value="${y}" ${y === thisYear ? 'selected' : ''}>${y}</option>
+            ${years.map((y) => `                <option value="${y}" ${y === thisYear ? 'selected' : ''}>${y}</option>
             `).join('')}        </select>
     </div>
 </div>

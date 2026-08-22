@@ -15,9 +15,9 @@ import { resolveAmountMode } from '../../server/routes/bank-import.js';
 
 /** I preimpostati come li vedrebbe il codice dopo averli letti dal database. */
 const profili = () => builtinProfiles().map((p, i) => ({ ...p, id: i + 1 }));
-const profilo = (chiave) => profili().filter((p) => p.builtin_key === chiave);
+const profile = (key) => profili().filter((p) => p.builtin_key === key);
 
-const righe = (testo) => testo.split('\n');
+const rows = (text) => text.split('\n');
 
 // ─── Date ───────────────────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ Operazione;Valuta;Tipologia Operazione;Descrizione;Uscite;Entrate
 `;
 
 test('il tracciato di Banca Sella viene riconosciuto come prima', () => {
-  const { best } = matchProfiles(righe(SELLA), profili());
+  const { best } = matchProfiles(rows(SELLA), profili());
   assert.equal(best.profile.builtin_key, 'sella');
   assert.equal(best.delimiter, ';');
   assert.equal(best.headerIdx, 4);
@@ -77,11 +77,11 @@ test('il tracciato di Banca Sella viene riconosciuto come prima', () => {
     op_date: 0, value_date: 1, tipologia: 2, description: [3], outflow: 4, inflow: 5,
   });
   assert.equal(resolveAmountMode(best.profile.amount_mode, best.mapping), 'in_out');
-  assert.equal(extractIban(righe(SELLA).slice(0, best.headerIdx)), 'IT60X0542811101000000123456');
+  assert.equal(extractIban(rows(SELLA).slice(0, best.headerIdx)), 'IT60X0542811101000000123456');
 });
 
 test('le colonne si riconoscono per nome, anche in ordine diverso', () => {
-  const file = righe([
+  const file = rows([
     'Descrizione;Data Contabile;Importo;Data Valuta',
     'BONIFICO A FAV. MARIO ROSSI BONIFICO;12/03/2026;-100,00;12/03/2026',
   ].join('\n'));
@@ -94,40 +94,40 @@ test('le colonne si riconoscono per nome, anche in ordine diverso', () => {
 });
 
 test('una colonna importo sola: il segno dice se e\' spesa o entrata', () => {
-  const file = righe([
+  const file = rows([
     'Data contabile;Data valuta;Descrizione;Importo',
     '12/03/2026;12/03/2026;SPESA SUPERMERCATO;-45,20',
     '14/03/2026;14/03/2026;ACCREDITO STIPENDIO;1.800,00',
   ].join('\n'));
-  const { best } = matchProfiles(file, profilo('mediolanum'));
+  const { best } = matchProfiles(file, profile('mediolanum'));
   assert.equal(resolveAmountMode(best.profile.amount_mode, best.mapping), 'signed');
 
-  const valori = righe(file.slice(best.headerIdx + 1).join('\n'))
+  const values = rows(file.slice(best.headerIdx + 1).join('\n'))
     .filter((r) => r.trim() !== '')
     .map((r) => parseBankAmountSigned(r.split(';')[best.mapping.amount]));
-  assert.deepEqual(valori, [
+  assert.deepEqual(values, [
     { value: 45.2, negative: true },
     { value: 1800, negative: false },
   ]);
 });
 
 test('la descrizione spezzata su piu\' colonne si riunisce nell\'ordine del file', () => {
-  const file = righe([
+  const file = rows([
     'Data;Dettagli;Importo;Descrizione',
     '12/03/2026;POS;-45,20;ESSELUNGA MILANO',
   ].join('\n'));
-  const { best } = matchProfiles(file, profilo('generico'));
+  const { best } = matchProfiles(file, profile('generico'));
   assert.deepEqual(best.mapping.description, [1, 3]);
 });
 
 test('una colonna presa da un campo non finisce anche in un altro', () => {
   // Fineco ha due colonne di testo: la corta fa da tipologia, la lunga da
   // descrizione. Nessuna delle due viene usata due volte.
-  const file = righe([
+  const file = rows([
     'Data Operazione;Data Valuta;Entrate;Uscite;Descrizione;Descrizione Completa',
     '12/03/2026;12/03/2026;;45,20;POS;ESSELUNGA MILANO',
   ].join('\n'));
-  const { best } = matchProfiles(file, profilo('fineco'));
+  const { best } = matchProfiles(file, profile('fineco'));
   assert.equal(best.mapping.tipologia, 4);
   assert.deepEqual(best.mapping.description, [5]);
 });
@@ -135,24 +135,24 @@ test('una colonna presa da un campo non finisce anche in un altro', () => {
 test('i nomi di colonna si confrontano senza accenti, maiuscole e punteggiatura', () => {
   assert.equal(normalizeHeader('  Descrizione Operazione* '), 'descrizione operazione');
   assert.equal(normalizeHeader('Valuta'), 'valuta');
-  const file = righe('DATA_CONTABILE|DESCRIZIONE|IMPORTO\n12/03/2026|SPESA|-10,00');
+  const file = rows('DATA_CONTABILE|DESCRIZIONE|IMPORTO\n12/03/2026|SPESA|-10,00');
   const { best } = matchProfiles(file, profili());
   assert.equal(best.delimiter, '|');
   assert.equal(best.mapping.amount, 2);
 });
 
 test('un file senza colonne riconoscibili non viene importato', () => {
-  const file = righe('pippo;pluto;paperino\n1;2;3');
-  const esito = matchProfiles(file, profili());
-  assert.equal(esito.best, null);
+  const file = rows('pippo;pluto;paperino\n1;2;3');
+  const outcome = matchProfiles(file, profili());
+  assert.equal(outcome.best, null);
   // L'errore mostra all'utente cosa c'era scritto nel file.
-  assert.deepEqual(esito.headersSeen[0], ['pippo', 'pluto', 'paperino']);
+  assert.deepEqual(outcome.headersSeen[0], ['pippo', 'pluto', 'paperino']);
 });
 
 test('il profilo scelto a mano non riconosce un file di un\'altra banca', () => {
-  const file = righe('Started Date,Description,Amount\n2026-03-12,SPESA,-10.00');
-  assert.equal(matchProfiles(file, profilo('sella')).best, null);
-  assert.equal(matchProfiles(file, profilo('revolut')).best.mapping.amount, 2);
+  const file = rows('Started Date,Description,Amount\n2026-03-12,SPESA,-10.00');
+  assert.equal(matchProfiles(file, profile('sella')).best, null);
+  assert.equal(matchProfiles(file, profile('revolut')).best.mapping.amount, 2);
 });
 
 test('il modo di leggere l\'importo ripiega su quello che c\'e\' nel file', () => {
@@ -166,8 +166,8 @@ test('il modo di leggere l\'importo ripiega su quello che c\'e\' nel file', () =
 // ─── Codifica e regole di significato, che valgono per tutte le banche ──────
 
 test('un file Windows-1252 non diventa un file di punti interrogativi', () => {
-  const testo = loadAndDecode(Buffer.from([0x50, 0x45, 0x52, 0xd2]));
-  assert.equal(testo, 'PERÒ');
+  const text = loadAndDecode(Buffer.from([0x50, 0x45, 0x52, 0xd2]));
+  assert.equal(text, 'PERÒ');
   assert.equal(loadAndDecode(Buffer.from('PERÒ', 'utf8')), 'PERÒ');
 });
 

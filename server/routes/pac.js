@@ -262,25 +262,25 @@ const summaryForPlan = (planId) => {
  * e' cosi' che generatePending resta idempotente.
  */
 function createContributionAtomic(userId, plan, date, source, notes = null) {
-  const esiste = one(
+  const exists = one(
     'SELECT 1 AS x FROM pac_contributions WHERE user_id = ? AND plan_id = ? AND contribution_date = ? LIMIT 1',
     userId, plan.plan_id ?? plan.id, date,
   );
-  if (esiste) return null;
+  if (exists) return null;
 
   const amount = Number(plan.amount);
 
   return transaction(() => {
-    const sorgente = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', plan.source_account_id, userId);
-    const destinazione = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', plan.account_id, userId);
-    if (!sorgente || !destinazione) throw HttpError.badRequest('Conto non trovato.');
+    const sourceAccount = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', plan.source_account_id, userId);
+    const destinationAccount = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', plan.account_id, userId);
+    if (!sourceAccount || !destinationAccount) throw HttpError.badRequest('Conto non trovato.');
 
-    const descrizione = `PAC ${plan.name} — versamento ${source}`;
+    const description = `PAC ${plan.name} — versamento ${source}`;
     const r = run(
       `INSERT INTO transfers
          (user_id, source_account_id, destination_account_id, amount, transfer_date, description, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      userId, plan.source_account_id, plan.account_id, amount.toFixed(2), date, descrizione, notes,
+      userId, plan.source_account_id, plan.account_id, amount.toFixed(2), date, description, notes,
     );
     const transferId = Number(r.lastInsertRowid);
     const categoryId = transfersCategoryId(userId);
@@ -291,14 +291,14 @@ function createContributionAtomic(userId, plan, date, source, notes = null) {
           expense_date, is_transfer, transfer_id)
        VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1, ?)`,
       userId, categoryId, plan.source_account_id, amount.toFixed(2),
-      `Trasferimento verso ${destinazione.name} — ${descrizione}`, date, transferId,
+      `Trasferimento verso ${destinationAccount.name} — ${description}`, date, transferId,
     );
     run(
       `INSERT INTO incomes
          (user_id, account_id, source, description, amount, payment_method,
           income_date, is_transfer, transfer_id)
        VALUES (?, ?, 'Trasferimento', ?, ?, 'transfer', ?, 1, ?)`,
-      userId, plan.account_id, `Trasferimento da ${sorgente.name} — ${descrizione}`,
+      userId, plan.account_id, `Trasferimento da ${sourceAccount.name} — ${description}`,
       amount.toFixed(2), date, transferId,
     );
 
@@ -748,12 +748,12 @@ async function fetchNavs(req, res) {
     const toTry = fund.symbol ? [fund.symbol] : (await symbolsFromIsin(fund.isin, fund.currency)).slice(0, 4);
 
     // Da un mese prima del primo versamento: prima non servirebbe a niente.
-    const primo = one(
+    const first = one(
       `SELECT MIN(c.contribution_date) AS d FROM pac_contributions c
        INNER JOIN pac_plans p ON p.id = c.plan_id
        WHERE c.user_id = ? AND p.fund_id = ?`, userId, fundId,
     )?.d ?? null;
-    const da = str(body.from) || (primo ? new Date(new Date(`${primo}T00:00:00Z`).getTime() - 31 * 86400000).toISOString().slice(0, 10) : null);
+    const da = str(body.from) || (first ? new Date(new Date(`${first}T00:00:00Z`).getTime() - 31 * 86400000).toISOString().slice(0, 10) : null);
 
     // La valuta sbagliata non e' un dettaglio: quei numeri farebbero sembrare
     // il piano cresciuto o calato per il cambio. Meglio provare la borsa dopo.

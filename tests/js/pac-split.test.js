@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { normalizeShares, sharesMismatch, suggestShares } from '../../server/pac-split.js';
 
-const piani = [
+const plans = [
   { id: 1, name: 'PAC CTO', amount: '100.00', beneficiary_keyword: null },
   { id: 2, name: 'PAC CPE', amount: '100.00', beneficiary_keyword: null },
   { id: 3, name: 'PAC CNA', amount: '300.00', beneficiary_keyword: 'MOLEINVEST' },
@@ -34,17 +34,17 @@ test('la somma delle quote deve fare l\'importo, al centesimo', () => {
 
 test('la proposta arriva solo se i piani fanno esattamente l\'importo', () => {
   // 100 + 100 + 300: e' il totale dei piani, quindi la divisione e' quella.
-  assert.deepEqual(suggestShares(piani, 500, 'ADDEBITO PAC'), [
+  assert.deepEqual(suggestShares(plans, 500, 'ADDEBITO PAC'), [
     { plan_id: 1, amount: 100 }, { plan_id: 2, amount: 100 }, { plan_id: 3, amount: 300 },
   ]);
   // 450 non e' il totale di niente: meglio nessuna proposta di una inventata.
-  assert.equal(suggestShares(piani, 450, 'ADDEBITO PAC'), null);
+  assert.equal(suggestShares(plans, 450, 'ADDEBITO PAC'), null);
 });
 
 test('se la descrizione nomina un piano, si guarda solo a quello', () => {
-  assert.deepEqual(suggestShares(piani, 300, 'BONIFICO A MOLEINVEST SPA'), [{ plan_id: 3, amount: 300 }]);
+  assert.deepEqual(suggestShares(plans, 300, 'BONIFICO A MOLEINVEST SPA'), [{ plan_id: 3, amount: 300 }]);
   // Nominato quel piano, l'importo dev'essere il suo: 500 non lo e' piu'.
-  assert.equal(suggestShares(piani, 500, 'BONIFICO A MOLEINVEST SPA'), null);
+  assert.equal(suggestShares(plans, 500, 'BONIFICO A MOLEINVEST SPA'), null);
 });
 
 test('senza piani non si propone niente', () => {

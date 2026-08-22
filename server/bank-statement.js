@@ -131,33 +131,33 @@ export function isAtmWithdrawalDescription(desc) {
   return /\bCOD\.\s*MCC\s*6011\b/i.test(s);
 }
 
-export function classifyExpense(tipologia, descrizione) {
+export function classifyExpense(tipologia, description) {
   const t = String(tipologia ?? '').toLowerCase();
 
   if (t.includes('stipendi')) return 'Trasferimenti';
   if (t.includes('bonifici')) return 'Bonifici';
   if (t.includes('bancomat pay')) return 'P2P';
   if (t.includes('addebiti diretti')) {
-    return /AMAZON/i.test(descrizione) ? 'Acquisti online' : 'Addebiti SDD';
+    return /AMAZON/i.test(description) ? 'Acquisti online' : 'Addebiti SDD';
   }
   if (t.includes('bollettini')) return 'Utenze';
   // Le commissioni della ricarica restano una spesa normale.
   if (t.includes('ricariche')) return 'Commissioni bancarie';
 
-  const mcc = String(descrizione ?? '').match(/COD\.\s*MCC\s*(\d{4})/i);
+  const mcc = String(description ?? '').match(/COD\.\s*MCC\s*(\d{4})/i);
   if (mcc && MCC_MAP[mcc[1]]) return MCC_MAP[mcc[1]];
 
-  if (isAtmWithdrawalDescription(descrizione)) return 'Prelievo contante';
+  if (isAtmWithdrawalDescription(description)) return 'Prelievo contante';
   return 'Pagamenti';
 }
 
-export function classifyIncomeSource(tipologia, descrizione) {
+export function classifyIncomeSource(tipologia, description) {
   const t = String(tipologia ?? '').toLowerCase();
   if (t.includes('stipendi')) return 'Stipendio';
   if (t.includes('bancomat pay')) return 'P2P';
   if (t.includes('bonifici')) {
-    const nome = extractCounterparty(tipologia, descrizione, 'income');
-    return nome !== null ? `Bonifico da ${nome}` : 'Bonifico';
+    const name = extractCounterparty(tipologia, description, 'income');
+    return name !== null ? `Bonifico da ${name}` : 'Bonifico';
   }
   return 'Entrata';
 }
@@ -195,7 +195,7 @@ const BUROCRAZIA = new RegExp(`^(?:${[
  * delle anagrafiche, per ritrovare quelli che erano stati creati prima che
  * questa regola esistesse.
  */
-export const looksLikeBankJargon = (nome) => BUROCRAZIA.test(String(nome ?? '').trim());
+export const looksLikeBankJargon = (name) => BUROCRAZIA.test(String(name ?? '').trim());
 
 /** Ripulisce il nome estratto: spazi, codici in coda, iniziali maiuscole. */
 export function cleanupCounterpartyName(raw) {
@@ -212,8 +212,8 @@ export function cleanupCounterpartyName(raw) {
  * campo dedicato: il nome va pescato dai formati ricorrenti, e quando non si
  * riconosce niente e' meglio nessun nome che uno sbagliato.
  */
-export function extractCounterparty(tipologia, descrizione, kind) {
-  const desc = String(descrizione ?? '').trim();
+export function extractCounterparty(tipologia, description, kind) {
+  const desc = String(description ?? '').trim();
   if (desc === '') return null;
 
   // "A FAV. MARIO ROSSI BONIFICO ..." — vale per entrambi i versi.
@@ -257,8 +257,8 @@ export function extractCounterparty(tipologia, descrizione, kind) {
   // ("- SAMSUNG PAY", "- CIRCUITO MASTERCARD").
   m = desc.match(new RegExp(`\\bC/O\\s+([A-Z][A-Z0-9\\s.'*&]+?)(?:\\s+(?:${FINE_NEGOZIO})\\b|\\s+\\d|$)`, 'u'));
   if (m) {
-    const candidato = cleanupCounterpartyName(m[1]);
-    if (candidato !== null) return candidato;
+    const candidate = cleanupCounterpartyName(m[1]);
+    if (candidate !== null) return candidate;
   }
 
   if (/\bAMAZON(?:\.IT|\s+EU|\.COM|\*MARK\w*|\s+MARKET\w*)?\b/i.test(desc)) return 'Amazon';
@@ -268,8 +268,8 @@ export function extractCounterparty(tipologia, descrizione, kind) {
 
   m = desc.match(/\bBOLLETTIN[OI]\s+(?:POSTALE\s+|BANCARIO\s+)?(.+?)(?:\s+CRO|\s+VAL\.|$)/i);
   if (m) {
-    const candidato = cleanupCounterpartyName(m[1]);
-    if (candidato !== null) return candidato;
+    const candidate = cleanupCounterpartyName(m[1]);
+    if (candidate !== null) return candidate;
   }
 
   // Movimenti interni e oneri bancari non hanno una controparte.
@@ -287,13 +287,13 @@ export function extractCounterparty(tipologia, descrizione, kind) {
   return cleanupCounterpartyName(m[1]);
 }
 
-export function guessPaymentMethod(tipologia, descrizione) {
+export function guessPaymentMethod(tipologia, description) {
   const t = String(tipologia ?? '').toLowerCase();
   if (t.includes('bonifici') || t.includes('bollettini') || t.includes('addebiti diretti')
       || t.includes('bancomat pay') || t.includes('ricariche')) {
     return 'transfer';
   }
-  if (/PRELIEVO DI CONTANTE/i.test(descrizione)) return 'cash';
+  if (/PRELIEVO DI CONTANTE/i.test(description)) return 'cash';
   return 'card';
 }
 
