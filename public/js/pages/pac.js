@@ -5,13 +5,12 @@ import FetchRequest                                       from '../FetchRequest.
 import { apiSend, apiGuard, escapeHtml, escapeAttr,
          confirmDialog }                                  from '../componentBase.js';
 import { toast }                                          from '../toast.js';
+import { fmtMoney } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
 const FREQ_LABEL = {
     weekly: 'Settimanale', monthly: 'Mensile',

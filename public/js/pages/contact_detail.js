@@ -7,6 +7,7 @@ import { apiSend, escapeAttr } from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { renderPager } from '../pager.js';
 import { setupQuickCreate } from '../components/quickCreateContact.js';
+import { fmtDate, getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -17,17 +18,7 @@ const ctx = window.MX_CONTACT ?? { id: 0, year: new Date().getFullYear() };
 const fmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
 function fmtAmount(v) { return fmt.format(Number(v) || 0); }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
-function getCsrfToken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
-}
 
-const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
-function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(String(iso) + 'T00:00:00');
-    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
-}
 
 let breakdownChart = null;
 

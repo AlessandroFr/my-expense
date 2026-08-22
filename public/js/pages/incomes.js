@@ -8,22 +8,13 @@ import { toast }                                         from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete } from '../optimistic.js';
 import { renderPager }                                   from '../pager.js';
+import { fmtDate, fmtMoney, getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
-const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
-function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(String(iso) + 'T00:00:00');
-    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
-}
 
 // Calcola se il colore di sfondo richiede testo chiaro o scuro (W3C luminance).
 function contrastText(hex) {
@@ -145,10 +136,6 @@ function renderDetailRow(it, detailId) {
 // ── Edit modal ─────────────────────────────────────────────────────────────
 let editModalEl = null, editModalInstance = null;
 
-function getCsrfToken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
-}
 
 function ensureEditModal() {
     if (editModalInstance) return editModalInstance;

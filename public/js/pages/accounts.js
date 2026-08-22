@@ -7,13 +7,12 @@ import { apiSend, apiGuard, escapeHtml, escapeAttr,
 import { toast }                                                from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
+import { fmtMoney } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
 const TYPE_LABELS = {
     checking: 'Conto corrente', card: 'Carta', cash: 'Contanti',

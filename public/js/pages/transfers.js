@@ -6,20 +6,12 @@ import { apiSend, apiGuard, escapeHtml, escapeAttr,
          confirmDialog }                                  from '../componentBase.js';
 import { toast }                                          from '../toast.js';
 import { renderPager }                                    from '../pager.js';
+import { fmtDate, fmtMoney } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
-
-const dateFmt = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const fmtDate = (iso) => {
-    if (!iso) return '';
-    const [y, m, d] = String(iso).split('-');
-    return dateFmt.format(new Date(Number(y), Number(m) - 1, Number(d)));
-};
 
 const createForm   = document.getElementById('transfer-create-form');
 const editForm     = document.getElementById('transfer-edit-form');

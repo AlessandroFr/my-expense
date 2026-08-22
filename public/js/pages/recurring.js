@@ -7,22 +7,13 @@ import { apiSend, apiGuard, escapeHtml, escapeAttr,
 import { toast }                                         from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
+import { fmtDate, fmtMoney } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 
-const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
-function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(String(iso) + 'T00:00:00');
-    return Number.isNaN(d.getTime()) ? String(iso) : dateFmt.format(d);
-}
 
 const FREQ_LABELS = { weekly: 'Settimanale', monthly: 'Mensile', yearly: 'Annuale' };
 

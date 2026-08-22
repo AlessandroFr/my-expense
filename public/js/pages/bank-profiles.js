@@ -5,6 +5,7 @@
 import FetchRequest from '../FetchRequest.js';
 import { apiSend }   from '../componentBase.js';
 import { toast }     from '../toast.js';
+import { getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -12,10 +13,6 @@ const BASE = document.body.dataset.baseUrl ?? '';
 
 const FIELDS = ['op_date', 'value_date', 'tipologia', 'description', 'outflow', 'inflow', 'amount'];
 
-function getCsrfToken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
-}
 
 /** Stessa normalizzazione del server (bank-profiles.js::normalizeHeader). */
 function normalizeHeader(raw) {

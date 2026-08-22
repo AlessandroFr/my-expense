@@ -7,6 +7,7 @@ import { apiSend, confirmDialog } from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { optimisticDelete } from '../optimistic.js';
 import { renderPager } from '../pager.js';
+import { getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -39,10 +40,6 @@ function escHtml(s) {
     const d = document.createElement('div');
     d.textContent = s ?? '';
     return d.innerHTML;
-}
-function getCsrfToken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
 }
 function fmtAmount(v) {
     return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(v) || 0);

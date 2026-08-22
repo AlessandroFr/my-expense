@@ -5,15 +5,13 @@ import FetchRequest                                       from '../FetchRequest.
 import { apiSend, apiGuard, escapeHtml, escapeAttr,
          confirmDialog }                                  from '../componentBase.js';
 import { toast }                                          from '../toast.js';
+import { fmtMoney, fmtNum } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
 const PLAN = window.MX_PLAN || {};
 
-const moneyFmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
-const fmtNum   = (n, dec = 4) => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: dec });
 
 const kpiEl       = document.getElementById('plan-kpi');
 const contribForm = document.getElementById('contribution-create-form');

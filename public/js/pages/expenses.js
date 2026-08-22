@@ -8,16 +8,13 @@ import { stagger, withViewTransition, animateEnter, flip } from '../transitions.
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 import { renderPager }       from '../pager.js';
 import { openPacSplit, wirePacSplitModal } from '../pac-split.js';
+import { fmtDate, fmtMoney, getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
-const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 const PAYMENT_LABELS = {
     cash: 'Contanti', card: 'Carta', transfer: 'Bonifico', other: 'Altro',
@@ -59,12 +56,7 @@ function htmlToPlain(html) {
     return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-function getCsrfToken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
-}
 
-function fmtMoney(n) { return moneyFmt.format(Number(n) || 0); }
 
 // ── Installment helpers (form spesa + bank import) ─────────────────────────
 
@@ -106,11 +98,6 @@ function showBudgetWarning(w) {
     } else if (w.near_limit) {
         toast.warning(`Attenzione: budget "${w.name}" all'${w.progress_pct}% (${fmtMoney(w.spent)} / ${fmtMoney(w.amount)}).`);
     }
-}
-function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso + 'T00:00:00');
-    return isNaN(d) ? iso : dateFmt.format(d);
 }
 
 function rowDataFromExpense(e) {

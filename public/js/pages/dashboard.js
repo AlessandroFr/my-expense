@@ -5,18 +5,14 @@ import FetchRequest                from '../FetchRequest.js';
 import { apiGuard, escapeHtml }    from '../componentBase.js';
 import { toast }                   from '../toast.js';
 import { tweenNumber, stagger } from '../transitions.js';
+import { fmtDate, fmtMoney } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const BASE = document.body.dataset.baseUrl ?? '';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
 const monthFmt      = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
 const monthShortFmt = new Intl.DateTimeFormat('it-IT', { month: 'short', year: '2-digit' });
-const dateFmt       = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-function fmtMoney(n) { return moneyFmt.format(Number(n) || 0); }
 
 function fmtMonthLong(ym) {
     if (!ym) return '';
@@ -30,11 +26,6 @@ function fmtMonthShort(ym) {
     return monthShortFmt.format(new Date(y, (m || 1) - 1, 1));
 }
 
-function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso + 'T00:00:00');
-    return Number.isNaN(d.getTime()) ? iso : dateFmt.format(d);
-}
 
 // ── Range presets ──────────────────────────────────────────────────────────
 

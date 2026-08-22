@@ -9,6 +9,7 @@ import { apiSend }   from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
+import { getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -50,10 +51,6 @@ function renderRow(c) {
     return tr;
 }
 
-function getCsrfToken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
-}
 
 // ── Form CREATE (lista) ─────────────────────────────────────────────────────
 
