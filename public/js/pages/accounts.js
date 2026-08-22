@@ -43,6 +43,21 @@ function renderCard(a) {
         bankRow = `<div class="small text-muted mt-1"><i class="bi bi-bank2 me-1"></i>${last4}${sep}${bank}</div>`;
     }
 
+    // Su un conto con un piano di accumulo il saldo dice solo quanto ci e'
+    // entrato: le quote comprate valgono un altro numero, ed e' quello che
+    // conta per sapere se ci stai guadagnando.
+    let marketRow = '';
+    if (a.market_value !== null && a.market_value !== undefined) {
+        const g = Number(a.market_gain) || 0;
+        const cls = g > 0 ? 'text-success' : (g < 0 ? 'text-danger' : 'text-muted');
+        marketRow = `<div class="mt-2 pt-2 border-top">
+            <div class="small text-muted">Valore delle quote</div>
+            <div class="h5 mb-0">${fmtMoney(a.market_value)}
+                <span class="small ${cls}">${g > 0 ? '+' : ''}${fmtMoney(g)}</span>
+            </div>
+        </div>`;
+    }
+
     return `
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm h-100" style="border-top:4px solid ${escapeAttr(a.color)}">
@@ -59,6 +74,7 @@ function renderCard(a) {
                     Spese ${fmtMoney(a.expenses_total)}
                 </div>
                 ${bankRow}
+                ${marketRow}
                 <div class="mt-3 text-end">
                     <button type="button" class="btn btn-sm btn-outline-primary" data-action="edit" data-id="${a.id}" title="Modifica">
                         <i class="bi bi-pencil"></i>

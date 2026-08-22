@@ -73,29 +73,131 @@ async function loadContributions() {
         </div>`;
 }
 
+/** Una casella dei numeri in cima alla pagina. */
+const kpi = (titolo, valore, dettaglio = '', classe = '') => `
+    <div class="col-6 col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
+        <div class="small text-muted">${escapeHtml(titolo)}</div>
+        <div class="h5 mb-0 ${classe}">${valore}</div>
+        ${dettaglio ? `<div class="small text-muted">${dettaglio}</div>` : ''}
+    </div></div></div>`;
+
+const segno = (n) => (Number(n) > 0 ? 'text-success' : Number(n) < 0 ? 'text-danger' : '');
+const conSegno = (n, testo) => `${Number(n) > 0 ? '+' : ''}${testo}`;
+
 function renderKpi() {
     let total = 0, units = 0;
     for (const c of contributions) {
         total += Number(c.amount) || 0;
         units += Number(c.units)  || 0;
     }
-    kpiEl.innerHTML = `
-        <div class="col-6 col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
-            <div class="small text-muted">Versato totale</div>
-            <div class="h5 mb-0">${escapeHtml(fmtMoney(total))}</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
-            <div class="small text-muted">Quote possedute</div>
-            <div class="h5 mb-0">${escapeHtml(fmtNum(units, 6))}</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
-            <div class="small text-muted"># versamenti</div>
-            <div class="h5 mb-0">${contributions.length}</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
-            <div class="small text-muted">Versamento</div>
-            <div class="h5 mb-0">${escapeHtml(fmtMoney(PLAN.amount))}</div>
-        </div></div></div>`;
+
+    // Finche' l'andamento non e' arrivato (o non e' calcolabile) si mostra
+    // quello che si sa con certezza: quanto e' stato versato.
+    const p = andamentoDati;
+    const valore = p?.valore ?? null;
+
+    kpiEl.innerHTML = [
+        kpi('Versato totale', escapeHtml(fmtMoney(total)), `${contributions.length} versamenti`),
+        kpi(
+            'Valore oggi',
+            valore === null ? '<span class="text-muted">—</span>' : escapeHtml(fmtMoney(valore)),
+            valore === null ? 'serve un NAV del fondo' : `col NAV del ${escapeHtml(p.nav_al ?? p.valore_al)}`,
+        ),
+        kpi(
+            'Guadagno',
+            p?.guadagno === null || p?.guadagno === undefined
+                ? '<span class="text-muted">—</span>'
+                : escapeHtml(conSegno(p.guadagno, fmtMoney(p.guadagno))),
+            p?.guadagno_pct === null || p?.guadagno_pct === undefined
+                ? '' : `${escapeHtml(conSegno(p.guadagno_pct, `${fmtNum(p.guadagno_pct, 2)}%`))} sul versato`,
+            segno(p?.guadagno),
+        ),
+        kpi(
+            'Rendimento annuo',
+            p?.tir === null || p?.tir === undefined
+                ? '<span class="text-muted">—</span>'
+                : escapeHtml(conSegno(p.tir, `${fmtNum(p.tir, 2)}%`)),
+            'tiene conto di quando hai versato',
+            segno(p?.tir),
+        ),
+    ].join('');
+}
+
+// ── Andamento ────────────────────────────────────────────────────────────────
+
+let andamentoDati = null;
+let andamentoChart = null;
+
+async function loadAndamento() {
+    const r = await apiGuard(api.get(`${BASE}/pac/plans/performance`, { plan_id: PLAN.id }));
+    andamentoDati = r.data ?? null;
+    renderKpi();
+    renderAndamento();
+}
+
+function renderAndamento() {
+    const canvas = document.getElementById('plan-chart');
+    const nota   = document.getElementById('plan-chart-note');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const serie = andamentoDati?.serie ?? [];
+    if (andamentoChart) andamentoChart.destroy();
+
+    if (serie.length === 0) {
+        if (nota) nota.textContent = 'nessun versamento da mostrare';
+        return;
+    }
+    const conValore = serie.filter(p => p.valore !== null).length;
+    if (nota) {
+        nota.textContent = conValore === 0
+            ? 'manca il NAV del fondo: si vede solo quanto hai versato'
+            : `${serie.length} punti, dal ${serie[0].date}`;
+    }
+
+    andamentoChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: serie.map(p => p.date),
+            datasets: [
+                {
+                    label: 'Valore',
+                    data: serie.map(p => p.valore),
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25,135,84,.12)',
+                    fill: true,
+                    tension: 0.25,
+                    // Un buco nella linea dice «qui il NAV non c'era», che e'
+                    // un'informazione: unire i punti la nasconderebbe.
+                    spanGaps: false,
+                },
+                {
+                    label: 'Versato',
+                    data: serie.map(p => p.versato),
+                    borderColor: '#6c757d',
+                    borderDash: [5, 4],
+                    pointRadius: 0,
+                    tension: 0,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y === null ? '—' : fmtMoney(ctx.parsed.y)}`,
+                    },
+                },
+            },
+            scales: {
+                y: { ticks: { callback: (v) => fmtMoney(v) } },
+                x: { ticks: { maxTicksLimit: 8 } },
+            },
+        },
+    });
 }
 
 async function loadNavHistory() {
@@ -128,7 +230,7 @@ contribForm.addEventListener('submit', async (ev) => {
     try {
         await send(`${BASE}/pac/contributions/create`, Object.fromEntries(fd.entries()));
         toast.success('Versamento registrato.');
-        await Promise.all([loadContributions(), loadNavHistory()]);
+        await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
     } catch (err) {
         toast.error(err.message ?? 'Errore registrazione versamento.');
     }
@@ -141,7 +243,7 @@ navForm.addEventListener('submit', async (ev) => {
         await send(`${BASE}/pac/funds/nav-update`, Object.fromEntries(fd.entries()));
         toast.success('NAV aggiornato.');
         navForm.elements['nav'].value = '';
-        await Promise.all([loadContributions(), loadNavHistory()]);
+        await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
     } catch (err) {
         toast.error(err.message ?? 'Errore aggiornamento NAV.');
     }
@@ -197,5 +299,5 @@ runNowBtn?.addEventListener('click', async () => {
         toast.error('Piano non identificato.');
         return;
     }
-    await Promise.all([loadContributions(), loadNavHistory()]);
+    await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
 })();

@@ -66,6 +66,7 @@ npm run dist       # crea l'installer in dist\
 | `server/bank-statement.js` | Lettura degli estratti conto: date, importi, significato |
 | `server/bank-profiles.js` | Il tracciato di ogni banca e il suo riconoscimento |
 | `server/contact-dedup.js` | Quali anagrafiche sono la stessa cosa scritta in due modi |
+| `server/pac-performance.js` | Andamento e rendimento di un piano di accumulo |
 | `public/js/` | Il frontend, un modulo per pagina |
 | `public/js/modal-guard.js` | Le finestre non si chiudono per sbaglio e non perdono quel che c'era scritto |
 | `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
@@ -145,6 +146,25 @@ nessun browser lo abbia più, si può togliere anche quello.
 schema smettono di valere in silenzio. Lo stesso pragma è un **no-op dentro una
 transazione**, quindi va chiamato prima di aprirla (vedi
 `routes/manutenzione.js`).
+
+**Il rendimento di un PAC non è «valore meno versato».** I soldi versati il
+mese scorso non hanno avuto il tempo di rendere quanto quelli di tre anni fa,
+quindi la percentuale onesta è il TIR (`pac-performance.js::tir`, l'XIRR dei
+fogli di calcolo), che sconta ogni versamento dalla sua data. Si cerca per
+bisezione e non con Newton: qualche millesimo di secondo in più, ma non diverge
+mai, e su un numero mostrato come «rendimento» questo conta di più. La
+percentuale secca sul versato resta accanto, come dato di montante.
+
+**Senza NAV il valore non si mostra.** Né nella curva (`valore: null`, buco nel
+grafico) né nei riquadri: un piano senza quotazioni fa vedere solo quanto è
+stato versato. Il valore viene sempre etichettato con **la data del NAV usato**
+(`nav_al`), che non è per forza oggi — un NAV vecchio di sei mesi valorizza lo
+stesso, ma chi legge deve saperlo.
+
+**Il saldo di un conto PAC non è quanto vale.** È la somma dei trasferimenti
+entrati, e da solo non sale mai. `accounts.withBalances` aggiunge
+`market_value`/`market_gain` per i conti che ospitano un piano — `null` per
+tutti gli altri, dove non significherebbero niente.
 
 **Gli importi sono float.** SQLite non ha un tipo decimale. Ogni aggregazione va
 arrotondata, e gli arrotondamenti passano da `roundLikePhp` in `amount.js`:

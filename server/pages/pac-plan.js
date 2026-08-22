@@ -27,6 +27,16 @@ export const render = ({ csrfToken, plan, freqLabel }) => {
 
 <div class="row g-3 mb-3" id="plan-kpi"></div>
 
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <h2 class="h6 mb-0"><i class="bi bi-graph-up me-1"></i>Andamento</h2>
+            <span class="small text-muted" id="plan-chart-note"></span>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="plan-chart"></canvas></div>
+    </div>
+</div>
+
 <div class="row g-3">
 <aside class="col-12 col-lg-5 col-xl-4">
 <div class="card shadow-sm mb-3">
@@ -108,6 +118,7 @@ window.MX_PLAN = ${JSON.stringify({
   source_account_id: plan.source_account_id,
 })};
 </script>
+<script src="/vendor/chart/chart.umd.min.js"></script>
 <script type="module" src="${asset('js/pages/pac-plan.js')}"></script>
 `;
 };

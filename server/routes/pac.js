@@ -11,6 +11,7 @@ import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
 import { avanza } from './recurring.js';
+import { riepilogo } from '../pac-performance.js';
 
 const FUND_TYPES = ['etf', 'mutual', 'index', 'other'];
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
@@ -620,6 +621,34 @@ async function listContributions(req, res) {
   ok(res, { contributions: rows.map(contributionToPublic) });
 }
 
+/**
+ * L'andamento del piano: quanto e' entrato, quanto vale, quanto ha reso.
+ *
+ * I versamenti sono l'altra faccia dei trasferimenti dal conto sorgente (ogni
+ * riga di pac_contributions ne porta l'id), quindi «quanto e' entrato» qui e
+ * quanto e' uscito dal conto sono lo stesso numero per costruzione.
+ */
+async function performance(req, res) {
+  const { searchParams } = new URL(req.url, 'http://localhost');
+  const userId = currentUserId();
+
+  const planId = int(searchParams.get('plan_id'));
+  const plan = planId > 0 ? findPlan(planId, userId) : null;
+  if (!plan) throw HttpError.notFound('Piano non trovato.');
+
+  const contributi = all(
+    `SELECT contribution_date, amount, nav, units FROM pac_contributions
+     WHERE user_id = ? AND plan_id = ? ORDER BY contribution_date ASC`,
+    userId, planId,
+  );
+  const navs = all(
+    'SELECT nav_date, nav FROM pac_fund_navs WHERE fund_id = ? ORDER BY nav_date ASC',
+    plan.fund_id,
+  );
+
+  ok(res, { plan_id: planId, ...riepilogo(contributi, navs, oggi()) });
+}
+
 async function createContribution(req, res) {
   const body = await readBody(req);
   assertCsrf(req, body);
@@ -691,6 +720,7 @@ export const pacRoutes = {
   'POST /pac/plans/delete': deletePlan,
   'POST /pac/plans/run': runPlan,
   'GET /pac/contributions': listContributions,
+  'GET /pac/plans/performance': performance,
   'POST /pac/contributions/create': createContribution,
   'POST /pac/contributions/delete': deleteContribution,
   'POST /pac/run-pending': runPending,

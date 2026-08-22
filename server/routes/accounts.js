@@ -5,6 +5,7 @@
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
+import { riepilogo } from '../pac-performance.js';
 
 const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other'];
 const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
@@ -30,6 +31,40 @@ const findForUser = (id, userId) => one(
 
 const round2 = (n) => roundLikePhp(n, 2);
 
+/**
+ * Il valore di mercato dei conti che ospitano un piano di accumulo.
+ *
+ * Il saldo di un conto PAC dice quanto ci e' entrato — la somma dei
+ * trasferimenti — e quindi non sale mai da solo. Quello che il conto vale
+ * davvero sono le quote comprate per il NAV di oggi, ed e' un altro numero.
+ */
+function valoriPac(userId) {
+  const piani = all('SELECT id, account_id, fund_id FROM pac_plans WHERE user_id = ?', userId);
+  const perConto = new Map();
+
+  for (const piano of piani) {
+    const contributi = all(
+      `SELECT contribution_date, amount, nav, units FROM pac_contributions
+       WHERE user_id = ? AND plan_id = ? ORDER BY contribution_date ASC`,
+      userId, piano.id,
+    );
+    if (contributi.length === 0) continue;
+
+    const navs = all(
+      'SELECT nav_date, nav FROM pac_fund_navs WHERE fund_id = ? ORDER BY nav_date ASC',
+      piano.fund_id,
+    );
+    const r = riepilogo(contributi, navs, new Date().toISOString().slice(0, 10));
+    if (r.valore === null) continue;
+
+    const acc = perConto.get(piano.account_id) ?? { valore: 0, versato: 0 };
+    acc.valore += r.valore;
+    acc.versato += r.versato;
+    perConto.set(piano.account_id, acc);
+  }
+  return perConto;
+}
+
 /** Saldo = apertura + entrate − spese, calcolato al volo come in PHP. */
 export function withBalances(userId, includeArchived = false) {
   const accounts = allForUser(userId, includeArchived);
@@ -52,13 +87,19 @@ export function withBalances(userId, includeArchived = false) {
     }
   }
 
+  const pac = valoriPac(userId);
+
   return accounts.map((a) => {
     const { exp, inc } = sums.get(a.id);
+    const investito = pac.get(a.id) ?? null;
     return {
       ...a,
       expenses_total: round2(exp),
       incomes_total: round2(inc),
       balance: round2(Number(a.opening_balance) + inc - exp),
+      // Solo per i conti con un piano di accumulo: altrove non significa niente.
+      market_value: investito === null ? null : round2(investito.valore),
+      market_gain: investito === null ? null : round2(investito.valore - investito.versato),
     };
   });
 }
