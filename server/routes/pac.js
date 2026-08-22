@@ -15,7 +15,7 @@ import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { normalizeShares, sharesMismatch } from '../pac-split.js';
 import { transfersCategoryId } from './categories.js';
-import { riepilogo } from '../pac-performance.js';
+import { summary } from '../pac-performance.js';
 import { NavError, simboliDaIsin, storico } from '../nav-fetch.js';
 
 const FUND_TYPES = ['etf', 'mutual', 'index', 'other'];
@@ -786,7 +786,7 @@ async function fetchNavs(req, res) {
     let salvati = 0;
     let valorizzati = 0;
     transaction(() => {
-      for (const q of serie.punti) {
+      for (const q of serie.points) {
         const r = run(
           'INSERT OR IGNORE INTO pac_fund_navs (fund_id, nav_date, nav) VALUES (?, ?, ?)',
           fundId, q.nav_date, q.nav,
@@ -816,11 +816,11 @@ async function fetchNavs(req, res) {
     ok(res, {
       symbol,
       currency: serie.currency,
-      scaricati: serie.punti.length,
+      scaricati: serie.points.length,
       salvati,
       valorizzati,
-      dal: serie.punti[0]?.nav_date ?? null,
-      al: serie.punti[serie.punti.length - 1]?.nav_date ?? null,
+      dal: serie.points[0]?.nav_date ?? null,
+      al: serie.points[serie.points.length - 1]?.nav_date ?? null,
     });
   } catch (err) {
     if (err instanceof NavError) throw HttpError.badRequest(err.message);

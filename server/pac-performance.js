@@ -11,9 +11,9 @@
  */
 
 const giorno = 24 * 60 * 60 * 1000;
-const aData = (s) => new Date(`${String(s).slice(0, 10)}T00:00:00Z`).getTime();
-const anni = (da, a) => (aData(a) - aData(da)) / (giorno * 365);
-const arrotonda = (n, cifre = 2) => Math.round(n * 10 ** cifre) / 10 ** cifre;
+const toDate = (s) => new Date(`${String(s).slice(0, 10)}T00:00:00Z`).getTime();
+const yearsBetween = (da, a) => (toDate(a) - toDate(da)) / (giorno * 365);
+const round2 = (n, cifre = 2) => Math.round(n * 10 ** cifre) / 10 ** cifre;
 
 /**
  * Il valore delle quote a una certa data, cioe' l'ultimo NAV conosciuto fino a
@@ -21,10 +21,10 @@ const arrotonda = (n, cifre = 2) => Math.round(n * 10 ** cifre) / 10 ** cifre;
  *
  * @param {{nav_date: string, nav: number}[]} navs ordinati per data crescente
  */
-function navAlGiorno(navs, data) {
+function navOnDay(navs, data) {
   let trovato = null;
   for (const n of navs) {
-    if (aData(n.nav_date) > aData(data)) break;
+    if (toDate(n.nav_date) > toDate(data)) break;
     trovato = Number(n.nav);
   }
   return trovato;
@@ -34,7 +34,7 @@ function navAlGiorno(navs, data) {
  * Tutti i NAV che si conoscono, da due fonti: lo storico del fondo e il NAV
  * che ogni versamento si porta dietro. A parita' di data vince lo storico.
  */
-export function navUnificati(navs, contributi) {
+export function mergedNavs(navs, contributi) {
   const perData = new Map();
   for (const c of contributi) {
     if (c.nav === null || c.nav === undefined) continue;
@@ -58,20 +58,20 @@ export function navUnificati(navs, contributi) {
  * @param {{nav_date: string, nav: number}[]} navs
  * @param {string} [oggi] per valorizzare anche il giorno corrente
  */
-export function andamento(contributi, navs, oggi = null) {
+export function performanceSeries(contributi, navs, oggi = null) {
   const versamenti = [...contributi]
     .filter((c) => c.contribution_date)
     .sort((a, b) => String(a.contribution_date).localeCompare(String(b.contribution_date)));
   if (versamenti.length === 0) return [];
 
-  const tuttiNav = navUnificati(navs, versamenti);
+  const tuttiNav = mergedNavs(navs, versamenti);
   const primoVersamento = String(versamenti[0].contribution_date).slice(0, 10);
 
   const date = new Set(versamenti.map((c) => String(c.contribution_date).slice(0, 10)));
   for (const n of tuttiNav) if (n.nav_date >= primoVersamento) date.add(n.nav_date);
   if (oggi) date.add(String(oggi).slice(0, 10));
 
-  const punti = [];
+  const points = [];
   for (const data of [...date].sort()) {
     let versato = 0;
     let quote = 0;
@@ -80,17 +80,17 @@ export function andamento(contributi, navs, oggi = null) {
       versato += Number(c.amount) || 0;
       quote += Number(c.units) || 0;
     }
-    const nav = navAlGiorno(tuttiNav, data);
-    punti.push({
+    const nav = navOnDay(tuttiNav, data);
+    points.push({
       date: data,
-      versato: arrotonda(versato),
-      quote: arrotonda(quote, 6),
+      versato: round2(versato),
+      quote: round2(quote, 6),
       // Senza NAV il valore non si sa: meglio un buco nel grafico che una
       // linea inventata.
-      valore: nav !== null && quote > 0 ? arrotonda(quote * nav) : null,
+      valore: nav !== null && quote > 0 ? round2(quote * nav) : null,
     });
   }
-  return punti;
+  return points;
 }
 
 /**
@@ -106,14 +106,14 @@ export function andamento(contributi, navs, oggi = null) {
  *   positivi in entrata (il valore finale, o un disinvestimento).
  * @returns {number|null} il tasso annuo (0.07 = 7%), null se non e' calcolabile.
  */
-export function tir(flussi) {
+export function irr(flussi) {
   const f = flussi.filter((x) => Number.isFinite(Number(x.amount)) && Number(x.amount) !== 0);
   if (f.length < 2) return null;
   // Serve almeno un'uscita e un'entrata, altrimenti nessun tasso azzera la somma.
   if (!f.some((x) => x.amount < 0) || !f.some((x) => x.amount > 0)) return null;
 
   const inizio = f.reduce((min, x) => (x.date < min ? x.date : min), f[0].date);
-  const durata = f.map((x) => ({ t: anni(inizio, x.date), a: Number(x.amount) }));
+  const durata = f.map((x) => ({ t: yearsBetween(inizio, x.date), a: Number(x.amount) }));
   if (durata.every((x) => x.t === 0)) return null;
 
   // -99,99% e' la perdita quasi totale, +1000% il guadagno oltre il quale la
@@ -137,20 +137,20 @@ export function tir(flussi) {
  * Il riepilogo che finisce sotto gli occhi: quanto hai messo, quanto vale,
  * quanto ci hai guadagnato e a che ritmo.
  */
-export function riepilogo(contributi, navs, oggi) {
-  const punti = andamento(contributi, navs, oggi);
-  const ultimo = [...punti].reverse().find((p) => p.valore !== null) ?? null;
+export function summary(contributi, navs, oggi) {
+  const points = performanceSeries(contributi, navs, oggi);
+  const ultimo = [...points].reverse().find((p) => p.valore !== null) ?? null;
 
   // La data del NAV con cui e' stato fatto il conto, che non e' per forza
   // oggi: un NAV vecchio di sei mesi valorizza lo stesso, ma chi legge deve
   // sapere che sta guardando il fondo di sei mesi fa.
-  const tuttiNav = navUnificati(navs, contributi);
+  const tuttiNav = mergedNavs(navs, contributi);
   const navUsato = ultimo === null
     ? null
     : [...tuttiNav].reverse().find((n) => n.nav_date <= ultimo.date) ?? null;
 
-  const versato = punti.length > 0 ? punti[punti.length - 1].versato : 0;
-  const quote = punti.length > 0 ? punti[punti.length - 1].quote : 0;
+  const versato = points.length > 0 ? points[points.length - 1].versato : 0;
+  const quote = points.length > 0 ? points[points.length - 1].quote : 0;
   const valore = ultimo?.valore ?? null;
 
   const flussi = contributi.map((c) => ({
@@ -160,20 +160,20 @@ export function riepilogo(contributi, navs, oggi) {
   if (valore !== null) flussi.push({ date: ultimo.date, amount: valore });
 
   return {
-    versato: arrotonda(versato),
-    quote: arrotonda(quote, 6),
+    versato: round2(versato),
+    quote: round2(quote, 6),
     valore,
     valore_al: ultimo?.date ?? null,
     nav_al: navUsato?.nav_date ?? null,
     nav: navUsato?.nav ?? null,
-    guadagno: valore === null ? null : arrotonda(valore - versato),
+    guadagno: valore === null ? null : round2(valore - versato),
     // La percentuale secca sul versato: dice quanto e' cresciuto il montante,
     // non a che ritmo. Per quello c'e' il TIR.
-    guadagno_pct: valore === null || versato === 0 ? null : arrotonda(((valore - versato) / versato) * 100),
-    tir: valore === null ? null : (() => {
-      const r = tir(flussi);
-      return r === null ? null : arrotonda(r * 100);
+    guadagno_pct: valore === null || versato === 0 ? null : round2(((valore - versato) / versato) * 100),
+    irr: valore === null ? null : (() => {
+      const r = irr(flussi);
+      return r === null ? null : round2(r * 100);
     })(),
-    serie: punti,
+    serie: points,
   };
 }

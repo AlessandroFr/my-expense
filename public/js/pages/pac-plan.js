@@ -93,7 +93,7 @@ function renderKpi() {
 
     // Finche' l'andamento non e' arrivato (o non e' calcolabile) si mostra
     // quello che si sa con certezza: quanto e' stato versato.
-    const p = andamentoDati;
+    const p = performanceData;
     const valore = p?.valore ?? null;
 
     kpiEl.innerHTML = [
@@ -114,11 +114,11 @@ function renderKpi() {
         ),
         kpi(
             'Rendimento annuo',
-            p?.tir === null || p?.tir === undefined
+            p?.irr === null || p?.irr === undefined
                 ? '<span class="text-muted">—</span>'
-                : escapeHtml(conSegno(p.tir, `${fmtNum(p.tir, 2)}%`)),
+                : escapeHtml(conSegno(p.irr, `${fmtNum(p.irr, 2)}%`)),
             'tiene conto di quando hai versato',
-            segno(p?.tir),
+            segno(p?.irr),
         ),
     ].join('');
 }
@@ -138,7 +138,7 @@ navFetchBtn?.addEventListener('click', async () => {
         toast.success((d.salvati > 0
             ? `${d.salvati} quotazioni nuove da ${d.symbol} (${d.dal} → ${d.al}).`
             : `Nessuna quotazione nuova: ${d.symbol} era già aggiornato.`) + versamenti);
-        await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
+        await Promise.all([loadContributions(), loadNavHistory(), loadPerformance()]);
     } catch (err) {
         toast.error(err.message ?? 'Non sono riuscito a scaricare le quotazioni.');
     } finally {
@@ -149,23 +149,23 @@ navFetchBtn?.addEventListener('click', async () => {
 
 // ── Andamento ────────────────────────────────────────────────────────────────
 
-let andamentoDati = null;
-let andamentoChart = null;
+let performanceData = null;
+let performanceChart = null;
 
-async function loadAndamento() {
+async function loadPerformance() {
     const r = await apiGuard(api.get(`${BASE}/pac/plans/performance`, { plan_id: PLAN.id }));
-    andamentoDati = r.data ?? null;
+    performanceData = r.data ?? null;
     renderKpi();
-    renderAndamento();
+    renderPerformance();
 }
 
-function renderAndamento() {
+function renderPerformance() {
     const canvas = document.getElementById('plan-chart');
     const nota   = document.getElementById('plan-chart-note');
     if (!canvas || typeof Chart === 'undefined') return;
 
-    const serie = andamentoDati?.serie ?? [];
-    if (andamentoChart) andamentoChart.destroy();
+    const serie = performanceData?.serie ?? [];
+    if (performanceChart) performanceChart.destroy();
 
     if (serie.length === 0) {
         if (nota) nota.textContent = 'nessun versamento da mostrare';
@@ -178,7 +178,7 @@ function renderAndamento() {
             : `${serie.length} punti, dal ${serie[0].date}`;
     }
 
-    andamentoChart = new Chart(canvas, {
+    performanceChart = new Chart(canvas, {
         type: 'line',
         data: {
             labels: serie.map(p => p.date),
@@ -254,7 +254,7 @@ contribForm.addEventListener('submit', async (ev) => {
     try {
         await send(`${BASE}/pac/contributions/create`, Object.fromEntries(fd.entries()));
         toast.success('Versamento registrato.');
-        await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
+        await Promise.all([loadContributions(), loadNavHistory(), loadPerformance()]);
     } catch (err) {
         toast.error(err.message ?? 'Errore registrazione versamento.');
     }
@@ -267,7 +267,7 @@ navForm.addEventListener('submit', async (ev) => {
         await send(`${BASE}/pac/funds/nav-update`, Object.fromEntries(fd.entries()));
         toast.success('NAV aggiornato.');
         navForm.elements['nav'].value = '';
-        await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
+        await Promise.all([loadContributions(), loadNavHistory(), loadPerformance()]);
     } catch (err) {
         toast.error(err.message ?? 'Errore aggiornamento NAV.');
     }
@@ -320,5 +320,5 @@ navHistEl.addEventListener('click', async (ev) => {
         toast.error('Piano non identificato.');
         return;
     }
-    await Promise.all([loadContributions(), loadNavHistory(), loadAndamento()]);
+    await Promise.all([loadContributions(), loadNavHistory(), loadPerformance()]);
 })();

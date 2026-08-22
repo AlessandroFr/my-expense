@@ -89,7 +89,7 @@ async function loadList() {
             </div>`;
             return;
         }
-        list.innerHTML = items.map(renderCard).join('''');
+        list.innerHTML = items.map(renderCard).join('');
         stagger(list);
     } catch (err) {
         toast.error(err.message ?? 'Errore caricamento budget.');
