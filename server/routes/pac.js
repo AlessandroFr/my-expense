@@ -16,7 +16,7 @@ import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { normalizeShares, sharesMismatch } from '../pac-split.js';
 import { transfersCategoryId } from './categories.js';
 import { summary } from '../pac-performance.js';
-import { NavError, simboliDaIsin, storico } from '../nav-fetch.js';
+import { NavError, symbolsFromIsin, priceHistory } from '../nav-fetch.js';
 
 const FUND_TYPES = ['etf', 'mutual', 'index', 'other'];
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
@@ -24,7 +24,7 @@ const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 const dec2 = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));
 const dec6 = (v) => (v === null || v === undefined ? null : Number(v).toFixed(6));
-const oggi = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
 const nullableInt = (raw) => {
   if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
   return int(raw);
@@ -543,7 +543,7 @@ async function updateNav(req, res) {
   if (fundId <= 0) throw HttpError.badRequest('ID fondo mancante.');
   if (!findFund(fundId, userId)) throw HttpError.notFound('Fondo non trovato.');
 
-  const date = str(body.nav_date) || oggi();
+  const date = str(body.nav_date) || today();
   if (!isValidDate(date)) throw HttpError.badRequest('Data NAV non valida (YYYY-MM-DD).');
 
   const nav = parseAmountLikePhp(body.nav);
@@ -736,16 +736,16 @@ async function fetchNavs(req, res) {
   const userId = currentUserId();
 
   const fundId = int(body.fund_id);
-  const fondo = fundId > 0 ? findFund(fundId, userId) : null;
-  if (!fondo) throw HttpError.notFound('Fondo non trovato.');
-  if (!fondo.symbol && !fondo.isin) {
+  const fund = fundId > 0 ? findFund(fundId, userId) : null;
+  if (!fund) throw HttpError.notFound('Fondo non trovato.');
+  if (!fund.symbol && !fund.isin) {
     throw HttpError.badRequest('Al fondo manca sia l\'ISIN sia il simbolo di borsa: senza non c\'e\' niente da cercare.');
   }
 
   try {
     // Col simbolo gia' scritto sul fondo si va dritti; senza si prova la
     // lista che esce dall'ISIN, dal piu' probabile in giu'.
-    const daProvare = fondo.symbol ? [fondo.symbol] : (await simboliDaIsin(fondo.isin, fondo.currency)).slice(0, 4);
+    const toTry = fund.symbol ? [fund.symbol] : (await symbolsFromIsin(fund.isin, fund.currency)).slice(0, 4);
 
     // Da un mese prima del primo versamento: prima non servirebbe a niente.
     const primo = one(
@@ -757,70 +757,70 @@ async function fetchNavs(req, res) {
 
     // La valuta sbagliata non e' un dettaglio: quei numeri farebbero sembrare
     // il piano cresciuto o calato per il cambio. Meglio provare la borsa dopo.
-    let serie = null;
+    let series = null;
     let symbol = null;
-    const scartati = [];
-    for (const candidato of daProvare) {
-      const s = await storico(candidato, da);
-      if (s.currency && s.currency !== fondo.currency.toUpperCase()) {
-        scartati.push(`${candidato} (${s.currency})`);
+    const rejected = [];
+    for (const candidate of toTry) {
+      const s = await priceHistory(candidate, da);
+      if (s.currency && s.currency !== fund.currency.toUpperCase()) {
+        rejected.push(`${candidate} (${s.currency})`);
         continue;
       }
-      serie = s;
-      symbol = candidato;
+      series = s;
+      symbol = candidate;
       break;
     }
-    if (serie === null) {
+    if (series === null) {
       throw new NavError(
-        `Trovato solo ${scartati.join(', ')}, ma il fondo e' in ${fondo.currency}. `
+        `Trovato solo ${rejected.join(', ')}, ma il fondo e' in ${fund.currency}. `
         + 'Scrivi a mano il simbolo di borsa sulla scheda del fondo: per l\'Italia finisce in .MI '
         + '(per esempio SWDA.MI).',
       );
     }
 
     // Il simbolo buono resta scritto sul fondo: la volta dopo si va dritti.
-    if (symbol !== fondo.symbol) {
+    if (symbol !== fund.symbol) {
       run('UPDATE pac_funds SET symbol = ? WHERE id = ? AND user_id = ?', symbol, fundId, userId);
     }
 
-    let salvati = 0;
-    let valorizzati = 0;
+    let saved = 0;
+    let valued = 0;
     transaction(() => {
-      for (const q of serie.points) {
+      for (const q of series.points) {
         const r = run(
           'INSERT OR IGNORE INTO pac_fund_navs (fund_id, nav_date, nav) VALUES (?, ?, ?)',
           fundId, q.nav_date, q.nav,
         );
-        salvati += r.changes;
+        saved += r.changes;
       }
 
       // I versamenti registrati quando il NAV non c'era erano rimasti senza
       // quote, e senza quote non entrano nel valore del piano. Ora il NAV c'e'.
-      const orfani = all(
+      const orphans = all(
         `SELECT c.id, c.contribution_date, c.amount FROM pac_contributions c
          INNER JOIN pac_plans p ON p.id = c.plan_id
          WHERE c.user_id = ? AND p.fund_id = ? AND (c.nav IS NULL OR c.units IS NULL)`,
         userId, fundId,
       );
-      for (const c of orfani) {
+      for (const c of orphans) {
         const nav = navOnOrBefore(fundId, c.contribution_date);
         if (nav === null || nav <= 0) continue;
         run(
           'UPDATE pac_contributions SET nav = ?, units = ? WHERE id = ? AND user_id = ?',
           dec6(nav), dec6(Number(c.amount) / nav), c.id, userId,
         );
-        valorizzati += 1;
+        valued += 1;
       }
     });
 
     ok(res, {
       symbol,
-      currency: serie.currency,
-      scaricati: serie.points.length,
-      salvati,
-      valorizzati,
-      dal: serie.points[0]?.nav_date ?? null,
-      al: serie.points[serie.points.length - 1]?.nav_date ?? null,
+      currency: series.currency,
+      downloaded: series.points.length,
+      saved,
+      valued,
+      from_date: series.points[0]?.nav_date ?? null,
+      to_date: series.points[series.points.length - 1]?.nav_date ?? null,
     });
   } catch (err) {
     if (err instanceof NavError) throw HttpError.badRequest(err.message);
@@ -853,7 +853,7 @@ async function performance(req, res) {
     plan.fund_id,
   );
 
-  ok(res, { plan_id: planId, ...riepilogo(contributi, navs, oggi()) });
+  ok(res, { plan_id: planId, ...summary(contributi, navs, today()) });
 }
 
 async function createContribution(req, res) {

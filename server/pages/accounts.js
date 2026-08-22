@@ -4,7 +4,7 @@ import { asset, csrfField, each, esc } from '../view.js';
  * Le banche fra cui scegliere il tracciato del conto. La voce vuota vale
  * «riconoscilo dal file», che e' come si comportava l'import prima.
  */
-const opzioniProfilo = (profiles) => `<option value="">Riconoscimento automatico</option>${
+const profileOptions = (profiles) => `<option value="">Riconoscimento automatico</option>${
   each(profiles, (p) => `<option value="${p.id}">${esc(p.name)}</option>`)}`;
 
 export const render = ({ csrfToken, bankProfiles = [] }) => `
@@ -80,7 +80,7 @@ export const render = ({ csrfToken, bankProfiles = [] }) => `
                         </div>
                         <div class="col-12">
                             <label class="form-label small mb-1">Estratto conto di</label>
-                            <select name="bank_profile_id" class="form-select">${opzioniProfilo(bankProfiles)}</select>
+                            <select name="bank_profile_id" class="form-select">${profileOptions(bankProfiles)}</select>
                             <div class="form-text">Chi ha scritto il file che importi: l'import salta la fase «indovina la banca».</div>
                         </div>
                         <div class="col-12">
@@ -183,7 +183,7 @@ export const render = ({ csrfToken, bankProfiles = [] }) => `
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small mb-1">Estratto conto di</label>
-                        <select name="bank_profile_id" class="form-select">${opzioniProfilo(bankProfiles)}</select>
+                        <select name="bank_profile_id" class="form-select">${profileOptions(bankProfiles)}</select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small mb-1">Intestatario</label>

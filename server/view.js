@@ -206,8 +206,8 @@ ${o.scripts ?? ''}</body>
 export const each = (items, fn) => (items ?? []).map(fn).join('');
 
 /** Come empty() di PHP sui casi che i template usano davvero. */
-export const vuoto = (v) => v === null || v === undefined || v === '' || v === 0 || v === '0'
+export const isEmpty = (v) => v === null || v === undefined || v === '' || v === 0 || v === '0'
   || (Array.isArray(v) && v.length === 0);
 
 /** Come count(). */
-export const quanti = (v) => (Array.isArray(v) ? v.length : (v ? Object.keys(v).length : 0));
+export const countOf = (v) => (Array.isArray(v) ? v.length : (v ? Object.keys(v).length : 0));

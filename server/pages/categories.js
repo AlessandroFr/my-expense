@@ -1,10 +1,10 @@
-import { esc, each, asset, csrfField, vuoto, quanti } from '../view.js';
+import { esc, each, asset, csrfField, isEmpty, countOf } from '../view.js';
 
 export const render = ({ csrfToken, categories }) => `
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-between align-items-center">
         <h1 class="h3 mb-0"><i class="bi bi-tags me-2"></i>Categorie</h1>
-        <span class="badge bg-secondary">${quanti(categories)} totali</span>
+        <span class="badge bg-secondary">${countOf(categories)} totali</span>
     </div>
 </div>
 
@@ -69,7 +69,7 @@ export const render = ({ csrfToken, categories }) => `
                     </td>
                     <td>${esc(c.name)}</td>
                     <td>
-                        ${(!vuoto(c.icon)) ? `                            <i class="bi ${esc(c.icon)} me-1"></i>
+                        ${(!isEmpty(c.icon)) ? `                            <i class="bi ${esc(c.icon)} me-1"></i>
                             <code class="small text-muted">${esc(c.icon)}</code>
                         ` : `                            <span class="text-muted">—</span>
                         `}                    </td>
@@ -86,7 +86,7 @@ export const render = ({ csrfToken, categories }) => `
                 </tr>
             `)}            </tbody>
         </table>
-        ${(vuoto(categories)) ? `            <div class="p-4 text-center text-muted">
+        ${(isEmpty(categories)) ? `            <div class="p-4 text-center text-muted">
                 <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                 Nessuna categoria. Aggiungi la prima qui sopra.
             </div>

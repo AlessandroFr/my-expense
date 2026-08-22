@@ -384,9 +384,9 @@ function normalizeTransaction(userId, data) {
 }
 
 /** Numero senza zeri inutili in coda, come fa rtrim(rtrim(...,'0'),'.'). */
-const compatta = (v) => dec6(v).replace(/0+$/, '').replace(/\.$/, '');
+const trimZeros = (v) => dec6(v).replace(/0+$/, '').replace(/\.$/, '');
 
-const categoriaInvestimenti = (userId) => {
+const investmentsCategoryId = (userId) => {
   const existing = one('SELECT id FROM categories WHERE user_id = ? AND name = ? LIMIT 1',
     userId, 'Investimenti');
   if (existing) return existing.id;
@@ -530,9 +530,9 @@ async function createTransaction(req, res) {
   const row = normalizeTransaction(userId, body);
 
   const id = transaction(() => {
-    const categoryId = categoriaInvestimenti(userId);
+    const categoryId = investmentsCategoryId(userId);
     const suffisso = row.fee > 0 ? ` (fee ${dec2(row.fee)})` : '';
-    const descrizione = `${row.kind} ${compatta(row.quantity)} ${row.instrument_name} @ ${compatta(row.price)}${suffisso}`;
+    const descrizione = `${row.kind} ${trimZeros(row.quantity)} ${row.instrument_name} @ ${trimZeros(row.price)}${suffisso}`;
     const testo = descrizione + (row.notes !== null ? ` — ${row.notes}` : '');
 
     let expenseId = null;

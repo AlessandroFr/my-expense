@@ -134,10 +134,10 @@ navFetchBtn?.addEventListener('click', async () => {
     try {
         const r = await send(`${BASE}/pac/funds/nav-fetch`, { fund_id: navFetchBtn.dataset.fundId });
         const d = r?.data ?? {};
-        const versamenti = d.valorizzati > 0 ? ` ${d.valorizzati} versamenti hanno ora le loro quote.` : '';
-        toast.success((d.salvati > 0
-            ? `${d.salvati} quotazioni nuove da ${d.symbol} (${d.dal} → ${d.al}).`
-            : `Nessuna quotazione nuova: ${d.symbol} era già aggiornato.`) + versamenti);
+        const contributionsText = d.valued > 0 ? ` ${d.valued} versamenti hanno ora le loro quote.` : '';
+        toast.success((d.saved > 0
+            ? `${d.saved} quotazioni nuove da ${d.symbol} (${d.from_date} → ${d.to_date}).`
+            : `Nessuna quotazione nuova: ${d.symbol} era già aggiornato.`) + contributionsText);
         await Promise.all([loadContributions(), loadNavHistory(), loadPerformance()]);
     } catch (err) {
         toast.error(err.message ?? 'Non sono riuscito a scaricare le quotazioni.');

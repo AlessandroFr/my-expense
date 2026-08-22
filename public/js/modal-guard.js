@@ -71,7 +71,7 @@ function scrivi(form, valori) {
 }
 
 const uguali = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const vuoto = (v) => Object.values(v).every((x) => x === '' || x === false);
+const isEmpty = (v) => Object.values(v).every((x) => x === '' || x === false);
 
 /** Chiusa la finestra: se c'era qualcosa di scritto, se lo tiene da parte. */
 function alleChiusura(modale) {
@@ -88,7 +88,7 @@ function alleChiusura(modale) {
   }
 
   const valori = leggi(form);
-  if (vuoto(valori)) appunti.delete(k);
+  if (isEmpty(valori)) appunti.delete(k);
   else appunti.set(k, valori);
 }
 

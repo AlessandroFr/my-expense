@@ -5,7 +5,7 @@
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
-import { riepilogo } from '../pac-performance.js';
+import { summary } from '../pac-performance.js';
 
 const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other'];
 const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
@@ -38,7 +38,7 @@ const round2 = (n) => roundLikePhp(n, 2);
  * trasferimenti — e quindi non sale mai da solo. Quello che il conto vale
  * davvero sono le quote comprate per il NAV di oggi, ed e' un altro numero.
  */
-function valoriPac(userId) {
+function pacValues(userId) {
   const piani = all('SELECT id, account_id, fund_id FROM pac_plans WHERE user_id = ?', userId);
   const perConto = new Map();
 
@@ -54,7 +54,7 @@ function valoriPac(userId) {
       'SELECT nav_date, nav FROM pac_fund_navs WHERE fund_id = ? ORDER BY nav_date ASC',
       piano.fund_id,
     );
-    const r = riepilogo(contributi, navs, new Date().toISOString().slice(0, 10));
+    const r = summary(contributi, navs, new Date().toISOString().slice(0, 10));
     if (r.valore === null) continue;
 
     const acc = perConto.get(piano.account_id) ?? { valore: 0, versato: 0 };
@@ -87,7 +87,7 @@ export function withBalances(userId, includeArchived = false) {
     }
   }
 
-  const pac = valoriPac(userId);
+  const pac = pacValues(userId);
 
   return accounts.map((a) => {
     const { exp, inc } = sums.get(a.id);

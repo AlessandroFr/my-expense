@@ -23,7 +23,7 @@ const RUMORE = new Set([
 ]);
 
 /** Minuscolo, senza accenti, senza punteggiatura, spazi collassati. */
-export function normalizza(nome) {
+export function normalizeForDedup(nome) {
   return String(nome ?? '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase()
@@ -32,7 +32,7 @@ export function normalizza(nome) {
 }
 
 /** Il nome ridotto a quel che lo distingue davvero. */
-export const nocciolo = (nome) => normalizza(nome)
+export const coreName = (nome) => normalizeForDedup(nome)
   .split(' ')
   .filter((t) => t !== '' && !RUMORE.has(t))
   .join(' ');
@@ -47,9 +47,9 @@ const MIN_PREFISSO = 6;
  * Perche' due nomi sono la stessa cosa, o null se non lo sono.
  * Il motivo finisce sotto gli occhi dell'utente: e' lui a decidere.
  */
-export function perche(a, b) {
-  const na = nocciolo(a);
-  const nb = nocciolo(b);
+export function whyDuplicate(a, b) {
+  const na = coreName(a);
+  const nb = coreName(b);
   if (na === '' || nb === '') return null;
   if (na === nb) return 'stesso nome';
 
@@ -77,15 +77,15 @@ export function perche(a, b) {
  * giorno fossero decine di migliaia, la strada e' indicizzare per prima
  * parola e confrontare solo dentro il secchio.
  */
-export function gruppiDoppioni(contatti) {
-  const items = contatti.filter((c) => nocciolo(c.name) !== '');
+export function duplicateGroups(contatti) {
+  const items = contatti.filter((c) => coreName(c.name) !== '');
   const padre = items.map((_, i) => i);
   const radice = (i) => (padre[i] === i ? i : (padre[i] = radice(padre[i])));
   const motivi = new Map();
 
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
-      const motivo = perche(items[i].name, items[j].name);
+      const motivo = whyDuplicate(items[i].name, items[j].name);
       if (motivo === null) continue;
       const [ri, rj] = [radice(i), radice(j)];
       if (ri !== rj) padre[rj] = ri;

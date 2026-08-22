@@ -36,7 +36,7 @@ export { NavError };
  * sbagliato, i NAV sarebbero in dollari e il piano risulterebbe cresciuto o
  * calato per il cambio. Si preferisce Milano, poi le altre piazze europee.
  */
-export function candidati(quotes, valuta = 'EUR') {
+export function symbolCandidates(quotes, valuta = 'EUR') {
   const utili = (quotes ?? []).filter((q) => q && q.symbol);
   const perValuta = utili.filter((q) => !q.currency || q.currency.toUpperCase() === valuta.toUpperCase());
   const lista = perValuta.length > 0 ? perValuta : utili;
@@ -55,7 +55,7 @@ export function candidati(quotes, valuta = 'EUR') {
 }
 
 /** Il migliore fra i candidati, o null se non c'e' niente. */
-export const scegliSimbolo = (quotes, valuta = 'EUR') => candidati(quotes, valuta)[0] ?? null;
+export const pickSymbol = (quotes, valuta = 'EUR') => symbolCandidates(quotes, valuta)[0] ?? null;
 
 /**
  * Le quotazioni dentro la risposta del grafico.
@@ -63,7 +63,7 @@ export const scegliSimbolo = (quotes, valuta = 'EUR') => candidati(quotes, valut
  * I giorni senza scambi arrivano con la chiusura a `null`: vanno buttati, non
  * riportati come quotazione zero.
  */
-export function serieDaChart(json) {
+export function seriesFromChart(json) {
   const res = json?.chart?.result?.[0];
   if (!res) {
     const errore = json?.chart?.error?.description;
@@ -88,7 +88,7 @@ export function serieDaChart(json) {
   };
 }
 
-async function leggiJson(url) {
+async function readJson(url) {
   let risposta;
   try {
     risposta = await fetch(url, { headers: TESTATE, signal: AbortSignal.timeout(15000) });
@@ -110,11 +110,11 @@ async function leggiJson(url) {
  * ricerca spesso non dice in che valuta. Chi chiama li prova in ordine e tiene
  * il primo che quota nella valuta giusta.
  */
-export async function simboliDaIsin(isin, valuta = 'EUR') {
-  const cerca = async (q) => (await leggiJson(`${CERCA}?q=${encodeURIComponent(q)}&quotesCount=10&newsCount=0`))?.quotes ?? [];
+export async function symbolsFromIsin(isin, valuta = 'EUR') {
+  const cerca = async (q) => (await readJson(`${CERCA}?q=${encodeURIComponent(q)}&quotesCount=10&newsCount=0`))?.quotes ?? [];
 
   const perIsin = await cerca(isin);
-  const trovati = candidati(perIsin, valuta);
+  const trovati = symbolCandidates(perIsin, valuta);
   if (trovati.length === 0) throw new NavError(`Nessun titolo trovato per l'ISIN ${isin}.`);
 
   // Cercando l'ISIN spesso esce una borsa sola, e non e' detto sia quella
@@ -124,10 +124,10 @@ export async function simboliDaIsin(isin, valuta = 'EUR') {
   const nome = perIsin.find((q) => q.longname || q.shortname);
   if (nome) {
     try {
-      const perNome = candidati(await cerca(nome.longname ?? nome.shortname), valuta);
+      const perNome = symbolCandidates(await cerca(nome.longname ?? nome.shortname), valuta);
       for (const s of perNome) if (!trovati.includes(s)) trovati.push(s);
       // Il piu' probabile torna in testa: l'ordine per borsa vale su tutti.
-      return candidati(trovati.map((symbol) => ({ symbol })), valuta);
+      return symbolCandidates(trovati.map((symbol) => ({ symbol })), valuta);
     } catch { /* la seconda ricerca e' un di piu': se fallisce restano i primi */ }
   }
   return trovati;
@@ -139,10 +139,10 @@ export async function simboliDaIsin(isin, valuta = 'EUR') {
  * @param {string} symbol simbolo di borsa (es. SWDA.MI)
  * @param {string} [da] data ISO da cui partire; senza, gli ultimi due anni
  */
-export async function storico(symbol, da = null) {
+export async function priceHistory(symbol, da = null) {
   const periodo = da
     ? `period1=${Math.floor(new Date(`${da}T00:00:00Z`).getTime() / 1000)}&period2=${Math.floor(Date.now() / 1000)}`
     : 'range=2y';
   const url = `${STORICO}/${encodeURIComponent(symbol)}?${periodo}&interval=1d`;
-  return serieDaChart(await leggiJson(url));
+  return seriesFromChart(await readJson(url));
 }

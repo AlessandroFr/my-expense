@@ -10,7 +10,7 @@ import { roundLikePhp } from '../amount.js';
 import { withBalances } from './accounts.js';
 
 const ADJUSTMENT_LABEL = 'Rettifica';
-const oggi = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
 
 /** Come isValidDate di PHP: rifiuta anche le date impossibili tipo 2026-02-31. */
 function isRealDate(date) {
@@ -35,7 +35,7 @@ const balanceFor = (userId, accountId) => {
   return conto ? conto.balance : 0;
 };
 
-const categoriaRettifica = (userId) => {
+const adjustmentCategoryId = (userId) => {
   const existing = one('SELECT id FROM categories WHERE user_id = ? AND name = ? LIMIT 1',
     userId, ADJUSTMENT_LABEL);
   if (existing) return existing.id;
@@ -64,7 +64,7 @@ async function reconcile(req, res) {
   if (!isRealDate(reconciledAt)) {
     throw HttpError.badRequest('Data riconciliazione non valida (formato YYYY-MM-DD).');
   }
-  if (reconciledAt > oggi()) {
+  if (reconciledAt > today()) {
     throw HttpError.badRequest("La data di riconciliazione non puo' essere futura.");
   }
 
@@ -96,7 +96,7 @@ async function reconcile(req, res) {
         `INSERT INTO expenses
            (user_id, category_id, account_id, amount, description, payment_method, expense_date)
          VALUES (?, ?, ?, ?, ?, 'other', ?)`,
-        userId, categoriaRettifica(userId), accountId,
+        userId, adjustmentCategoryId(userId), accountId,
         Math.abs(difference).toFixed(2), descrizione, reconciledAt,
       );
       expenseId = Number(r.lastInsertRowid);

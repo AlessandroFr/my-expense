@@ -1,7 +1,7 @@
-import { esc, asset, csrfField, vuoto } from '../view.js';
+import { esc, asset, csrfField, isEmpty } from '../view.js';
 
 export const render = ({ csrfToken, instrument }) => {
-  const oggi = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   return `
 <div class="row mb-3">
     <div class="col-12 d-flex align-items-center flex-wrap gap-2">
@@ -11,9 +11,9 @@ export const render = ({ csrfToken, instrument }) => {
         <div class="ms-2">
             <h1 class="h3 mb-0">${esc(instrument.name)}</h1>
             <div class="text-muted small">
-                ${(!vuoto(instrument.ticker)) ? `                    <span class="badge bg-secondary me-1">${esc(instrument.ticker)}</span>
-                ` : ``}                ${(!vuoto(instrument.isin)) ? `                    ISIN: <code>${esc(instrument.isin)}</code>
-                ` : ``}                · ${esc(instrument.currency ?? 'EUR')}                ${(!vuoto(instrument.asset_class_name)) ? `                    · <span class="badge" style="background:${esc(instrument.asset_class_color ?? '#6c757d')}">${esc(instrument.asset_class_name)}</span>
+                ${(!isEmpty(instrument.ticker)) ? `                    <span class="badge bg-secondary me-1">${esc(instrument.ticker)}</span>
+                ` : ``}                ${(!isEmpty(instrument.isin)) ? `                    ISIN: <code>${esc(instrument.isin)}</code>
+                ` : ``}                · ${esc(instrument.currency ?? 'EUR')}                ${(!isEmpty(instrument.asset_class_name)) ? `                    · <span class="badge" style="background:${esc(instrument.asset_class_color ?? '#6c757d')}">${esc(instrument.asset_class_name)}</span>
                 ` : ``}            </div>
         </div>
     </div>
@@ -32,7 +32,7 @@ export const render = ({ csrfToken, instrument }) => {
             </div>
             <div class="col-5">
                 <label class="form-label small mb-1">Data</label>
-                <input type="date" name="price_date" class="form-control" required value="${oggi}">
+                <input type="date" name="price_date" class="form-control" required value="${today}">
             </div>
             <div class="col-12 d-grid mt-2">
                 <button type="submit" class="btn btn-primary">

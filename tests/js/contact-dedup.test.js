@@ -4,51 +4,51 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { gruppiDoppioni, nocciolo, perche } from '../../server/contact-dedup.js';
+import { duplicateGroups, coreName, whyDuplicate } from '../../server/contact-dedup.js';
 
 const c = (id, name, usage_total = 0) => ({ id, name, usage_total });
 const nomi = (gruppo) => gruppo.members.map((m) => m.name).sort();
 
 test('il nocciolo del nome ignora sigle societarie e punteggiatura', () => {
-  assert.equal(nocciolo('Centro Nuoto Riva S.R.L.'), 'centro nuoto riva');
-  assert.equal(nocciolo('CENTRO NUOTO RIVA SRL'), 'centro nuoto riva');
-  assert.equal(nocciolo('Anthropic* Claude'), 'anthropic claude');
+  assert.equal(coreName('Centro Nuoto Riva S.R.L.'), 'centro nuoto riva');
+  assert.equal(coreName('CENTRO NUOTO RIVA SRL'), 'centro nuoto riva');
+  assert.equal(coreName('Anthropic* Claude'), 'anthropic claude');
 });
 
 test('due nomi sono lo stesso se coincidono o se uno comincia con l\'altro', () => {
-  assert.equal(perche('Coop Centrale', 'COOP CENTRALE S.R.L.'), 'stesso nome');
+  assert.equal(whyDuplicate('Coop Centrale', 'COOP CENTRALE S.R.L.'), 'stesso nome');
   // Il nome troncato dalla banca a lunghezza fissa.
-  assert.equal(perche('Supermercato Coop Centr', 'Supermercato Coop Centrale'), 'uno comincia con l\'altro');
-  assert.equal(perche('Anthropic', 'Anthropic* Claude Sub San Francisco'), 'uno comincia con l\'altro');
+  assert.equal(whyDuplicate('Supermercato Coop Centr', 'Supermercato Coop Centrale'), 'uno comincia con l\'altro');
+  assert.equal(whyDuplicate('Anthropic', 'Anthropic* Claude Sub San Francisco'), 'uno comincia con l\'altro');
 });
 
 test('nome e cognome invertiti sono la stessa persona', () => {
-  assert.equal(perche('ROSSI MARIO', 'Mario Rossi'), 'nome e cognome invertiti');
-  assert.equal(perche('Neri Giulia', 'GIULIA NERI'), 'nome e cognome invertiti');
-  assert.equal(perche('Mario Gallo', 'Mario Ometto'), null);
+  assert.equal(whyDuplicate('ROSSI MARIO', 'Mario Rossi'), 'nome e cognome invertiti');
+  assert.equal(whyDuplicate('Neri Giulia', 'GIULIA NERI'), 'nome e cognome invertiti');
+  assert.equal(whyDuplicate('Mario Gallo', 'Mario Ometto'), null);
 });
 
 test('gli spazi di troppo non fanno due negozi', () => {
-  assert.equal(perche("MC DONALD'S", "MCDONALD'S"), 'stesso nome');
+  assert.equal(whyDuplicate("MC DONALD'S", "MCDONALD'S"), 'stesso nome');
 });
 
 test('due supermercati diversi restano due', () => {
   // «Coop» e' un'insegna: trattarla da sigla societaria faceva diventare
   // «Supermercato Coop» un «Supermercato» qualunque, che si prendeva il vicino.
-  assert.equal(perche('Supermercato Coop', 'Supermercato Aurora'), null);
-  assert.equal(perche('Supermercato Coop', 'Supermercato Coop Centrale'), 'uno comincia con l\'altro');
+  assert.equal(whyDuplicate('Supermercato Coop', 'Supermercato Aurora'), null);
+  assert.equal(whyDuplicate('Supermercato Coop', 'Supermercato Coop Centrale'), 'uno comincia con l\'altro');
 });
 
 test('nomi corti e nomi diversi restano separati', () => {
   // Sotto i sei caratteri il prefisso non vuol dire niente.
-  assert.equal(perche('Bar', 'Bar Ristorante Pizzeria'), null);
-  assert.equal(perche('Coop', 'Coop Centrale'), null);
-  assert.equal(perche('Verdi Anna', 'Bianchi Luigi'), null);
-  assert.equal(perche('', 'Qualcosa'), null);
+  assert.equal(whyDuplicate('Bar', 'Bar Ristorante Pizzeria'), null);
+  assert.equal(whyDuplicate('Coop', 'Coop Centrale'), null);
+  assert.equal(whyDuplicate('Verdi Anna', 'Bianchi Luigi'), null);
+  assert.equal(whyDuplicate('', 'Qualcosa'), null);
 });
 
 test('i nomi che si somigliano finiscono in un gruppo solo', () => {
-  const gruppi = gruppiDoppioni([
+  const gruppi = duplicateGroups([
     c(1, 'Anthropic', 3),
     c(2, 'Anthropic* Claude Sub San Francisco', 12),
     c(3, 'ANTHROPIC*CLAUDE'),
@@ -62,11 +62,11 @@ test('i nomi che si somigliano finiscono in un gruppo solo', () => {
 });
 
 test('a pari movimenti vince il nome piu\' corto', () => {
-  const gruppi = gruppiDoppioni([c(1, 'Forno Aurora Centro Centro'), c(2, 'Forno Aurora Centro')]);
+  const gruppi = duplicateGroups([c(1, 'Forno Aurora Centro Centro'), c(2, 'Forno Aurora Centro')]);
   assert.equal(gruppi[0].suggested_winner_id, 2);
 });
 
 test('chi non ha doppioni non compare', () => {
-  assert.deepEqual(gruppiDoppioni([c(1, 'Verdi Anna'), c(2, 'Bianchi Luigi')]), []);
-  assert.deepEqual(gruppiDoppioni([]), []);
+  assert.deepEqual(duplicateGroups([c(1, 'Verdi Anna'), c(2, 'Bianchi Luigi')]), []);
+  assert.deepEqual(duplicateGroups([]), []);
 });

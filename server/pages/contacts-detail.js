@@ -1,4 +1,4 @@
-import { esc, asset, csrfField, vuoto } from '../view.js';
+import { esc, asset, csrfField, isEmpty } from '../view.js';
 
 export const render = ({ csrfToken, contact, year }) => {
   const anni = Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - i);
@@ -18,10 +18,10 @@ ${(contact === null) ? `    <div class="alert alert-warning">
                       style="width:1rem;height:1rem;background-color:${esc(contact.color)}"></span>
                 ${esc(contact.name)}            </h1>
             <div class="text-muted small">
-                ${(!vuoto(contact.vat_number)) ? `                    <code class="me-2">P.IVA ${esc(contact.vat_number)}</code>
-                ` : ``}                ${(!vuoto(contact.email)) ? `                    <a href="mailto:${esc(contact.email)}" class="me-2">
+                ${(!isEmpty(contact.vat_number)) ? `                    <code class="me-2">P.IVA ${esc(contact.vat_number)}</code>
+                ` : ``}                ${(!isEmpty(contact.email)) ? `                    <a href="mailto:${esc(contact.email)}" class="me-2">
                         <i class="bi bi-envelope"></i> ${esc(contact.email)}                    </a>
-                ` : ``}                ${(!vuoto(contact.iban)) ? `                    <code class="me-2">IBAN ${esc(contact.iban)}</code>
+                ` : ``}                ${(!isEmpty(contact.iban)) ? `                    <code class="me-2">IBAN ${esc(contact.iban)}</code>
                 ` : ``}            </div>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">

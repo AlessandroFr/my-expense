@@ -13,7 +13,7 @@
 import { app, BrowserWindow, Menu, dialog, shell } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { controllaAggiornamenti } from './update.js';
+import { checkForUpdates } from './update.js';
 
 /**
  * Dove tenere i dati.
@@ -68,7 +68,7 @@ if (!app.requestSingleInstanceLock()) {
 
 let finestra = null;
 
-function creaFinestra(url) {
+function createWindow(url) {
   finestra = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -126,7 +126,7 @@ app.on('window-all-closed', () => app.quit());
  * un messaggio, senza niente. Dentro una funzione, invece, il file finisce
  * subito e l'attesa si risolve regolarmente.
  */
-async function avviaApplicazione() {
+async function startApplication() {
   await app.whenReady();
   nota('pronta');
 
@@ -149,19 +149,19 @@ async function avviaApplicazione() {
 
   // Importato qui e non in cima perche' la cartella dei dati dev'essere gia'
   // decisa: il server la legge nel momento in cui viene caricato.
-  const { avvia } = await import('../server/index.js');
-  const { url, porta } = await avvia(0);
+  const { start } = await import('../server/index.js');
+  const { url, porta } = await start(0);
   nota(`server in ascolto sulla porta ${porta}`);
-  creaFinestra(url);
+  createWindow(url);
   nota('finestra aperta');
 
   // Dopo la finestra, non prima: un aggiornamento che non arriva non deve
   // ritardare l'avvio, e se qualcosa va storto l'app e' gia' utilizzabile.
-  controllaAggiornamenti(app, dialog, nota)
+  checkForUpdates(app, dialog, nota)
     .catch((err) => nota(`aggiornamenti: ${err?.stack ?? err}`));
 }
 
-avviaApplicazione().catch((err) => {
+startApplication().catch((err) => {
   // Senza server non c'e' niente da mostrare: meglio dirlo che aprire una
   // finestra che non funziona.
   nota(`avvio fallito: ${err?.stack ?? err}`);

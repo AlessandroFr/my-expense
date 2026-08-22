@@ -29,7 +29,7 @@ const cartellaPredefinita = 'C:\\dev\\my-expense\\dist';
 const NOME_INSTALLER = /^MyExpense-Setup-(\d+(?:\.\d+)*)\.exe$/;
 
 /** Confronta due versioni tipo `1.2.10`: maggiore di zero se `a` e' piu' recente di `b`. */
-export function confrontaVersioni(a, b) {
+export function compareVersions(a, b) {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
   for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
@@ -44,14 +44,14 @@ export function confrontaVersioni(a, b) {
  * versione corrente. Gli installer vecchi restano nella cartella e vengono
  * semplicemente ignorati, non c'e' niente da ripulire.
  */
-export function installerPiuRecente(nomi, versioneCorrente) {
+export function newestInstaller(nomi, versioneCorrente) {
   let scelto = null;
   for (const nome of nomi) {
     const trovato = NOME_INSTALLER.exec(nome);
     if (!trovato) continue;
     const versione = trovato[1];
-    if (confrontaVersioni(versione, versioneCorrente) <= 0) continue;
-    if (!scelto || confrontaVersioni(versione, scelto.versione) > 0) scelto = { nome, versione };
+    if (compareVersions(versione, versioneCorrente) <= 0) continue;
+    if (!scelto || compareVersions(versione, scelto.versione) > 0) scelto = { nome, versione };
   }
   return scelto;
 }
@@ -61,7 +61,7 @@ export function installerPiuRecente(nomi, versioneCorrente) {
  *
  * Da sorgente non fa niente: li' l'aggiornamento e' `git pull`.
  */
-export async function controllaAggiornamenti(app, dialog, nota) {
+export async function checkForUpdates(app, dialog, nota) {
   if (!app.isPackaged) return;
 
   const cartella = process.env.MY_EXPENSE_UPDATE_DIR || cartellaPredefinita;
@@ -73,7 +73,7 @@ export async function controllaAggiornamenti(app, dialog, nota) {
     return;
   }
 
-  const nuovo = installerPiuRecente(nomi, app.getVersion());
+  const nuovo = newestInstaller(nomi, app.getVersion());
   if (!nuovo) return;
   nota(`aggiornamenti: trovata la versione ${nuovo.versione}`);
 

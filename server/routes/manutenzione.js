@@ -32,11 +32,11 @@ const TABELLE_RIPRISTINO = [
   'securities_transactions', 'pac_funds', 'pac_fund_navs', 'pac_plans', 'pac_contributions',
 ];
 
-const cartellaAllegati = (userId) => uploadsDir(userId);
+const attachmentsDir = (userId) => uploadsDir(userId);
 
 /** Cancella i file degli allegati dell'utente, senza far fallire il resto. */
-function svuotaAllegati(userId) {
-  const dir = cartellaAllegati(userId);
+function clearAttachments(userId) {
+  const dir = attachmentsDir(userId);
   if (!existsSync(dir)) return 0;
   let n = 0;
   for (const f of readdirSync(dir)) {
@@ -121,7 +121,7 @@ async function dbReset(req, res) {
 
   // I file su disco dopo il commit: se qualcosa va storto restano solo file
   // orfani, non un database incoerente.
-  conta.attachment_files_deleted = svuotaAllegati(userId);
+  conta.attachment_files_deleted = clearAttachments(userId);
 
   ok(res, { scope, counters: conta });
 }
@@ -252,7 +252,7 @@ async function dbResetInterno(userId) {
   } finally {
     db().exec('PRAGMA foreign_keys = ON');
   }
-  svuotaAllegati(userId);
+  clearAttachments(userId);
 }
 
 export const manutenzioneRoutes = {

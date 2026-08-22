@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   classifyExpense, extractCounterparty, extractIban, loadAndDecode,
-  parseBankAmountSigned, parseStatementDate, sembraGergoBancario,
+  parseBankAmountSigned, parseStatementDate, looksLikeBankJargon,
 } from '../../server/bank-statement.js';
 import { builtinProfiles, matchProfiles, normalizeHeader } from '../../server/bank-profiles.js';
 import { resolveAmountMode } from '../../server/routes/bank-import.js';
@@ -214,10 +214,10 @@ test('si riconosce un nome che e\' gergo della banca', () => {
   // quelli finiti in anagrafica prima che la regola esistesse.
   for (const n of ['Prel', 'Bonifico', 'Vostra Disposizione', 'Carta Di Debito',
     'Pagamenti Paesi Ue Carta', 'Trasferimento', 'IMPOSTA DI BOLLO']) {
-    assert.equal(sembraGergoBancario(n), true, n);
+    assert.equal(looksLikeBankJargon(n), true, n);
   }
   for (const n of ['Old Wild West', 'Poste Italiane', 'Verdi Anna', 'Supermercato Coop', 'Postemobile']) {
-    assert.equal(sembraGergoBancario(n), false, n);
+    assert.equal(looksLikeBankJargon(n), false, n);
   }
 });
 

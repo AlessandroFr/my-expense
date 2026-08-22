@@ -13,7 +13,7 @@ const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-const oggi = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
 
 /**
  * Avanza una data di un periodo, riproducendo il comportamento di
@@ -121,7 +121,7 @@ export function generatePending(userId) {
      FROM recurring_expenses WHERE user_id = ? AND active = 1`,
     userId,
   );
-  const today = oggi();
+  const today = today();
   let created = 0;
 
   transaction(() => {

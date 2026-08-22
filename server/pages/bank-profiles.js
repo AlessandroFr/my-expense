@@ -1,4 +1,4 @@
-import { esc, each, asset, vuoto } from '../view.js';
+import { esc, each, asset, isEmpty } from '../view.js';
 import { AMOUNT_MODES, DATE_ORDERS, DELIMITERS, ENCODINGS, FIELDS, FIELD_LABELS } from '../bank-profiles.js';
 
 const ETICHETTE_SEPARATORE = {
@@ -27,13 +27,13 @@ const AIUTO_CAMPI = {
 const opzioni = (valori, etichette, scelto) => valori.map((v) =>
   `<option value="${esc(v)}"${v === scelto ? ' selected' : ''}>${esc(etichette[v] ?? v)}</option>`).join('');
 
-const colonneDi = (profilo) => {
+const columnsOfProfile = (profilo) => {
   try { return JSON.parse(profilo?.columns_json ?? '{}'); } catch { return {}; }
 };
 
 /** Il form del profilo: identico per il nuovo e per la modifica. */
 const form = (profilo) => {
-  const cols = colonneDi(profilo);
+  const cols = columnsOfProfile(profilo);
   const nuovo = profilo === null;
   const id = nuovo ? 'new' : String(profilo.id);
   return `
@@ -151,7 +151,7 @@ ${each(profiles, (p) => `    <details class="card shadow-sm" data-id="${p.id}">
             <span>
                 <strong>${esc(p.name)}</strong>
                 ${p.builtin_key ? '<span class="badge bg-secondary ms-2">preimpostato</span>' : ''}
-                <span class="text-muted small ms-2">${esc(Object.keys(colonneDi(p)).length)} campi mappati</span>
+                <span class="text-muted small ms-2">${esc(Object.keys(columnsOfProfile(p)).length)} campi mappati</span>
             </span>
             <i class="bi bi-chevron-down text-muted"></i>
         </summary>
@@ -160,7 +160,7 @@ ${each(profiles, (p) => `    <details class="card shadow-sm" data-id="${p.id}">
         </div>
     </details>
 `)}</div>
-${(vuoto(profiles)) ? `<div class="p-4 text-center text-muted">Nessun profilo. Creane uno qui sopra.</div>` : ``}
+${(isEmpty(profiles)) ? `<div class="p-4 text-center text-muted">Nessun profilo. Creane uno qui sopra.</div>` : ``}
 
 <script type="application/json" id="bank-profiles-generic">${JSON.stringify(genericColumns)}</script>
 <script type="module" src="${asset('js/pages/bank-profiles.js')}"></script>

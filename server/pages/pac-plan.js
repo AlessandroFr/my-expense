@@ -1,7 +1,7 @@
-import { esc, asset, csrfField, vuoto } from '../view.js';
+import { esc, asset, csrfField, isEmpty } from '../view.js';
 
 export const render = ({ csrfToken, plan, freqLabel }) => {
-  const oggi = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   return `
 <div class="row mb-3">
     <div class="col-12 d-flex flex-wrap align-items-center gap-2">
@@ -12,7 +12,7 @@ export const render = ({ csrfToken, plan, freqLabel }) => {
             <h1 class="h3 mb-0">${esc(plan.name)}</h1>
             <div class="text-muted small">
                 ${esc(freqLabel)} · €${esc(plan.amount)} ·
-                ${esc(plan.fund_name ?? '—')}                ${(!vuoto(plan.asset_class_name)) ? `                    · <span class="badge" style="background:${esc(plan.asset_class_color ?? '#6c757d')}">${esc(plan.asset_class_name)}</span>
+                ${esc(plan.fund_name ?? '—')}                ${(!isEmpty(plan.asset_class_name)) ? `                    · <span class="badge" style="background:${esc(plan.asset_class_color ?? '#6c757d')}">${esc(plan.asset_class_name)}</span>
                 ` : ``}                ${(plan.active === 0) ? `                    · <span class="badge bg-secondary">disattivato</span>
                 ` : ``}            </div>
         </div>
@@ -48,7 +48,7 @@ export const render = ({ csrfToken, plan, freqLabel }) => {
             </div>
             <div class="col-5">
                 <label class="form-label small mb-1">Data</label>
-                <input type="date" name="contribution_date" class="form-control" required value="${oggi}">
+                <input type="date" name="contribution_date" class="form-control" required value="${today}">
             </div>
             <div class="col-12">
                 <label class="form-label small mb-1">Note</label>
@@ -74,7 +74,7 @@ export const render = ({ csrfToken, plan, freqLabel }) => {
             </div>
             <div class="col-5">
                 <label class="form-label small mb-1">Data</label>
-                <input type="date" name="nav_date" class="form-control" required value="${oggi}">
+                <input type="date" name="nav_date" class="form-control" required value="${today}">
             </div>
             <div class="col-12 d-grid mt-2">
                 <button type="submit" class="btn btn-secondary">

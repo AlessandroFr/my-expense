@@ -1,4 +1,4 @@
-import { esc, each, asset, csrfField, vuoto } from '../view.js';
+import { esc, each, asset, csrfField, isEmpty } from '../view.js';
 
 export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts, defaultCash, today, paymentMethods, paymentLabels }) => `
 <div class="row mb-3 align-items-center">
@@ -75,7 +75,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                     </div>
                     <div class="mb-2">
                         <label class="form-label small fw-semibold">Conto su cui importare</label>
-                        ${(vuoto(accounts)) ? `                            <div class="alert alert-warning small mb-0">
+                        ${(isEmpty(accounts)) ? `                            <div class="alert alert-warning small mb-0">
                                 Nessun conto attivo. <a href="${esc('/accounts')}">Crea prima un conto</a>.
                             </div>
                         ` : `                            <select name="account_id" class="form-select" required>
@@ -105,7 +105,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                 </div>
                 <div class="modal-footer" id="bank-step1-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
-                    <button type="button" id="bank-preview-btn" class="btn btn-primary" ${vuoto(accounts) ? 'disabled' : ''}>
+                    <button type="button" id="bank-preview-btn" class="btn btn-primary" ${isEmpty(accounts) ? 'disabled' : ''}>
                         <i class="bi bi-search me-1"></i>Anteprima
                     </button>
                 </div>

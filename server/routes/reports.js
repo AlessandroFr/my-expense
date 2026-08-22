@@ -134,9 +134,9 @@ async function dashboardData(req, res) {
     from = fromIn;
     to = toIn;
   } else {
-    const oggi = new Date();
-    const primo = new Date(Date.UTC(oggi.getUTCFullYear(), oggi.getUTCMonth(), 1));
-    const ultimo = new Date(Date.UTC(oggi.getUTCFullYear(), oggi.getUTCMonth() + 1, 0));
+    const today = new Date();
+    const primo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const ultimo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
     from = primo.toISOString().slice(0, 10);
     to = ultimo.toISOString().slice(0, 10);
   }

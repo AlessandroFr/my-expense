@@ -58,7 +58,7 @@ export function extractIban(lines) {
 const pad = (n) => String(Number(n)).padStart(2, '0');
 
 /** Anno a due cifre: sopra il 70 e' del secolo scorso. */
-const anno4 = (a) => (String(a).length === 4 ? Number(a) : (Number(a) >= 70 ? 1900 + Number(a) : 2000 + Number(a)));
+const fourDigitYear = (a) => (String(a).length === 4 ? Number(a) : (Number(a) >= 70 ? 1900 + Number(a) : 2000 + Number(a)));
 
 /**
  * Le date di un estratto conto. `order` viene dal profilo della banca:
@@ -79,9 +79,9 @@ export function parseStatementDate(raw, order = 'auto') {
   const parti = solaData.match(/^(\d{1,4})[/.-](\d{1,2})[/.-](\d{1,4})$/);
   if (parti) {
     const [, a, b, c] = parti;
-    if (order === 'ymd') return `${anno4(a)}-${pad(b)}-${pad(c)}`;
-    if (order === 'mdy') return `${anno4(c)}-${pad(a)}-${pad(b)}`;
-    return `${anno4(c)}-${pad(b)}-${pad(a)}`;
+    if (order === 'ymd') return `${fourDigitYear(a)}-${pad(b)}-${pad(c)}`;
+    if (order === 'mdy') return `${fourDigitYear(c)}-${pad(a)}-${pad(b)}`;
+    return `${fourDigitYear(c)}-${pad(b)}-${pad(a)}`;
   }
   throw HttpError.badRequest(`Data non valida: '${s}'.`);
 }
@@ -195,7 +195,7 @@ const BUROCRAZIA = new RegExp(`^(?:${[
  * delle anagrafiche, per ritrovare quelli che erano stati creati prima che
  * questa regola esistesse.
  */
-export const sembraGergoBancario = (nome) => BUROCRAZIA.test(String(nome ?? '').trim());
+export const looksLikeBankJargon = (nome) => BUROCRAZIA.test(String(nome ?? '').trim());
 
 /** Ripulisce il nome estratto: spazi, codici in coda, iniziali maiuscole. */
 export function cleanupCounterpartyName(raw) {

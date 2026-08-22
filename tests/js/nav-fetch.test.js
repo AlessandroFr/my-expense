@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { NavError, candidati, scegliSimbolo, serieDaChart } from '../../server/nav-fetch.js';
+import { NavError, symbolCandidates, pickSymbol, seriesFromChart } from '../../server/nav-fetch.js';
 
 test('fra piu\' borse vince Milano, che quota in euro', () => {
   const quotes = [
@@ -12,7 +12,7 @@ test('fra piu\' borse vince Milano, che quota in euro', () => {
     { symbol: 'SWDA.MI', currency: 'EUR' },
     { symbol: 'EUNL.DE', currency: 'EUR' },
   ];
-  assert.equal(scegliSimbolo(quotes, 'EUR'), 'SWDA.MI');
+  assert.equal(pickSymbol(quotes, 'EUR'), 'SWDA.MI');
 });
 
 test('senza Milano si prende un\'altra piazza europea, non quella in dollari', () => {
@@ -20,15 +20,15 @@ test('senza Milano si prende un\'altra piazza europea, non quella in dollari', (
     { symbol: 'IWDA.L', currency: 'USD' },
     { symbol: 'EUNL.DE', currency: 'EUR' },
   ];
-  assert.equal(scegliSimbolo(quotes, 'EUR'), 'EUNL.DE');
+  assert.equal(pickSymbol(quotes, 'EUR'), 'EUNL.DE');
 });
 
 test('se nessuno quota nella valuta giusta si propone comunque qualcosa', () => {
   // Meglio proporre e far correggere che non trovare niente: la valuta viene
   // poi verificata prima di salvare i NAV.
-  assert.equal(scegliSimbolo([{ symbol: 'IWDA.L', currency: 'USD' }], 'EUR'), 'IWDA.L');
-  assert.equal(scegliSimbolo([], 'EUR'), null);
-  assert.equal(scegliSimbolo(undefined, 'EUR'), null);
+  assert.equal(pickSymbol([{ symbol: 'IWDA.L', currency: 'USD' }], 'EUR'), 'IWDA.L');
+  assert.equal(pickSymbol([], 'EUR'), null);
+  assert.equal(pickSymbol(undefined, 'EUR'), null);
 });
 
 const chart = (timestamp, close, extra = {}) => ({
@@ -42,7 +42,7 @@ const chart = (timestamp, close, extra = {}) => ({
 });
 
 test('le quotazioni escono come data e valore', () => {
-  const r = serieDaChart(chart(
+  const r = seriesFromChart(chart(
     [Date.UTC(2026, 0, 2) / 1000, Date.UTC(2026, 0, 5) / 1000],
     [126.98, 127.5],
   ));
@@ -55,7 +55,7 @@ test('le quotazioni escono come data e valore', () => {
 });
 
 test('i giorni senza scambi si buttano invece di valere zero', () => {
-  const r = serieDaChart(chart(
+  const r = seriesFromChart(chart(
     [Date.UTC(2026, 0, 2) / 1000, Date.UTC(2026, 0, 3) / 1000, Date.UTC(2026, 0, 4) / 1000],
     [126.98, null, 0],
   ));
@@ -63,6 +63,6 @@ test('i giorni senza scambi si buttano invece di valere zero', () => {
 });
 
 test('una risposta senza dati e\' un errore parlante, non un elenco vuoto', () => {
-  assert.throws(() => serieDaChart({ chart: { error: { description: 'No data found' } } }), NavError);
-  assert.throws(() => serieDaChart({}), /non leggibile/);
+  assert.throws(() => seriesFromChart({ chart: { error: { description: 'No data found' } } }), NavError);
+  assert.throws(() => seriesFromChart({}), /non leggibile/);
 });

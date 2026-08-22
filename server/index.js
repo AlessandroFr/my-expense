@@ -72,7 +72,7 @@ const server = createServer(async (req, res) => {
  * @param {number} porta 0 per una porta qualunque
  * @returns {Promise<{porta: number, url: string, chiudi: () => void}>}
  */
-export function avvia(porta = 0) {
+export function start(porta = 0) {
   migrate(databasePath());
   ensureUser();
 
@@ -93,6 +93,6 @@ export function avvia(porta = 0) {
 // ogni riavvio e il browser tiene i preferiti. Importato da Electron: niente,
 // e' il main process a decidere quando partire.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { url } = await avvia(Number(process.env.PORT ?? 8080));
+  const { url } = await start(Number(process.env.PORT ?? 8080));
   console.log(`My Expense in ascolto su ${url}`);
 }

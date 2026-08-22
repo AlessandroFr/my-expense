@@ -58,7 +58,7 @@ export function mergedNavs(navs, contributi) {
  * @param {{nav_date: string, nav: number}[]} navs
  * @param {string} [oggi] per valorizzare anche il giorno corrente
  */
-export function performanceSeries(contributi, navs, oggi = null) {
+export function performanceSeries(contributi, navs, today = null) {
   const versamenti = [...contributi]
     .filter((c) => c.contribution_date)
     .sort((a, b) => String(a.contribution_date).localeCompare(String(b.contribution_date)));
@@ -69,7 +69,7 @@ export function performanceSeries(contributi, navs, oggi = null) {
 
   const date = new Set(versamenti.map((c) => String(c.contribution_date).slice(0, 10)));
   for (const n of tuttiNav) if (n.nav_date >= primoVersamento) date.add(n.nav_date);
-  if (oggi) date.add(String(oggi).slice(0, 10));
+  if (today) date.add(String(today).slice(0, 10));
 
   const points = [];
   for (const data of [...date].sort()) {
@@ -137,8 +137,8 @@ export function irr(flussi) {
  * Il riepilogo che finisce sotto gli occhi: quanto hai messo, quanto vale,
  * quanto ci hai guadagnato e a che ritmo.
  */
-export function summary(contributi, navs, oggi) {
-  const points = performanceSeries(contributi, navs, oggi);
+export function summary(contributi, navs, today) {
+  const points = performanceSeries(contributi, navs, today);
   const ultimo = [...points].reverse().find((p) => p.valore !== null) ?? null;
 
   // La data del NAV con cui e' stato fatto il conto, che non e' per forza

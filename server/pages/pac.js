@@ -1,7 +1,7 @@
 import { asset, csrfField } from '../view.js';
 
 export const render = ({ csrfToken }) => {
-  const oggi = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   return `
 <div class="row mb-3">
     <div class="col-12 d-flex flex-wrap align-items-center gap-2">
@@ -69,7 +69,7 @@ export const render = ({ csrfToken }) => {
             </div>
             <div class="col-6">
                 <label class="form-label small mb-1">Inizio</label>
-                <input type="date" name="start_date" class="form-control" required value="${oggi}">
+                <input type="date" name="start_date" class="form-control" required value="${today}">
             </div>
             <div class="col-6">
                 <label class="form-label small mb-1">Fine (opz.)</label>

@@ -33,36 +33,36 @@ import * as wikiPage from '../pages/wiki.js';
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 const PAYMENT_LABELS = { cash: 'Contanti', card: 'Carta', transfer: 'Bonifico', other: 'Altro' };
 
-const oggi = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
 
 const username = () => one('SELECT username FROM users ORDER BY id LIMIT 1')?.username ?? '';
 
-const categorie = (userId) => all(
+const categoriesForUser = (userId) => all(
   `SELECT id, user_id, name, color, icon, sort_order, created_at, updated_at
    FROM categories WHERE user_id = ? ORDER BY sort_order ASC, name ASC`, userId,
 );
 
-const contiAttivi = (userId) => all(
+const activeAccounts = (userId) => all(
   `SELECT id, name, type, color, icon, opening_balance, iban, bic, bank_name,
           account_holder, account_number, notes, archived, is_default_cash,
           sort_order, created_at, updated_at
    FROM accounts WHERE user_id = ? AND archived = 0 ORDER BY sort_order ASC, name ASC`, userId,
 );
 
-const anagrafiche = (userId) => all(
+const contactsForUser = (userId) => all(
   `SELECT id, name, name_norm, type, vat_number, iban, email, notes, color,
           archived, created_at, updated_at
    FROM contacts WHERE user_id = ? AND archived = 0 ORDER BY name ASC`, userId,
 );
 
-const contoCassa = (userId) => one(
+const defaultCashAccount = (userId) => one(
   `SELECT id, user_id, name, type, color, icon, opening_balance, archived, is_default_cash, sort_order
    FROM accounts WHERE user_id = ? AND type = 'cash'
    ORDER BY is_default_cash DESC, sort_order ASC, id ASC LIMIT 1`, userId,
 );
 
 /** Manda la pagina al browser, insieme al cookie col token CSRF. */
-function inviaHtml(res, html, csrfToken) {
+function sendHtml(res, html, csrfToken) {
   const body = Buffer.from(html, 'utf8');
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
@@ -84,7 +84,7 @@ const pagina = (title, modulo, dati = () => ({})) => async (req, res) => {
   const csrfToken = req.csrfToken;
 
   const content = modulo.render({ csrfToken, ...dati(userId, req) });
-  inviaHtml(res, page({ title, path: pathname, username: username(), csrfToken, content }), csrfToken);
+  sendHtml(res, page({ title, path: pathname, username: username(), csrfToken, content }), csrfToken);
 };
 
 const dashboard = pagina('Dashboard', dashboardPage, () => ({ username: username() }));
@@ -94,24 +94,24 @@ export const pageRoutes = {
   'GET /dashboard': dashboard,
 
   'GET /expenses': pagina('Spese', expensesPage, (userId) => ({
-    categories: categorie(userId),
-    accounts: contiAttivi(userId),
+    categories: categoriesForUser(userId),
+    accounts: activeAccounts(userId),
     bankProfiles: profiliBanca(userId),
-    contacts: anagrafiche(userId),
-    defaultCash: contoCassa(userId),
-    today: oggi(),
+    contacts: contactsForUser(userId),
+    defaultCash: defaultCashAccount(userId),
+    today: today(),
     paymentMethods: PAYMENT_METHODS,
     paymentLabels: PAYMENT_LABELS,
   })),
 
   'GET /incomes': pagina('Entrate', incomesPage, (userId) => ({
-    accounts: contiAttivi(userId),
-    contacts: anagrafiche(userId),
-    today: oggi(),
+    accounts: activeAccounts(userId),
+    contacts: contactsForUser(userId),
+    today: today(),
   })),
 
   'GET /categories': pagina('Categorie', categoriesPage, (userId) => ({
-    categories: categorie(userId),
+    categories: categoriesForUser(userId),
   })),
 
   'GET /categories/edit': pagina('Modifica categoria', categoriesEditPage, (userId, req) => {
@@ -137,12 +137,12 @@ export const pageRoutes = {
     genericColumns: GENERIC_COLUMNS,
   })),
   'GET /transfers': pagina('Trasferimenti', transfersPage, (userId) => ({
-    accounts: contiAttivi(userId),
+    accounts: activeAccounts(userId),
   })),
 
   'GET /recurring': pagina('Spese ricorrenti', recurringPage, (userId) => ({
-    contacts: anagrafiche(userId),
-    today: oggi(),
+    contacts: contactsForUser(userId),
+    today: today(),
   })),
 
   'GET /contacts': pagina('Anagrafiche', contactsPage),
