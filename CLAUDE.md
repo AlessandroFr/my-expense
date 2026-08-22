@@ -65,6 +65,7 @@ npm run dist       # crea l'installer in dist\
 | `server/zip.js`, `multipart.js` | Formati che Node non ha in libreria standard |
 | `server/bank-statement.js` | Lettura degli estratti conto: date, importi, significato |
 | `server/bank-profiles.js` | Il tracciato di ogni banca e il suo riconoscimento |
+| `server/contact-dedup.js` | Quali anagrafiche sono la stessa cosa scritta in due modi |
 | `public/js/` | Il frontend, un modulo per pagina |
 | `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
 | `database/schema.sql` | Lo schema di partenza |

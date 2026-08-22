@@ -12,6 +12,9 @@ export const render = ({ csrfToken }) => `
             <button type="button" id="contacts-merge-btn" class="btn btn-warning btn-sm d-none" data-action="merge-open">
                 <i class="bi bi-bezier2 me-1"></i>Fondi <span data-merge-count>0</span>
             </button>
+            <button type="button" id="contacts-dedup-btn" class="btn btn-outline-warning btn-sm" data-action="dedup-open">
+                <i class="bi bi-search me-1"></i>Trova doppioni
+            </button>
             <button type="button" class="btn btn-primary btn-sm" data-action="new">
                 <i class="bi bi-plus-circle me-1"></i>Nuova anagrafica
             </button>
@@ -163,6 +166,30 @@ export const render = ({ csrfToken }) => `
             </div>
         </div>
     </form>
+</dialog>
+
+<dialog id="dedup-modal" class="border-0 rounded-3 shadow p-0" style="max-width:760px; width:95%">
+    <div class="modal-content border-0">
+        <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-search me-2"></i>Doppioni da unire</h5>
+            <button type="button" class="btn-close" data-action="dedup-close"></button>
+        </div>
+        <div class="modal-body">
+            <p class="small text-muted mb-3">
+                Nomi che sembrano la stessa cosa scritta in due modi. Per ogni gruppo scegli
+                il nome da tenere e premi «Unisci»: i movimenti degli altri passano su quello,
+                e gli altri spariscono. Se un gruppo non ti convince, lascialo stare.
+            </p>
+            <div id="dedup-groups">
+                <div class="text-center text-muted py-4">
+                    <div class="spinner-border spinner-border-sm me-2"></div>Sto cercando…
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-action="dedup-close">Chiudi</button>
+        </div>
+    </div>
 </dialog>
 
 <script type="module" src="${asset('js/pages/contacts.js')}"></script>

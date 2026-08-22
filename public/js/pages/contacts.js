@@ -3,7 +3,7 @@
 // ricerca debounced, modal CRUD, archivio/elimina.
 
 import FetchRequest from '../FetchRequest.js';
-import { apiSend }   from '../componentBase.js';
+import { apiSend, confirmDialog } from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { optimisticDelete } from '../optimistic.js';
 import { renderPager } from '../pager.js';
@@ -381,6 +381,15 @@ function wire() {
         refreshMergeUi();
     });
 
+    // ── Doppioni ─────────────────────────────────────────────────────────
+    document.getElementById('contacts-dedup-btn')?.addEventListener('click', openDedupModal);
+    const dedupDlg = document.getElementById('dedup-modal');
+    dedupDlg?.addEventListener('click', (ev) => {
+        if (ev.target.closest('[data-action="dedup-close"]')) { dedupDlg.close(); return; }
+        const btn = ev.target.closest('[data-dedup-merge]');
+        if (btn) mergeDedupGroup(btn.dataset.dedupMerge);
+    });
+
     // ── Merge modal ──────────────────────────────────────────────────────
     document.getElementById('contacts-merge-btn')?.addEventListener('click', openMergeModal);
     const mergeDlg  = document.getElementById('merge-modal');
@@ -393,6 +402,103 @@ function wire() {
         if (submitBtn) submitBtn.disabled = false;
     });
     document.getElementById('merge-form')?.addEventListener('submit', submitMerge);
+}
+
+// ── Doppioni ─────────────────────────────────────────────────────────────────
+// Trova i nomi che sono la stessa cosa scritta in due modi e li fa unire un
+// gruppo alla volta. La fusione vera e' sempre /contacts/merge: qui si sceglie
+// soltanto chi resta.
+
+async function openDedupModal() {
+    const dlg = document.getElementById('dedup-modal');
+    const box = document.getElementById('dedup-groups');
+    if (!dlg || !box) return;
+
+    box.innerHTML = '<div class="text-center text-muted py-4">'
+        + '<div class="spinner-border spinner-border-sm me-2"></div>Sto cercando…</div>';
+    dlg.showModal();
+
+    try {
+        const resp = await api.get(`${BASE}/contacts/duplicates`);
+        renderDedupGroups(resp?.data?.groups ?? [], Number(resp?.data?.scanned ?? 0));
+    } catch (err) {
+        box.innerHTML = `<div class="alert alert-danger small mb-0">${escHtml(err.message ?? 'Ricerca fallita.')}</div>`;
+    }
+}
+
+function renderDedupGroups(groups, scanned) {
+    const box = document.getElementById('dedup-groups');
+    if (!box) return;
+
+    if (groups.length === 0) {
+        box.innerHTML = `<div class="alert alert-success small mb-0">
+            <i class="bi bi-check-circle me-1"></i>Nessun doppione fra le ${scanned} anagrafiche.
+        </div>`;
+        return;
+    }
+
+    box.innerHTML = groups.map((g, gi) => {
+        const righe = g.members.map((m) => `
+            <label class="list-group-item d-flex align-items-center gap-2 py-1">
+                <input type="radio" class="form-check-input m-0" name="dedup-winner-${gi}" value="${m.id}"
+                       ${m.id === g.suggested_winner_id ? 'checked' : ''}>
+                <span class="flex-grow-1">${escHtml(m.name)}</span>
+                <span class="small text-muted">${m.usage_total > 0 ? `${m.usage_total} mov.` : '—'}</span>
+            </label>`).join('');
+        return `
+            <div class="card mb-2" data-dedup-group="${gi}">
+                <div class="card-body p-2">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-light text-dark border">${escHtml(g.reason)}</span>
+                        <span class="small text-muted">tieni il nome selezionato</span>
+                        <button type="button" class="btn btn-warning btn-sm ms-auto" data-dedup-merge="${gi}">
+                            <i class="bi bi-bezier2 me-1"></i>Unisci
+                        </button>
+                    </div>
+                    <div class="list-group list-group-flush">${righe}</div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+async function mergeDedupGroup(gi) {
+    const card = document.querySelector(`[data-dedup-group="${gi}"]`);
+    if (!card) return;
+
+    const scelti = [...card.querySelectorAll(`input[name="dedup-winner-${gi}"]`)];
+    const winnerId = Number(scelti.find((r) => r.checked)?.value ?? 0);
+    const losers = scelti.map((r) => Number(r.value)).filter((id) => id !== winnerId);
+    if (winnerId <= 0 || losers.length === 0) return;
+
+    const winnerName = scelti.find((r) => r.checked)?.closest('label')?.querySelector('span')?.textContent ?? '';
+    const conferma = await confirmDialog(
+        `Unire ${losers.length} nome${losers.length === 1 ? '' : 'i'} in "${winnerName.trim()}"? `
+        + 'I movimenti passano su questo nome, gli altri vengono cancellati.',
+        { confirmText: 'Unisci', confirmClass: 'btn-warning' },
+    );
+    if (!conferma) return;
+
+    try {
+        const r = await send(`${BASE}/contacts/merge`, new URLSearchParams({
+            winner_id: String(winnerId),
+            loser_ids: JSON.stringify(losers),
+            _csrf: getCsrfToken(),
+        }));
+        const stats = r?.data?.result ?? {};
+        const re = stats.reassigned ?? {};
+        const spostati = (re.expenses ?? 0) + (re.incomes ?? 0) + (re.recurring ?? 0);
+        toast.success(`Uniti in "${stats.winner_name ?? winnerName}": ${spostati} movimenti spostati.`);
+        card.remove();
+        // I gruppi rimasti restano validi: la fusione tocca solo questo.
+        const box = document.getElementById('dedup-groups');
+        if (box && !box.querySelector('[data-dedup-group]')) {
+            box.innerHTML = '<div class="alert alert-success small mb-0">'
+                + '<i class="bi bi-check-circle me-1"></i>Fatto, non resta altro da unire.</div>';
+        }
+        loadList();
+    } catch (err) {
+        toast.error(err.message ?? 'Errore fusione anagrafiche.');
+    }
 }
 
 function openMergeModal() {

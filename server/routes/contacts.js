@@ -7,6 +7,7 @@
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { roundLikePhp } from '../amount.js';
+import { gruppiDoppioni } from '../contact-dedup.js';
 
 const TYPES = ['supplier', 'customer', 'both'];
 
@@ -484,6 +485,35 @@ async function merge(req, res) {
   });
 }
 
+/**
+ * I doppioni da fondere. Legge e basta: propone i gruppi e chi dovrebbe
+ * vincere, poi e' l'utente a confermare passando da /contacts/merge.
+ */
+async function duplicates(req, res) {
+  const userId = currentUserId();
+  const contatti = all(
+    'SELECT id, name, vat_number FROM contacts WHERE user_id = ? AND archived = 0 ORDER BY name ASC',
+    userId,
+  );
+  // I movimenti di tutti in due query invece di una per anagrafica: con
+  // qualche centinaio di nomi la differenza si sente.
+  const usi = new Map(contatti.map((c) => [c.id, 0]));
+  for (const table of ['expenses', 'incomes', 'recurring_expenses']) {
+    for (const r of all(
+      `SELECT contact_id, COUNT(*) AS n FROM ${table}
+       WHERE user_id = ? AND contact_id IS NOT NULL GROUP BY contact_id`, userId,
+    )) {
+      if (usi.has(r.contact_id)) usi.set(r.contact_id, usi.get(r.contact_id) + r.n);
+    }
+  }
+
+  const groups = gruppiDoppioni(contatti.map((c) => ({
+    id: c.id, name: c.name, vat_number: c.vat_number, usage_total: usi.get(c.id) ?? 0,
+  })));
+
+  ok(res, { groups, scanned: contatti.length });
+}
+
 async function reassign(req, res) {
   const body = await readBody(req);
   assertCsrf(req, body);
@@ -576,6 +606,7 @@ export const contactRoutes = {
   'GET /contacts/list': list,
   'GET /contacts/balance': balance,
   'GET /contacts/movements': movements,
+  'GET /contacts/duplicates': duplicates,
   'POST /contacts/create': create,
   'POST /contacts/quick-create': quickCreate,
   'POST /contacts/update': update,
