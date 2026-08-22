@@ -3,7 +3,7 @@
 // + flusso "Riassegna movimenti" (modal con selezione per singolo movimento).
 
 import FetchRequest from '../FetchRequest.js';
-import { apiSend }   from '../componentBase.js';
+import { apiSend, escapeAttr } from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { renderPager } from '../pager.js';
 import { setupQuickCreate } from '../components/quickCreateContact.js';
@@ -161,7 +161,7 @@ async function ensureTargetsLoaded() {
     const dl = document.getElementById('reassign-targets-datalist');
     if (dl) {
         dl.innerHTML = reassign.targets
-            .map(c => `<option value="${escHtml(c.name)}" data-id="${c.id}"></option>`)
+            .map(c => `<option value="${escapeAttr(c.name)}" data-id="${c.id}"></option>`)
             .join('');
     }
     reassign.loaded = true;
@@ -236,7 +236,7 @@ function renderReassignRow(m) {
         <td>
             <input type="text" class="form-control form-control-sm reassign-row-target"
                    list="reassign-targets-datalist" autocomplete="off"
-                   value="${escHtml(targetName)}" placeholder="Anagrafica destinazione…">
+                   value="${escapeAttr(targetName)}" placeholder="Anagrafica destinazione…">
         </td>`;
     return tr;
 }

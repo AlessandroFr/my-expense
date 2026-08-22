@@ -2,7 +2,7 @@
 // AJAX layer per /expenses (lista + filtri + create + edit inline + delete).
 
 import FetchRequest         from '../FetchRequest.js';
-import { apiSend, apiGuard } from '../componentBase.js';
+import { apiSend, apiGuard, escapeAttr } from '../componentBase.js';
 import { toast }             from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
@@ -138,7 +138,7 @@ function shareBadge(e) {
     if (!e.shared_with && !e.share_amount) return '';
     const yours = e.share_amount ? fmtMoney(e.share_amount) : '';
     const tip   = e.shared_with ? `Diviso con: ${e.shared_with}` : 'Spesa condivisa';
-    return `<span class="badge bg-info-subtle text-info-emphasis ms-1" title="${escHtml(tip)}">
+    return `<span class="badge bg-info-subtle text-info-emphasis ms-1" title="${escapeAttr(tip)}">
         <i class="bi bi-people me-1"></i>${yours || 'split'}</span>`;
 }
 
@@ -151,7 +151,7 @@ function installmentBadge(e) {
         tip += ` — totale ${fmtMoney(e.installment_group_total)}`;
     }
     return `<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1"
-              title="${escHtml(tip)}"
+              title="${escapeAttr(tip)}"
               data-bs-toggle="tooltip">
         <i class="bi bi-card-list me-1"></i>${seq}/${total}</span>`;
 }
@@ -191,7 +191,7 @@ function accountCell(e) {
     const icon  = e.account_icon
         ? `<i class="bi bi-${escHtml(e.account_icon)} me-1"></i>`
         : '<i class="bi bi-bank me-1"></i>';
-    return `<span class="badge mx-account-badge" style="background-color:${escHtml(color)};color:${fg}" title="${escHtml(e.account_name ?? '')}">
+    return `<span class="badge mx-account-badge" style="background-color:${escHtml(color)};color:${fg}" title="${escapeAttr(e.account_name ?? '')}">
         ${icon}${escHtml(e.account_name ?? '')}
     </span>`;
 }
@@ -248,7 +248,7 @@ function renderViewRow(e) {
     const detailId = detailIdFor(e);
     const descPlain = htmlToPlain(e.description ?? '');
     const descCell = descPlain
-        ? `<div class="text-truncate" title="${escHtml(descPlain)}">${escHtml(descPlain)}</div>`
+        ? `<div class="text-truncate" title="${escapeAttr(descPlain)}">${escHtml(descPlain)}</div>`
         : `<div class="text-truncate text-muted">—</div>`;
     const tagCount = (e.tags ?? []).length;
     const tagBadge = tagCount > 0
@@ -270,7 +270,7 @@ function renderViewRow(e) {
         <td class="text-nowrap">${categoryCell(e)}</td>
         <td class="mx-cell-truncate">${descCell}</td>
         <td class="text-center">${tagBadge}</td>
-        <td class="text-center"><i class="bi ${paymentIcon(e.payment_method)}" title="${escHtml(payLabel)}"></i></td>
+        <td class="text-center"><i class="bi ${paymentIcon(e.payment_method)}" title="${escapeAttr(payLabel)}"></i></td>
         <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}${installmentBadge(e)}</td>
         <td class="text-end mx-row-actions">
             <div class="dropdown">
@@ -501,7 +501,7 @@ async function loadTags() {
 function renderTagDataList() {
     const dl = document.getElementById('all-tags-datalist');
     if (!dl) return;
-    dl.innerHTML = allTags.map(t => `<option value="${escHtml(t.name)}"></option>`).join('');
+    dl.innerHTML = allTags.map(t => `<option value="${escapeAttr(t.name)}"></option>`).join('');
 }
 
 function renderTagFilter() {
@@ -509,7 +509,7 @@ function renderTagFilter() {
     if (!sel) return;
     const cur = sel.value;
     sel.innerHTML = '<option value="">Tutti</option>' +
-        allTags.map(t => `<option value="${escHtml(t.name)}"${t.name === cur ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('');
+        allTags.map(t => `<option value="${escapeAttr(t.name)}"${t.name === cur ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('');
 }
 
 async function assignTags(expenseId, tagsCsv) {
@@ -1097,7 +1097,7 @@ function bankRenderRow(r) {
     if (isIncome) {
         middleField = `
             <input type="text" class="form-control form-control-sm bank-cell" data-field="source"
-                   value="${escHtml(r.source ?? '')}" placeholder="Es. Bonifico da X" maxlength="64">`;
+                   value="${escapeAttr(r.source ?? '')}" placeholder="Es. Bonifico da X" maxlength="64">`;
     } else {
         middleField = `
             <select class="form-select form-select-sm bank-cell" data-field="category_id">
@@ -1123,7 +1123,7 @@ function bankRenderRow(r) {
             <div class="col-12 col-md-4 col-lg-3">
                 <label class="form-label small mb-1">${isIncome ? 'Cliente' : 'Fornitore'}${contactBadge}${propagatedBadge}${backfillBadge}</label>
                 <input type="text" class="form-control form-control-sm bank-cell" data-field="contact_name"
-                       value="${escHtml(r.contact_name ?? '')}" placeholder="—" maxlength="120" list="contacts-datalist">
+                       value="${escapeAttr(r.contact_name ?? '')}" placeholder="—" maxlength="120" list="contacts-datalist">
             </div>`;
     }
 
@@ -1173,8 +1173,8 @@ function bankRenderRow(r) {
 
             <div class="mb-2">
                 <input type="text" class="form-control form-control-sm bank-cell" data-field="description"
-                       value="${escHtml(r.description ?? '')}" maxlength="512" placeholder="Descrizione">
-                ${r.tipologia ? `<div class="form-text small mt-0 fst-italic text-truncate" title="${escHtml(r.tipologia)}">${escHtml(r.tipologia)}</div>` : ''}
+                       value="${escapeAttr(r.description ?? '')}" maxlength="512" placeholder="Descrizione">
+                ${r.tipologia ? `<div class="form-text small mt-0 fst-italic text-truncate" title="${escapeAttr(r.tipologia)}">${escHtml(r.tipologia)}</div>` : ''}
             </div>
 
             <div class="row g-2 align-items-end">
@@ -1215,11 +1215,11 @@ function bankRenderRow(r) {
                 <div class="row g-2 mt-1">
                     <div class="col-md-3">
                         <label class="form-label small mb-1">Data operazione</label>
-                        <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escHtml(r.op_date ?? '')}">
+                        <input type="date" class="form-control form-control-sm bank-cell" data-field="op_date" value="${escapeAttr(r.op_date ?? '')}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small mb-1">Data valuta</label>
-                        <input type="date" class="form-control form-control-sm bank-cell" data-field="value_date" value="${escHtml(r.value_date ?? '')}">
+                        <input type="date" class="form-control form-control-sm bank-cell" data-field="value_date" value="${escapeAttr(r.value_date ?? '')}">
                     </div>
                 </div>
             </details>

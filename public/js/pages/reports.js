@@ -2,7 +2,7 @@
 // Report annuale: KPI + chart trend mensile + chart categorie + heatmap + top 10.
 
 import FetchRequest          from '../FetchRequest.js';
-import { apiGuard, escapeHtml } from '../componentBase.js';
+import { apiGuard, escapeAttr, escapeHtml } from '../componentBase.js';
 import { toast }             from '../toast.js';
 import { stagger, withViewTransition, animateEnter, flip, tweenNumber } from '../transitions.js';
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
@@ -138,7 +138,7 @@ function renderHeatmap(heatmap) {
             const pct   = maxVal > 0 ? v / maxVal : 0;
             const alpha = 0.15 + 0.85 * pct;
             const bg    = `background:${row.color}${Math.round(alpha * 255).toString(16).padStart(2,'0')}`;
-            return `<td style="${bg}" title="${escapeHtml(row.name)}: ${fmtMoney(v)}"><small>${fmtMoney(v).replace(',00','').replace('€','').replace('EUR','').trim()}</small></td>`;
+            return `<td style="${bg}" title="${escapeAttr(row.name)}: ${fmtMoney(v)}"><small>${fmtMoney(v).replace(',00','').replace('€','').replace('EUR','').trim()}</small></td>`;
         }).join('');
         return `<tr>
             <td class="text-start"><span class="badge me-1" style="background:${escapeHtml(row.color)}">&nbsp;</span>${escapeHtml(row.name)}</td>
