@@ -9,10 +9,10 @@
  * restare identico a quello di prima.
  */
 
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { publicDir } from './paths.js';
+import { projectRoot, publicDir } from './paths.js';
 
 /** Come htmlspecialchars($v, ENT_QUOTES, 'UTF-8'): protegge anche gli apici. */
 export function esc(value) {
@@ -41,6 +41,20 @@ export const csrfField = (token) =>
   `<input type="hidden" name="_csrf" value="${esc(token)}">`;
 
 const NOME_APP = 'My Expense';
+
+/**
+ * La versione in fondo al menu dell'account: e' l'unico modo per sapere, a
+ * colpo d'occhio, se l'aggiornamento e' andato a buon fine (vedi
+ * `electron/update.js`). Letta una volta sola all'avvio: dentro il pacchetto
+ * il file non cambia mentre l'app gira.
+ */
+const VERSIONE = (() => {
+  try {
+    return JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8')).version ?? '';
+  } catch {
+    return '';
+  }
+})();
 
 /** Le voci di menu che devono risultare attive per il percorso corrente. */
 function navState(path) {
@@ -164,6 +178,8 @@ ${o.head ?? ''}</head>
                     <li><a class="dropdown-item" href="/backup/download"><i class="bi bi-cloud-download me-2"></i>Backup ZIP</a></li>
                     <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2"></i>Impostazioni</a></li>
                     <li><a class="dropdown-item" href="/wiki"><i class="bi bi-question-circle me-2"></i>Guida</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><span class="dropdown-item-text text-body-secondary small">Versione ${esc(VERSIONE)}</span></li>
                 </ul>
             </div>
         </div>
