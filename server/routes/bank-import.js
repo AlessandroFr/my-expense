@@ -20,6 +20,7 @@ import { parseMultipart } from '../multipart.js';
 import { explodeInstallments, validateSpec } from '../installments.js';
 import { splitCsvLine } from './csv.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
+import { transfersCategoryId } from './categories.js';
 import { plansForSplit, setExpenseSplit } from './pac.js';
 import { suggestShares } from '../pac-split.js';
 import { FIELD_LABELS, matchProfiles } from '../bank-profiles.js';
@@ -417,14 +418,6 @@ async function preview(req, res) {
 
 // ─── Conferma ───────────────────────────────────────────────────────────────
 
-const categoriaTrasferimenti = (userId) => {
-  const existing = one('SELECT id FROM categories WHERE user_id = ? AND name = ? LIMIT 1', userId, 'Trasferimento');
-  if (existing) return existing.id;
-  const r = run('INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)',
-    userId, 'Trasferimento', '#6c757d', 'arrow-left-right', 100);
-  return Number(r.lastInsertRowid);
-};
-
 /** Conto prepagata di destinazione: se non esiste lo crea. */
 function resolvePrepaidAccount(userId, name) {
   const existing = one('SELECT id FROM accounts WHERE user_id = ? AND name = ? LIMIT 1', userId, name);
@@ -530,7 +523,7 @@ async function commit(req, res) {
   // Le righe che l'utente ha marcato come versamento in un piano di accumulo:
   // {row_idx, shares:[{plan_id, amount}]}. Restano fuori dalle righe perche'
   // fuori sta gia' la rateizzazione, ed e' lo stesso genere di aggiunta.
-  const pacMap = new Map();
+  const pacSplits = new Map();
   const pacRaw = str(body.pac_splits);
   if (pacRaw !== '') {
     let decoded;
@@ -538,7 +531,7 @@ async function commit(req, res) {
     if (!Array.isArray(decoded)) throw HttpError.badRequest('Formato pac_splits non valido (JSON atteso).');
     for (const entry of decoded) {
       if (!entry || entry.row_idx === undefined || !Array.isArray(entry.shares)) continue;
-      pacMap.set(int(entry.row_idx), entry.shares);
+      pacSplits.set(int(entry.row_idx), entry.shares);
     }
   }
 
@@ -612,7 +605,7 @@ async function commit(req, res) {
 
           const expId = insertImportedExpense({
             userId,
-            categoryId: categoryId ?? categoriaTrasferimenti(userId),
+            categoryId: categoryId ?? transfersCategoryId(userId),
             contactId: null,
             accountId,
             amount: amount.toFixed(2),
@@ -706,7 +699,7 @@ async function commit(req, res) {
 
         // Se la riga era un versamento, la spesa appena scritta diventa la
         // faccia in uscita del trasferimento verso il conto PAC.
-        const shares = pacMap.get(idx);
+        const shares = pacSplits.get(idx);
         if (shares) pacCnt += setExpenseSplit(userId, id, shares, 'import');
         continue;
       }

@@ -1,5 +1,5 @@
 // ─── pages/pac-plan.js ───────────────────────────────────────────────────────
-// Dettaglio piano PAC: KPI, versamenti, NAV, "genera ora".
+// Dettaglio piano PAC: KPI, versamenti, NAV, andamento.
 
 import FetchRequest                                       from '../FetchRequest.js';
 import { apiSend, apiGuard, escapeHtml, escapeAttr,
@@ -31,7 +31,8 @@ async function loadContributions() {
     renderKpi();
     if (!contributions.length) {
         contribsEl.innerHTML = `<div class="text-center text-muted py-3">
-            Nessun versamento. Usa "Genera ora" o registra un versamento manuale.</div>`;
+            Nessun versamento. Si segnano sui movimenti, in Spese, oppure si
+            registrano qui a mano.</div>`;
         return;
     }
     const rows = contributions.map(c => {
@@ -280,13 +281,13 @@ contribsEl.addEventListener('click', async (ev) => {
     if (!c) return;
     // Se il versamento arriva da un movimento, si disfa tutta la divisione di
     // quel movimento: la spesa torna in elenco, con il suo importo intero.
-    const messaggio = c.expense_id !== null
+    const message = c.expense_id !== null
         ? `Il versamento del ${c.contribution_date} (${fmtMoney(c.amount)}) arriva da una spesa. `
           + 'Togliendolo, la spesa torna fra le spese con il suo importo intero, '
           + 'e spariscono anche le quote sugli altri piani dello stesso movimento.'
         : `Eliminare il versamento del ${c.contribution_date} (${fmtMoney(c.amount)})? Il Transfer collegato verra' rimosso.`;
     const ok = await confirmDialog(
-        messaggio,
+        message,
         { confirmText: c.expense_id !== null ? 'Togli' : 'Elimina', confirmClass: 'btn-danger' }
     );
     if (!ok) return;

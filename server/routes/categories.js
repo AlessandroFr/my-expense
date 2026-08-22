@@ -7,12 +7,32 @@ import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 
 const COLUMNS = 'id, user_id, name, color, icon, sort_order, created_at, updated_at';
 
+export const TRANSFERS_CATEGORY = 'Trasferimento';
+
 /** Stesso ordinamento di CategoryRepository::listForUser. */
 export const listForUser = (userId) =>
   all(`SELECT ${COLUMNS} FROM categories WHERE user_id = ? ORDER BY sort_order ASC, name ASC`, userId);
 
 const findById = (id, userId) =>
   one(`SELECT ${COLUMNS} FROM categories WHERE id = ? AND user_id = ? LIMIT 1`, id, userId);
+
+/**
+ * La categoria di sistema «Trasferimento», creata la prima volta che serve.
+ *
+ * La usano tutti i movimenti che non sono spese ma passaggi di soldi fra conti
+ * — trasferimenti, ricariche, prelievi, versamenti nei piani di accumulo — e
+ * sta qui perche' e' una categoria, non un pezzo di nessuno di quei domini.
+ */
+export function transfersCategoryId(userId) {
+  const existing = one('SELECT id FROM categories WHERE user_id = ? AND name = ? LIMIT 1',
+    userId, TRANSFERS_CATEGORY);
+  if (existing) return existing.id;
+  const res = run(
+    'INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)',
+    userId, TRANSFERS_CATEGORY, '#6c757d', 'arrow-left-right', 100,
+  );
+  return Number(res.lastInsertRowid);
+}
 
 /** Traduce CategoryService::normalize, messaggi d'errore compresi. */
 export function normalize(data) {

@@ -16,18 +16,18 @@ import { parseAmountLikePhp, roundLikePhp } from './amount.js';
  */
 export function normalizeShares(raw) {
   if (!Array.isArray(raw)) return [];
-  const out = [];
-  const visti = new Set();
-  for (const q of raw) {
-    const planId = Number.parseInt(q?.plan_id, 10);
+  const shares = [];
+  const seen = new Set();
+  for (const entry of raw) {
+    const planId = Number.parseInt(entry?.plan_id, 10);
     if (!Number.isInteger(planId) || planId <= 0) continue;
-    const amount = roundLikePhp(parseAmountLikePhp(q?.amount));
+    const amount = roundLikePhp(parseAmountLikePhp(entry?.amount));
     if (amount <= 0) continue;
-    if (visti.has(planId)) throw new Error('Lo stesso piano compare due volte nella divisione.');
-    visti.add(planId);
-    out.push({ plan_id: planId, amount });
+    if (seen.has(planId)) throw new Error('Lo stesso piano compare due volte nella divisione.');
+    seen.add(planId);
+    shares.push({ plan_id: planId, amount });
   }
-  return out;
+  return shares;
 }
 
 /**
@@ -36,13 +36,13 @@ export function normalizeShares(raw) {
  * mano fra cinque righe non e' il mestiere di chi sta importando l'estratto.
  */
 export function sharesMismatch(shares, total) {
-  const somma = roundLikePhp(shares.reduce((s, q) => s + q.amount, 0));
-  const atteso = roundLikePhp(total);
-  if (somma === atteso) return null;
-  const diff = roundLikePhp(atteso - somma);
-  return diff > 0
-    ? `Mancano ${diff.toFixed(2)} euro: le quote fanno ${somma.toFixed(2)} su ${atteso.toFixed(2)}.`
-    : `Ci sono ${(-diff).toFixed(2)} euro di troppo: le quote fanno ${somma.toFixed(2)} su ${atteso.toFixed(2)}.`;
+  const assigned = roundLikePhp(shares.reduce((sum, share) => sum + share.amount, 0));
+  const expected = roundLikePhp(total);
+  if (assigned === expected) return null;
+  const missing = roundLikePhp(expected - assigned);
+  return missing > 0
+    ? `Mancano ${missing.toFixed(2)} euro: le quote fanno ${assigned.toFixed(2)} su ${expected.toFixed(2)}.`
+    : `Ci sono ${(-missing).toFixed(2)} euro di troppo: le quote fanno ${assigned.toFixed(2)} su ${expected.toFixed(2)}.`;
 }
 
 /**
@@ -56,14 +56,14 @@ export function sharesMismatch(shares, total) {
  * un numero inventato in mezzo a dei soldi e' peggio di nessun numero.
  */
 export function suggestShares(plans, amount, description) {
-  const desc = String(description ?? '').toLowerCase();
-  const conKeyword = plans.filter((p) => {
-    const k = String(p.beneficiary_keyword ?? '').trim().toLowerCase();
-    return k !== '' && desc.includes(k);
+  const haystack = String(description ?? '').toLowerCase();
+  const named = plans.filter((plan) => {
+    const keyword = String(plan.beneficiary_keyword ?? '').trim().toLowerCase();
+    return keyword !== '' && haystack.includes(keyword);
   });
-  const candidati = conKeyword.length > 0 ? conKeyword : plans;
-  if (candidati.length === 0) return null;
+  const candidates = named.length > 0 ? named : plans;
+  if (candidates.length === 0) return null;
 
-  const shares = candidati.map((p) => ({ plan_id: p.id, amount: roundLikePhp(Number(p.amount)) }));
+  const shares = candidates.map((plan) => ({ plan_id: plan.id, amount: roundLikePhp(Number(plan.amount)) }));
   return sharesMismatch(shares, amount) === null ? shares : null;
 }

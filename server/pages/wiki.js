@@ -410,7 +410,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
         my-expense è un <strong>tracker personale delle finanze</strong>: registra spese, entrate e trasferimenti tra conti, calcola budget e bilanci, importa estratti conto bancari, fa OCR degli scontrini e ti aiuta a capire dove vanno i tuoi soldi.
     </p>
     <p>
-        I dati vivono <strong>sul tuo computer</strong> (database MySQL locale via XAMPP). Non passano da nessun server esterno. Funziona in browser come applicazione web installabile (PWA), anche offline grazie alla cache del Service Worker.
+        I dati vivono <strong>sul tuo computer</strong>, in un solo file di database dentro la cartella dell'applicazione. Non passano da nessun server esterno: my-expense &egrave; un programma installato, con dentro il suo server, e il backup &egrave; copiare quel file.
     </p>
     <div class="row g-3 mt-1">
         <div class="col-md-4"><div class="mx-stat-card lilac"><div class="mx-stat-l">Domini</div><div class="mx-stat-v">17</div><div class="mx-stat-d">aree funzionali</div></div></div>
@@ -759,12 +759,11 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
         <li>Bottone <i class="bi bi-cloud-download"></i> <strong>Backup ZIP</strong> nel menu utente, oppure URL diretto <code>/backup/download</code>.</li>
         <li>Il file scaricato contiene:
             <ul>
-                <li><code>dump.sql</code> con INSERT statements (compatibile con MySQL/MariaDB).</li>
+                <li><code>dump.sql</code> con gli INSERT dei tuoi dati (si rilegge con <code>sqlite3</code>).</li>
                 <li><code>uploads/{user_id}/</code> con tutti gli allegati delle spese.</li>
             </ul>
         </li>
-        <li><strong>Restore</strong>: la pagina <code>/settings</code> ha la tab "Ripristina backup". Carica il file, digita la frase di conferma + password.</li>
-        <li><strong>Fallback</strong>: se l'estensione PHP <code>ZipArchive</code> non è disponibile, il download produce solo il file <code>.sql</code>.</li>
+        <li><strong>Restore</strong>: la pagina <code>/settings</code> ha la tab "Ripristina backup". Carica il file e digita la frase di conferma.</li>
     </ul>
     <div class="wiki-tip"><i class="bi bi-shield-check"></i><div>Per buona pratica, scarica un backup <strong>prima</strong> di qualsiasi operazione potenzialmente distruttiva (reset DB, restore, import massivo).</div></div>
 </section>
@@ -819,12 +818,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── SICUREZZA ─── -->
 <section class="wiki-section" data-wiki-section>
-    ${intestazione(SEZIONI[22])}    <p class="wiki-section-lead">my-expense gira <strong>completamente sul tuo computer</strong> (XAMPP: Apache + MySQL + PHP). Nessun dato esce mai dalla macchina.</p>
+    ${intestazione(SEZIONI[22])}    <p class="wiki-section-lead">my-expense gira <strong>completamente sul tuo computer</strong> (un'applicazione installata, con dentro il suo server e il suo database). Nessun dato esce mai dalla macchina.</p>
     <ul>
-        <li><strong>Password</strong>: hashate con bcrypt (<code>PASSWORD_BCRYPT</code>), mai memorizzate in chiaro.</li>
-        <li><strong>Sessione</strong>: cookie di sessione PHP, scadenza standard, <code>HttpOnly</code>.</li>
+        <li><strong>Niente login</strong>: chi ha acceso il computer ha gi&agrave; accesso al file dei dati, quindi una password in pi&ugrave; non proteggerebbe niente.</li>
+        <li><strong>Il server ascolta solo su 127.0.0.1</strong>: dalla rete non &egrave; raggiungibile.</li>
         <li><strong>CSRF</strong>: ogni form e ogni richiesta non-GET porta un token CSRF (campo <code>_csrf</code> nei form, header <code>X-CSRF-Token</code> dalle fetch). Doppio canale: hidden field + cookie.</li>
-        <li><strong>Upload</strong>: gli allegati sono salvati fuori dalla docroot, accessibili solo via endpoint autenticato che verifica l'ownership; whitelist mime: jpg/png/gif/webp/pdf; max 8 MB.</li>
+        <li><strong>Allegati</strong>: salvati nella cartella dei dati, fuori da quella servita; whitelist mime: jpg/png/gif/webp/pdf; max 8 MB.</li>
         <li><strong>Database</strong>: tutte le tabelle hanno colonna <code>user_id</code>; le query sono <strong>scoped</strong> sull'utente loggato — non puoi vedere i dati di un altro utente neanche conoscendo gli ID.</li>
         <li><strong>OCR</strong>: gira al 100% nel browser (Tesseract.js compilato in WebAssembly). Lo scontrino non viene mai inviato a un server.</li>
         <li><strong>Service Worker</strong>: cache solo dei tuoi asset; nessuna telemetria.</li>

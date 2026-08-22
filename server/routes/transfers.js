@@ -12,8 +12,8 @@
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
+import { transfersCategoryId } from './categories.js';
 
-const CATEGORY_NAME = 'Trasferimento';
 const INCOME_SOURCE = 'Trasferimento';
 
 const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -119,19 +119,6 @@ const descrizioni = (row) => ({
     : `Trasferimento da ${row.source_name}`,
 });
 
-/** La categoria di sistema "Trasferimento", creata la prima volta che serve. */
-function categoriaTrasferimenti(userId) {
-  const existing = one(
-    'SELECT id FROM categories WHERE user_id = ? AND name = ? LIMIT 1', userId, CATEGORY_NAME,
-  );
-  if (existing) return existing.id;
-  const res = run(
-    'INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)',
-    userId, CATEGORY_NAME, '#6c757d', 'arrow-left-right', 100,
-  );
-  return Number(res.lastInsertRowid);
-}
-
 async function list(req, res) {
   const { searchParams } = new URL(req.url, 'http://localhost');
   const userId = currentUserId();
@@ -174,7 +161,7 @@ async function create(req, res) {
       row.amount, row.transfer_date, row.description, row.notes,
     );
     const transferId = Number(result.lastInsertRowid);
-    const categoryId = categoriaTrasferimenti(userId);
+    const categoryId = transfersCategoryId(userId);
 
     run(
       `INSERT INTO expenses

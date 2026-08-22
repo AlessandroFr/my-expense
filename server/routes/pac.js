@@ -14,6 +14,7 @@ import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { normalizeShares, sharesMismatch } from '../pac-split.js';
+import { transfersCategoryId } from './categories.js';
 import { riepilogo } from '../pac-performance.js';
 import { NavError, simboliDaIsin, storico } from '../nav-fetch.js';
 
@@ -114,7 +115,7 @@ function normalizeFund(data) {
 const PLAN_SELECT = `
   SELECT p.id, p.user_id, p.account_id, p.source_account_id, p.fund_id,
          p.name, p.frequency, p.amount, p.start_date, p.end_date,
-         p.last_generated_date, p.beneficiary_iban, p.beneficiary_keyword,
+         p.beneficiary_iban, p.beneficiary_keyword,
          p.active, p.notes, p.created_at, p.updated_at,
          a.name AS account_name, sa.name AS source_account_name, f.name AS fund_name,
          ac.name AS asset_class_name, ac.color AS asset_class_color
@@ -135,7 +136,6 @@ const planToPublic = (r) => ({
   amount: dec2(r.amount),
   start_date: r.start_date,
   end_date: r.end_date ?? null,
-  last_generated_date: r.last_generated_date ?? null,
   beneficiary_iban: r.beneficiary_iban ?? null,
   beneficiary_keyword: r.beneficiary_keyword ?? null,
   active: r.active ? 1 : 0,
@@ -256,17 +256,6 @@ const summaryForPlan = (planId) => {
   return { count: r.cnt, total_amount: Number(r.total_amount), total_units: Number(r.total_units) };
 };
 
-const categoriaTrasferimenti = (userId) => {
-  const existing = one('SELECT id FROM categories WHERE user_id = ? AND name = ? LIMIT 1',
-    userId, 'Trasferimento');
-  if (existing) return existing.id;
-  const res = run(
-    'INSERT INTO categories (user_id, name, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)',
-    userId, 'Trasferimento', '#6c757d', 'arrow-left-right', 100,
-  );
-  return Number(res.lastInsertRowid);
-};
-
 /**
  * Crea il versamento e il trasferimento che lo accompagna, in una transazione
  * sola. Ritorna null se per quel piano e quella data un versamento esiste gia':
@@ -294,7 +283,7 @@ function createContributionAtomic(userId, plan, date, source, notes = null) {
       userId, plan.source_account_id, plan.account_id, amount.toFixed(2), date, descrizione, notes,
     );
     const transferId = Number(r.lastInsertRowid);
-    const categoryId = categoriaTrasferimenti(userId);
+    const categoryId = transfersCategoryId(userId);
 
     run(
       `INSERT INTO expenses
@@ -396,81 +385,81 @@ export function setExpenseSplit(userId, expenseId, rawShares, source = 'manual')
     return 0;
   }
 
-  const errore = sharesMismatch(shares, Number(expense.amount));
-  if (errore !== null) throw HttpError.badRequest(errore);
+  const mismatch = sharesMismatch(shares, Number(expense.amount));
+  if (mismatch !== null) throw HttpError.badRequest(mismatch);
 
   if (expense.account_id === null) {
     throw HttpError.badRequest('Assegna un conto alla spesa prima di marcarla come versamento.');
   }
 
-  const piani = shares.map((q) => {
-    const plan = findPlan(q.plan_id, userId);
+  const plans = shares.map((share) => {
+    const plan = findPlan(share.plan_id, userId);
     if (!plan) throw HttpError.badRequest('Piano di accumulo non trovato.');
-    return { ...plan, share: q.amount };
+    return { ...plan, share: share.amount };
   });
 
   // Il trasferimento ha una destinazione sola: quote su conti PAC diversi
   // sarebbero due movimenti, non uno.
-  const conti = new Set(piani.map((p) => p.account_id));
-  if (conti.size > 1) {
+  const destinations = new Set(plans.map((plan) => plan.account_id));
+  if (destinations.size > 1) {
     throw HttpError.badRequest('Le quote devono andare su piani dello stesso conto PAC.');
   }
-  const destinazione = piani[0].account_id;
-  if (destinazione === expense.account_id) {
+  const destinationId = plans[0].account_id;
+  if (destinationId === expense.account_id) {
     throw HttpError.badRequest("Il conto della spesa e' lo stesso del conto PAC: non e' un versamento.");
   }
 
   const date = expense.expense_date;
-  const totale = roundLikePhp(Number(expense.amount));
+  const total = roundLikePhp(Number(expense.amount));
 
   return transaction(() => {
     clearSplitRows(userId, expense);
 
-    const nomi = piani.map((p) => p.name).join(', ');
-    const t = run(
+    const planNames = plans.map((plan) => plan.name).join(', ');
+    const transfer = run(
       `INSERT INTO transfers
          (user_id, source_account_id, destination_account_id, amount, transfer_date, description, notes)
        VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-      userId, expense.account_id, destinazione, totale.toFixed(2), date,
-      `Versamento PAC — ${nomi}`.slice(0, 255),
+      userId, expense.account_id, destinationId, total.toFixed(2), date,
+      `Versamento PAC — ${planNames}`.slice(0, 255),
     );
-    const transferId = Number(t.lastInsertRowid);
+    const transferId = Number(transfer.lastInsertRowid);
 
     // La spesa non sparisce e non cambia importo: diventa la faccia in uscita
     // del trasferimento, cosi' smette di contare come spesa nei report.
     run('UPDATE expenses SET is_transfer = 1, transfer_id = ? WHERE id = ? AND user_id = ?',
       transferId, expense.id, userId);
 
-    const sorgente = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', expense.account_id, userId);
+    const sourceAccount = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', expense.account_id, userId);
     run(
       `INSERT INTO incomes
          (user_id, account_id, source, description, amount, payment_method,
           income_date, is_transfer, transfer_id)
        VALUES (?, ?, 'Trasferimento', ?, ?, 'transfer', ?, 1, ?)`,
-      userId, destinazione, `Versamento PAC da ${sorgente?.name ?? 'conto'} — ${nomi}`.slice(0, 255),
-      totale.toFixed(2), date, transferId,
+      userId, destinationId, `Versamento PAC da ${sourceAccount?.name ?? 'conto'} — ${planNames}`.slice(0, 255),
+      total.toFixed(2), date, transferId,
     );
 
-    for (const p of piani) {
-      const nav = navOnOrBefore(p.fund_id, date);
-      const units = nav !== null && nav > 0 ? p.share / nav : null;
+    for (const plan of plans) {
+      const nav = navOnOrBefore(plan.fund_id, date);
+      const units = nav !== null && nav > 0 ? plan.share / nav : null;
       try {
         run(
           `INSERT INTO pac_contributions
              (user_id, plan_id, contribution_date, amount, nav, units, transfer_id, expense_id, source, notes)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-          userId, p.id, date, p.share.toFixed(2),
+          userId, plan.id, date, plan.share.toFixed(2),
           nav !== null ? dec6(nav) : null, units !== null ? dec6(units) : null,
           transferId, expense.id, source,
         );
       } catch (err) {
         if (String(err.message).includes('UNIQUE')) {
-          throw HttpError.conflict(`Il piano «${p.name}» ha gia' un versamento in data ${date}.`);
+          throw HttpError.conflict(`Il piano «${plan.name}» ha gia' un versamento in data ${date}.`);
         }
         throw err;
       }
     }
-    return piani.length;
+    return plans.length;
   });
 }
 
