@@ -65,37 +65,48 @@ function pacValues(userId) {
   return perConto;
 }
 
-/** Saldo = apertura + entrate − spese, calcolato al volo come in PHP. */
+/**
+ * Saldo = apertura + entrate − spese, calcolato al volo come in PHP.
+ *
+ * Il saldo conta tutto, giroconti e rettifiche comprese: quei soldi il conto li
+ * ha persi o presi davvero. I due totali che si mostrano sulla scheda no: un
+ * prelievo verso «In tasca» non e' una spesa, e sommarlo faceva sembrare che da
+ * quel conto fossero usciti decine di migliaia di euro che invece sono solo
+ * cambiati di tasca.
+ */
 export function withBalances(userId, includeArchived = false) {
   const accounts = allForUser(userId, includeArchived);
   if (accounts.length === 0) return [];
 
-  const sums = new Map(accounts.map((a) => [a.id, { exp: 0, inc: 0 }]));
+  const sums = new Map(accounts.map((a) => [a.id, { exp: 0, inc: 0, expOwn: 0, incOwn: 0 }]));
   const ids = accounts.map((a) => a.id);
   const placeholders = ids.map(() => '?').join(',');
 
   for (const [table, key] of [['expenses', 'exp'], ['incomes', 'inc']]) {
     const rows = all(
-      `SELECT account_id, COALESCE(SUM(amount), 0) AS total
+      `SELECT account_id, COALESCE(SUM(amount), 0) AS total,
+              COALESCE(SUM(CASE WHEN is_transfer = 0 THEN amount ELSE 0 END), 0) AS own
        FROM ${table} WHERE user_id = ? AND account_id IN (${placeholders})
        GROUP BY account_id`,
       userId, ...ids,
     );
     for (const r of rows) {
       const entry = sums.get(r.account_id);
-      if (entry) entry[key] = Number(r.total);
+      if (!entry) continue;
+      entry[key] = Number(r.total);
+      entry[`${key}Own`] = Number(r.own);
     }
   }
 
   const pac = pacValues(userId);
 
   return accounts.map((a) => {
-    const { exp, inc } = sums.get(a.id);
+    const { exp, inc, expOwn, incOwn } = sums.get(a.id);
     const investito = pac.get(a.id) ?? null;
     return {
       ...a,
-      expenses_total: round2(exp),
-      incomes_total: round2(inc),
+      expenses_total: round2(expOwn),
+      incomes_total: round2(incOwn),
       balance: round2(Number(a.opening_balance) + inc - exp),
       // Solo per i conti con un piano di accumulo: altrove non significa niente.
       market_value: investito === null ? null : round2(investito.value),

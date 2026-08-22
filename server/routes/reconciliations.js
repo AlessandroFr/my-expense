@@ -3,6 +3,12 @@
 //
 // L'utente dichiara il saldo reale del conto a una certa data; se non coincide
 // con quello calcolato, la differenza diventa un movimento di rettifica.
+//
+// La rettifica nasce marcata `is_transfer = 1`, come i giroconti: sistema il
+// saldo del conto ma non e' spesa ne' entrata di niente, quindi resta fuori da
+// report, budget, grafici ed elenco movimenti. Senza quella marcatura una
+// riconciliazione di qualche migliaio di euro finisce nel mese come se fosse
+// spesa vera, e il mese non e' piu' leggibile.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
@@ -85,8 +91,8 @@ async function reconcile(req, res) {
     if (difference > 0) {
       // Il conto ha piu' soldi del previsto: manca un'entrata.
       const r = run(
-        `INSERT INTO incomes (user_id, account_id, source, description, amount, income_date)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO incomes (user_id, account_id, source, description, amount, income_date, is_transfer)
+         VALUES (?, ?, ?, ?, ?, ?, 1)`,
         userId, accountId, ADJUSTMENT_LABEL, description, Math.abs(difference).toFixed(2), reconciledAt,
       );
       incomeId = Number(r.lastInsertRowid);
@@ -94,8 +100,8 @@ async function reconcile(req, res) {
     } else if (difference < 0) {
       const r = run(
         `INSERT INTO expenses
-           (user_id, category_id, account_id, amount, description, payment_method, expense_date)
-         VALUES (?, ?, ?, ?, ?, 'other', ?)`,
+           (user_id, category_id, account_id, amount, description, payment_method, expense_date, is_transfer)
+         VALUES (?, ?, ?, ?, ?, 'other', ?, 1)`,
         userId, adjustmentCategoryId(userId), accountId,
         Math.abs(difference).toFixed(2), description, reconciledAt,
       );
@@ -164,13 +170,24 @@ async function remove(req, res) {
 
   const id = int(body.id);
   if (id <= 0) throw HttpError.badRequest('ID riconciliazione mancante.');
-  if (!one('SELECT 1 AS x FROM account_reconciliations WHERE id = ? AND user_id = ?', id, userId)) {
-    throw HttpError.notFound('Riconciliazione non trovata.');
-  }
+  const row = one(
+    `SELECT adjustment_expense_id, adjustment_income_id
+     FROM account_reconciliations WHERE id = ? AND user_id = ?`, id, userId,
+  );
+  if (!row) throw HttpError.notFound('Riconciliazione non trovata.');
 
-  // Il movimento di rettifica resta: e' un movimento vero, ed e' quello che ha
-  // reso il saldo corretto. La FK e' ON DELETE SET NULL.
-  run('DELETE FROM account_reconciliations WHERE id = ? AND user_id = ?', id, userId);
+  // Via anche il movimento di rettifica: e' marcato come giroconto, quindi non
+  // si vede in nessun elenco: lasciarlo vorrebbe dire un saldo spostato da una
+  // riga che non si trova piu'. Il saldo torna quello di prima della verifica.
+  transaction(() => {
+    run('DELETE FROM account_reconciliations WHERE id = ? AND user_id = ?', id, userId);
+    if (row.adjustment_expense_id !== null) {
+      run('DELETE FROM expenses WHERE id = ? AND user_id = ?', row.adjustment_expense_id, userId);
+    }
+    if (row.adjustment_income_id !== null) {
+      run('DELETE FROM incomes WHERE id = ? AND user_id = ?', row.adjustment_income_id, userId);
+    }
+  });
   ok(res, { deleted: true });
 }
 
