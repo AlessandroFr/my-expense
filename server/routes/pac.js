@@ -69,6 +69,32 @@ const navOnOrBefore = (fundId, date) => {
   return row ? Number(row.nav) : null;
 };
 
+/**
+ * Riscrive NAV e quote di tutti i versamenti di un piano sul fondo indicato.
+ *
+ * Le quote di un versamento appartengono al fondo in cui i soldi sono finiti:
+ * cambiato il fondo, quelle vecchie descrivono un altro prodotto e il valore
+ * del piano diventa un numero senza significato. Si rifanno tutte, ognuna con
+ * il NAV della sua data. Da chiamare dentro una transazione.
+ *
+ * @returns {number} quanti versamenti hanno trovato un NAV
+ */
+function recalculateUnits(userId, planId, fundId) {
+  let fatti = 0;
+  const versamenti = all(
+    'SELECT id, contribution_date, amount FROM pac_contributions WHERE user_id = ? AND plan_id = ?',
+    userId, planId,
+  );
+  for (const c of versamenti) {
+    const nav = navOnOrBefore(fundId, c.contribution_date);
+    const valido = nav !== null && nav > 0;
+    run('UPDATE pac_contributions SET nav = ?, units = ? WHERE id = ? AND user_id = ?',
+      valido ? dec6(nav) : null, valido ? dec6(Number(c.amount) / nav) : null, c.id, userId);
+    if (valido) fatti += 1;
+  }
+  return fatti;
+}
+
 function normalizeFund(data) {
   const name = str(data.name);
   if (name === '' || [...name].length > 128) throw HttpError.badRequest('Nome fondo obbligatorio (max 128).');
@@ -623,20 +649,61 @@ async function updatePlan(req, res) {
   const userId = currentUserId();
 
   const id = int(body.id);
-  if (id <= 0 || !findPlan(id, userId)) throw HttpError.notFound('Piano non trovato.');
+  const prima = id > 0 ? findPlan(id, userId) : null;
+  if (!prima) throw HttpError.notFound('Piano non trovato.');
 
   const row = normalizePlan(userId, body);
-  run(
-    `UPDATE pac_plans
-     SET account_id = ?, source_account_id = ?, fund_id = ?, name = ?, frequency = ?,
-         amount = ?, start_date = ?, end_date = ?, beneficiary_iban = ?,
-         beneficiary_keyword = ?, notes = ?
-     WHERE id = ? AND user_id = ?`,
-    row.account_id, row.source_account_id, row.fund_id, row.name, row.frequency,
-    row.amount, row.start_date, row.end_date, row.beneficiary_iban,
-    row.beneficiary_keyword, row.notes, id, userId,
-  );
+  transaction(() => {
+    run(
+      `UPDATE pac_plans
+       SET account_id = ?, source_account_id = ?, fund_id = ?, name = ?, frequency = ?,
+           amount = ?, start_date = ?, end_date = ?, beneficiary_iban = ?,
+           beneficiary_keyword = ?, notes = ?
+       WHERE id = ? AND user_id = ?`,
+      row.account_id, row.source_account_id, row.fund_id, row.name, row.frequency,
+      row.amount, row.start_date, row.end_date, row.beneficiary_iban,
+      row.beneficiary_keyword, row.notes, id, userId,
+    );
+    if (row.fund_id !== prima.fund_id) recalculateUnits(userId, id, row.fund_id);
+  });
   ok(res, { plan: findPlan(id, userId) });
+}
+
+/**
+ * Cambia il fondo di un piano gia' avviato.
+ *
+ * Capita di sbagliare fondo alla creazione e di accorgersene dopo mesi di
+ * versamenti: senza questo si potrebbe solo buttare il piano e rifarlo, e con
+ * lui se ne andrebbero tutti i versamenti. I soldi versati restano quelli, si
+ * rifanno solo le quote — che e' l'unica cosa che dipende dal fondo.
+ */
+async function changePlanFund(req, res) {
+  const body = await readBody(req);
+  assertCsrf(req, body);
+  const userId = currentUserId();
+
+  const id = int(body.id);
+  const plan = id > 0 ? findPlan(id, userId) : null;
+  if (!plan) throw HttpError.notFound('Piano non trovato.');
+
+  const fundId = int(body.fund_id);
+  const fund = fundId > 0 ? findFund(fundId, userId) : null;
+  if (!fund) throw HttpError.badRequest('Fondo non trovato.');
+
+  if (fundId === plan.fund_id) {
+    ok(res, { plan, recalculated: 0, total: 0 });
+    return;
+  }
+
+  const totale = one(
+    'SELECT COUNT(*) AS n FROM pac_contributions WHERE user_id = ? AND plan_id = ?', userId, id,
+  ).n;
+  const fatti = transaction(() => {
+    run('UPDATE pac_plans SET fund_id = ? WHERE id = ? AND user_id = ?', fundId, id, userId);
+    return recalculateUnits(userId, id, fundId);
+  });
+
+  ok(res, { plan: findPlan(id, userId), recalculated: fatti, total: totale });
 }
 
 async function togglePlan(req, res) {
@@ -931,6 +998,7 @@ export const pacRoutes = {
   'GET /pac/plans': listPlans,
   'POST /pac/plans/create': createPlan,
   'POST /pac/plans/update': updatePlan,
+  'POST /pac/plans/change-fund': changePlanFund,
   'POST /pac/plans/toggle': togglePlan,
   'POST /pac/plans/delete': deletePlan,
   'GET /pac/contributions': listContributions,

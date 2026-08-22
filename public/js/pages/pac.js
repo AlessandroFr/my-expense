@@ -20,6 +20,8 @@ const FREQ_LABEL = {
 const planForm   = document.getElementById('plan-create-form');
 const fundForm   = document.getElementById('fund-create-form');
 const fundModal  = document.getElementById('fund-create-modal');
+const changeForm  = document.getElementById('fund-change-form');
+const changeModal = document.getElementById('fund-change-modal');
 const listEl     = document.getElementById('pac-plans-list');
 const kpiEl      = document.getElementById('pac-kpi');
 
@@ -49,6 +51,7 @@ async function loadFunds() {
     const opts = ['<option value="">Seleziona…</option>']
         .concat(funds.map(f => `<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join('');
     planForm.querySelector('select[data-role="fund"]').innerHTML = opts;
+    changeForm.querySelector('select[data-role="change-fund"]').innerHTML = opts;
 }
 
 async function loadAssetClasses() {
@@ -135,6 +138,10 @@ function renderPlans() {
                 <td class="text-end">${p.current_value !== null ? escapeHtml(fmtMoney(p.current_value)) : '<span class="text-muted">—</span>'}</td>
                 <td class="text-end ${pnlCls}">${p.unrealized_pnl !== null ? escapeHtml(fmtMoney(p.unrealized_pnl)) : '<span class="text-muted">—</span>'}</td>
                 <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="fund"
+                            data-id="${escapeAttr(p.id)}" title="Cambia fondo">
+                        <i class="bi bi-arrow-left-right"></i>
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-action="toggle"
                             data-id="${escapeAttr(p.id)}" data-active="${Number(p.active) === 1 ? 0 : 1}">
                         <i class="bi bi-${Number(p.active) === 1 ? 'pause' : 'play'}-fill"></i>
@@ -181,6 +188,14 @@ listEl.addEventListener('click', async (ev) => {
     const plan = plans.find(x => String(x.id) === String(id));
     if (!plan) return;
 
+    if (btn.dataset.action === 'fund') {
+        changeForm.elements['id'].value = plan.id;
+        changeForm.elements['fund_id'].value = String(plan.fund_id ?? '');
+        changeForm.querySelector('[data-role="change-plan-name"]').textContent = plan.name;
+        openModal(changeModal);
+        return;
+    }
+
     if (btn.dataset.action === 'toggle') {
         try {
             await send(`${BASE}/pac/plans/toggle`, { id, active: btn.dataset.active });
@@ -209,21 +224,44 @@ listEl.addEventListener('click', async (ev) => {
 
 document.addEventListener('click', (ev) => {
     const open  = ev.target.closest('a[data-action="new-fund"]');
-    const close = ev.target.closest('[data-fund-action="close"]');
-    if (open)  { ev.preventDefault(); openFundModal(); }
-    if (close) closeFundModal();
+    if (open) { ev.preventDefault(); openModal(fundModal); }
+    if (ev.target.closest('[data-fund-action="close"]'))   closeModal(fundModal);
+    if (ev.target.closest('[data-change-action="close"]')) closeModal(changeModal);
 });
 
-function openFundModal() {
-    if (!fundModal) return;
-    if (typeof fundModal.showModal === 'function') fundModal.showModal();
-    else fundModal.setAttribute('open', '');
+function openModal(el) {
+    if (!el) return;
+    if (typeof el.showModal === 'function') el.showModal();
+    else el.setAttribute('open', '');
 }
-function closeFundModal() {
-    if (!fundModal) return;
-    if (typeof fundModal.close === 'function') fundModal.close();
-    else fundModal.removeAttribute('open');
+function closeModal(el) {
+    if (!el) return;
+    if (typeof el.close === 'function') el.close();
+    else el.removeAttribute('open');
 }
+
+// Cambiare fondo rifa' le quote di tutti i versamenti: se il fondo nuovo non
+// ha quotazioni vecchie quanto il piano, qualche versamento resta senza quote
+// e l'avviso lo dice, invece di mostrare un valore che manca di un pezzo.
+changeForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = Object.fromEntries(new FormData(changeForm).entries());
+    if (!fd.fund_id) { toast.error('Scegli il fondo.'); return; }
+    try {
+        const r = await send(`${BASE}/pac/plans/change-fund`, fd);
+        const d = r?.data ?? {};
+        closeModal(changeModal);
+        const scoperti = Number(d.total ?? 0) - Number(d.recalculated ?? 0);
+        toast.success(scoperti > 0
+            ? `Piano spostato. ${scoperti} versamenti su ${d.total} restano senza quote: `
+              + 'scarica le quotazioni del fondo nuovo dalla scheda del piano.'
+            : `Piano spostato su ${escapeHtml(d.plan?.fund_name ?? 'il fondo scelto')}, `
+              + `${d.recalculated} versamenti ricalcolati.`);
+        await loadPlans();
+    } catch (err) {
+        toast.error(err.message ?? 'Errore cambio fondo.');
+    }
+});
 
 fundForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -233,7 +271,7 @@ fundForm.addEventListener('submit', async (ev) => {
         toast.success('Fondo creato.');
         fundForm.reset();
         fundForm.elements['currency'].value = 'EUR';
-        closeFundModal();
+        closeModal(fundModal);
         await loadFunds();
         const newId = r.data?.fund?.id;
         if (newId) planForm.elements['fund_id'].value = String(newId);

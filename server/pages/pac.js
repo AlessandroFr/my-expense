@@ -122,6 +122,33 @@ export const render = ({ csrfToken }) => {
 </section>
 </div>
 
+<dialog id="fund-change-modal" class="border-0 rounded-3 shadow p-0" style="max-width: 520px; width: 95%">
+    <form id="fund-change-form" method="dialog" class="m-0">
+        ${csrfField(csrfToken)}        <input type="hidden" name="id">
+        <div class="modal-content border-0">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>Cambia fondo</h5>
+                <button type="button" class="btn-close" data-change-action="close" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">
+                    Sposta il piano <b data-role="change-plan-name"></b> su un altro fondo.
+                    I versamenti restano tutti: si rifanno solo le quote, con la
+                    quotazione che il fondo nuovo aveva il giorno di ogni versamento.
+                </p>
+                <label class="form-label small mb-1">Fondo</label>
+                <select name="fund_id" class="form-select" required data-role="change-fund">
+                    <option value="">Seleziona…</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-change-action="close">Annulla</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Sposta</button>
+            </div>
+        </div>
+    </form>
+</dialog>
+
 <dialog id="fund-create-modal" class="border-0 rounded-3 shadow p-0" style="max-width: 640px; width: 95%">
     <form id="fund-create-form" method="dialog" class="m-0">
         ${csrfField(csrfToken)}        <div class="modal-content border-0">
