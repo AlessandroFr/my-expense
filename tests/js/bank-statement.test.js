@@ -195,6 +195,27 @@ test('il bonifico in uscita di Mediolanum non e\' intestato alla formula', () =>
   );
 });
 
+test('il negozio si stacca dall\'indirizzo e da quel che la banca aggiunge dopo', () => {
+  // Pagamento NFC a Venezia: dopo il negozio c'e' il sestiere, poi un trattino
+  // e "SAMSUNG PAY". Prima di questa regola il fornitore risultava "Prel".
+  assert.equal(
+    extractCounterparty(
+      'Prelievi - Pagamenti',
+      'NFC -PREL./PAGAM. CARTA EUROPAY N. 5266981 DEL 31/10/22 22:02 IN ITALIA A VENEZIA ITA VALUTA EUR '
+      + 'PAESE ITALIA C/O OLD WILD WEST SESTIERE CANNA PAGAMENTO NFC - SAMSUNG PAY COD. MCC 5814 000010420581',
+      'expense',
+    ),
+    'Old Wild West',
+  );
+});
+
+test('il gergo della banca non diventa un fornitore', () => {
+  // Meglio nessun nome che un nome sbagliato: quello giusto si mette a mano
+  // una volta, quello sbagliato va tolto da ogni movimento.
+  assert.equal(extractCounterparty('Prelievi - Pagamenti', 'NFC -PREL./PAGAM. CARTA EUROPAY N. 5266981', 'expense'), null);
+  assert.equal(extractCounterparty('Prelievi - Pagamenti', 'PAGAMENTI PAESI NON UE VALUTA EUR', 'expense'), null);
+});
+
 test('i movimenti del dossier titoli non hanno un fornitore', () => {
   assert.equal(
     extractCounterparty('Acquisti - Aggiuntivi', 'ACQUISTO TITOLI PER CONTANTI 30/12 001/41278450/000 QTA: 5 TITOLO : ETFS INVESC GOLD MTF', 'expense'),

@@ -162,6 +162,32 @@ export function classifyIncomeSource(tipologia, descrizione) {
   return 'Entrata';
 }
 
+/**
+ * Dove finisce il nome del negozio dopo "C/O": una parola dell'estratto conto,
+ * o l'inizio dell'indirizzo. In mezzo c'e' anche il veneziano «sestiere»,
+ * perche' a Venezia l'indirizzo comincia cosi'.
+ */
+const FINE_NEGOZIO = [
+  'DEL', 'VAL', 'COD', 'CRO', 'NOTE', 'DATA', 'IL', 'IN', 'CARTA', 'CIRCUITO',
+  'PAGAMENTO', 'PRESSO', 'VIA', 'VIALE', 'PIAZZA', 'PIAZZALE', 'CORSO', 'LARGO',
+  'VICOLO', 'GALLERIA', 'STRADA', 'SESTIERE', 'CALLE', 'FONDAMENTA', 'LOCALITA',
+].join('|');
+
+/**
+ * Parole che l'estratto conto usa per conto suo. Se il nome che resta e' una
+ * di queste, non e' un fornitore: e' un pezzo della descrizione della banca,
+ * ed e' meglio nessun nome che "Prel".
+ */
+// Le parole sono scritte per esteso, singolare e plurale: un prefisso
+// generico bloccherebbe anche i fornitori veri (POS -> «Poste Italiane»).
+const BUROCRAZIA = new RegExp(`^(?:${[
+  'PREL', 'PAGAM', 'PAGAMENTO', 'PAGAMENTI', 'PRELIEVO', 'PRELIEVI',
+  'CARTA', 'VALUTA', 'PAESE', 'PAESI', 'CIRCUITO', 'MASTERCARD', 'VISA',
+  'EUROPAY', 'MAESTRO', 'BONIFICO', 'ADDEBITO', 'ADDEBITI', 'ACCREDITO',
+  'OPERAZIONE', 'TRASFERIMENTO', 'DISPOSIZIONE', 'SEPA', 'POS', 'NFC',
+  'SAMSUNG', 'GOOGLE', 'APPLE', 'EMOLUMENTI', 'IMPOSTA', 'COMMISSIONI',
+].join('|')})\\b`, 'i');
+
 /** Ripulisce il nome estratto: spazi, codici in coda, iniziali maiuscole. */
 export function cleanupCounterpartyName(raw) {
   let s = String(raw ?? '').trim().replace(/\s+/g, ' ');
@@ -217,12 +243,14 @@ export function extractCounterparty(tipologia, descrizione, kind) {
 
   // Il negozio viene dopo "C/O" e finisce al primo termine tipico
   // dell'estratto conto, a un indirizzo o a una cifra. L'asterisco e la e
-  // commerciale fanno parte del nome ("ANTHROPIC* CLAUDE", "GIULIA & C"), e
-  // "CARTA" chiude sempre: dopo c'e' il numero della carta, non il negozio.
-  m = desc.match(
-    /\bC\/O\s+([A-Z][A-Z0-9\s.'*&]+?)(?:\s+(?:DEL|VAL|COD|CRO|NOTE|DATA|IL|IN|CARTA|VIA|VIALE|PIAZZA|CORSO|LARGO|VICOLO|GALLERIA)\b|\s+\d|$)/u,
-  );
-  if (m) return cleanupCounterpartyName(m[1]);
+  // commerciale fanno parte del nome ("ANTHROPIC* CLAUDE", "GIULIA & C"); il
+  // trattino no, perche' separa il negozio da quel che la banca aggiunge dopo
+  // ("- SAMSUNG PAY", "- CIRCUITO MASTERCARD").
+  m = desc.match(new RegExp(`\\bC/O\\s+([A-Z][A-Z0-9\\s.'*&]+?)(?:\\s+(?:${FINE_NEGOZIO})\\b|\\s+\\d|$)`, 'u'));
+  if (m) {
+    const candidato = cleanupCounterpartyName(m[1]);
+    if (candidato !== null) return candidato;
+  }
 
   if (/\bAMAZON(?:\.IT|\s+EU|\.COM|\*MARK\w*|\s+MARKET\w*)?\b/i.test(desc)) return 'Amazon';
 
@@ -242,8 +270,12 @@ export function extractCounterparty(tipologia, descrizione, kind) {
   // c'e', e senza questa riga diventava "Acquisto Titoli Per Contanti".
   if (/\b(ACQUISTO|VENDITA)\s+TITOLI\b/i.test(desc)) return null;
 
+  // Ultima spiaggia: la prima sequenza di parole maiuscole. Se pesca il gergo
+  // della banca si rinuncia — un nome sbagliato va corretto a mano su ogni
+  // movimento, mentre un nome mancante si aggiunge dove serve.
   m = desc.match(/\b([A-Z][A-Z.']{3,}(?:\s+[A-Z][A-Z.']+){0,4})\b/u);
-  return m ? cleanupCounterpartyName(m[1]) : null;
+  if (!m || BUROCRAZIA.test(m[1])) return null;
+  return cleanupCounterpartyName(m[1]);
 }
 
 export function guessPaymentMethod(tipologia, descrizione) {
