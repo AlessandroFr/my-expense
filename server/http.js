@@ -115,3 +115,15 @@ export const int = (v, fallback = 0) => {
 };
 
 export const str = (v) => (v === undefined || v === null ? '' : String(v).trim());
+
+/** Il formato delle date che girano fra client e server: YYYY-MM-DD. */
+export const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+/**
+ * Un id che puo' mancare. I form mandano '' o '0' quando il campo e' vuoto, e
+ * quello vuol dire «nessuno», non «id zero».
+ */
+export const nullableInt = (raw) => {
+  if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
+  return int(raw);
+};

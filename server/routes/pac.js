@@ -11,7 +11,7 @@
 // di quella divisione — importo, frequenza, fondo — e serve a proporla.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
+import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { normalizeShares, sharesMismatch } from '../pac-split.js';
 import { transfersCategoryId } from './categories.js';
@@ -21,14 +21,9 @@ import { NavError, symbolsFromIsin, priceHistory } from '../nav-fetch.js';
 const FUND_TYPES = ['etf', 'mutual', 'index', 'other'];
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 const dec2 = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));
 const dec6 = (v) => (v === null || v === undefined ? null : Number(v).toFixed(6));
 const today = () => new Date().toISOString().slice(0, 10);
-const nullableInt = (raw) => {
-  if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
-  return int(raw);
-};
 
 // ─── Fondi ──────────────────────────────────────────────────────────────────
 

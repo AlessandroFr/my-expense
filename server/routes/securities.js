@@ -6,7 +6,7 @@
 // SELL e DIVIDEND), tutto in una transazione sola. SPLIT non muove denaro.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
+import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 
 const KINDS = ['BUY', 'SELL', 'DIVIDEND', 'FEE', 'SPLIT'];
@@ -19,14 +19,9 @@ const DEFAULT_ASSET_CLASSES = [
   { name: 'Immobiliare', color: '#fd7e14', icon: 'building', sort_order: 50 },
 ];
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 const round = (n, d) => roundLikePhp(n, d);
 const dec2 = (v) => Number(v).toFixed(2);
 const dec6 = (v) => Number(v).toFixed(6);
-const nullableInt = (raw) => {
-  if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
-  return int(raw);
-};
 
 // ─── Classi di attivo ───────────────────────────────────────────────────────
 

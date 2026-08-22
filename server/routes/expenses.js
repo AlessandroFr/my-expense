@@ -4,17 +4,15 @@
 // passano da InstallmentCalculator: verranno migrati insieme all'importer.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
+import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str } from '../http.js';
+import { money, parseAmountLikePhp } from '../amount.js';
 import { checkForCategory } from './budgets.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
 
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 /** Come number_format($v, 2, '.', ''): il frontend riceve gli importi come stringhe. */
-const money = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));
 
 const SELECT_COLUMNS = `
   e.id, e.user_id, e.category_id, e.contact_id, e.account_id, e.amount, e.description,
@@ -144,10 +142,6 @@ const findById = (id, userId) => {
 const ownedExists = (userId, table, id) =>
   Boolean(one(`SELECT 1 AS x FROM ${table} WHERE id = ? AND user_id = ? LIMIT 1`, id, userId));
 
-const nullableInt = (raw) => {
-  if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
-  return int(raw);
-};
 
 /** Traduce ExpenseService::normalizeAndValidate. */
 function normalizeAndValidate(userId, data) {

@@ -10,14 +10,12 @@
 // dentro i movimenti gia' importati dalla banca: appartiene all'importer.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
+import { HttpError, assertCsrf, int, isValidDate, ok, readBody, str } from '../http.js';
+import { money, parseAmountLikePhp } from '../amount.js';
 import { transfersCategoryId } from './categories.js';
 
 const INCOME_SOURCE = 'Trasferimento';
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-const money = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));
 
 const SELECT_COLUMNS = `
   t.id, t.user_id, t.source_account_id, t.destination_account_id,

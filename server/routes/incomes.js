@@ -1,12 +1,10 @@
 // Entrate — contratto identico a IncomeController + IncomeService + Repository.
 
 import { all, one, run, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
-import { parseAmountLikePhp } from '../amount.js';
+import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str } from '../http.js';
+import { money, parseAmountLikePhp } from '../amount.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-const money = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));
 
 const SELECT_COLUMNS = `
   i.id, i.user_id, i.contact_id, i.account_id, i.source, i.description, i.amount,
@@ -62,10 +60,6 @@ const findById = (id, userId) => {
   return row ? toPublic(row) : null;
 };
 
-const nullableInt = (raw) => {
-  if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
-  return int(raw);
-};
 
 const ownedExists = (userId, table, id) =>
   Boolean(one(`SELECT 1 AS x FROM ${table} WHERE id = ? AND user_id = ? LIMIT 1`, id, userId));

@@ -35,3 +35,9 @@ export function roundLikePhp(value, precision = 2) {
   const rounded = Math.sign(shifted) * Math.round(Math.abs(shifted));
   return Number(`${rounded}e${-precision}`);
 }
+
+/**
+ * Un importo come lo vuole il frontend: stringa con due decimali, o null.
+ * Come number_format($v, 2, '.', '') di PHP, che e' quello che leggeva prima.
+ */
+export const money = (v) => (v === null || v === undefined ? null : Number(v).toFixed(2));

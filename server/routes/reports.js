@@ -5,13 +5,12 @@
 // movimenti, budget, titoli e piani di accumulo.
 
 import { all, one, currentUserId } from '../db.js';
-import { HttpError, int, ok, str } from '../http.js';
+import { HttpError, int, isValidDate, ok, str } from '../http.js';
 import { roundLikePhp, roundLikePhp as round2 } from '../amount.js';
 import { progressForMonth } from './budgets.js';
 import { holdingsForUser, holdingsByAssetClass } from './securities.js';
 import { generatePending } from './recurring.js';
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 /** Somma dei movimenti in un intervallo, trasferimenti esclusi. */
 const totalForRange = (table, dateCol, userId, from, to) => Number(one(

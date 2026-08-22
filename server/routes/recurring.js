@@ -5,14 +5,13 @@
 // grazie a last_generated_date, che avanza solo fino a oggi.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
+import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp } from '../amount.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
 
 const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
@@ -47,10 +46,6 @@ const listForUser = (userId) => all(
 const findForUser = (id, userId) =>
   one('SELECT * FROM recurring_expenses WHERE id = ? AND user_id = ? LIMIT 1', id, userId);
 
-const nullableInt = (raw) => {
-  if (raw === null || raw === undefined || raw === '' || raw === '0' || raw === 0) return null;
-  return int(raw);
-};
 
 const ownedExists = (userId, table, id) =>
   Boolean(one(`SELECT 1 AS x FROM ${table} WHERE id = ? AND user_id = ? LIMIT 1`, id, userId));

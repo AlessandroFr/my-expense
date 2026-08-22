@@ -5,7 +5,7 @@
 // ma le anagrafiche nuove nascono sempre 'both'.
 
 import { all, one, run, transaction, currentUserId } from '../db.js';
-import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
+import { HttpError, assertCsrf, int, isValidDate, ok, readBody, str } from '../http.js';
 import { roundLikePhp } from '../amount.js';
 import { duplicateGroups } from '../contact-dedup.js';
 import { looksLikeBankJargon } from '../bank-statement.js';
@@ -20,7 +20,6 @@ const DETAIL_COLUMNS = `id, user_id, name, name_norm, type, vat_number, iban, em
                         color, archived, created_at, updated_at`;
 
 const round2 = (n) => roundLikePhp(n, 2);
-const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 /** Nome normalizzato per il confronto: minuscolo, spazi collassati. */
 export const normalizeName = (name) => str(name).toLowerCase().replace(/\s+/g, ' ');
