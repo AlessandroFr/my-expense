@@ -137,6 +137,29 @@ priceUpdateForm.addEventListener('submit', async (ev) => {
     }
 });
 
+// ── Quotazioni da Internet ───────────────────────────────────────────────────
+
+const priceFetchBtn = document.getElementById('price-fetch-btn');
+
+priceFetchBtn?.addEventListener('click', async () => {
+    const text = priceFetchBtn.innerHTML;
+    priceFetchBtn.disabled = true;
+    priceFetchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scarico…';
+    try {
+        const r = await send(`${BASE}/securities/prices/fetch`, { instrument_id: ID });
+        const d = r?.data ?? {};
+        toast.success(d.saved > 0
+            ? `${d.saved} quotazioni nuove da ${d.symbol} (${d.from_date} → ${d.to_date}).`
+            : `Nessuna quotazione nuova: ${d.symbol} era già aggiornato.`);
+        await loadPrices();
+    } catch (err) {
+        toast.error(err.message ?? 'Non sono riuscito a scaricare le quotazioni.');
+    } finally {
+        priceFetchBtn.disabled = false;
+        priceFetchBtn.innerHTML = text;
+    }
+});
+
 priceHistoryEl.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-action="del-price"]');
     if (!btn) return;

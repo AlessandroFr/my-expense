@@ -6,6 +6,7 @@ import { all, one, run, transaction, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { summary } from '../pac-performance.js';
+import { holdingsForUser } from './securities.js';
 
 const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other'];
 const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
@@ -32,13 +33,14 @@ const findForUser = (id, userId) => one(
 const round2 = (n) => roundLikePhp(n, 2);
 
 /**
- * Il valore di mercato dei conti che ospitano un piano di accumulo.
+ * Il valore di mercato dei conti che ospitano investimenti.
  *
- * Il saldo di un conto PAC dice quanto ci e' entrato — la somma dei
- * trasferimenti — e quindi non sale mai da solo. Quello che il conto vale
- * davvero sono le quote comprate per il NAV di oggi, ed e' un altro numero.
+ * Il saldo di un conto PAC o di un dossier titoli dice quanto ci e' entrato —
+ * la somma dei trasferimenti — e quindi non sale mai da solo. Quello che il
+ * conto vale davvero sono le quote comprate al prezzo di oggi, ed e' un altro
+ * numero.
  */
-function pacValues(userId) {
+function investmentValues(userId) {
   const plans = all('SELECT id, account_id, fund_id FROM pac_plans WHERE user_id = ?', userId);
   const perConto = new Map();
 
@@ -61,6 +63,16 @@ function pacValues(userId) {
     acc.value += r.value;
     acc.contributed += r.contributed;
     perConto.set(plan.account_id, acc);
+  }
+
+  // Stessa storia per il dossier titoli: il saldo dice quanti soldi ci sono
+  // entrati, le posizioni dicono quanto valgono oggi.
+  for (const h of holdingsForUser(userId)) {
+    if (h.account_id === null || h.mark_value === null) continue;
+    const acc = perConto.get(h.account_id) ?? { value: 0, contributed: 0 };
+    acc.value += h.mark_value;
+    acc.contributed += h.qty * h.avg_cost;
+    perConto.set(h.account_id, acc);
   }
   return perConto;
 }
@@ -98,17 +110,17 @@ export function withBalances(userId, includeArchived = false) {
     }
   }
 
-  const pac = pacValues(userId);
+  const mercato = investmentValues(userId);
 
   return accounts.map((a) => {
     const { exp, inc, expOwn, incOwn } = sums.get(a.id);
-    const investito = pac.get(a.id) ?? null;
+    const investito = mercato.get(a.id) ?? null;
     return {
       ...a,
       expenses_total: round2(expOwn),
       incomes_total: round2(incOwn),
       balance: round2(Number(a.opening_balance) + inc - exp),
-      // Solo per i conti con un piano di accumulo: altrove non significa niente.
+      // Solo per i conti che ospitano investimenti: altrove non significa niente.
       market_value: investito === null ? null : round2(investito.value),
       market_gain: investito === null ? null : round2(investito.value - investito.contributed),
     };

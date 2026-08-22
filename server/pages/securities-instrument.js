@@ -40,6 +40,13 @@ export const render = ({ csrfToken, instrument }) => {
                 </button>
             </div>
         </form>
+        <div class="d-grid mt-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="price-fetch-btn"
+                    data-instrument-id="${instrument.id}">
+                <i class="bi bi-cloud-download me-1"></i>Scarica le quotazioni
+            </button>
+            <div class="form-text">Le prende da Internet con l'ISIN o il ticker. Quelle scritte a mano restano come sono.</div>
+        </div>
     </div>
 </div>
 

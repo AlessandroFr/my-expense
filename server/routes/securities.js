@@ -8,6 +8,7 @@
 import { all, one, run, transaction, currentUserId } from '../db.js';
 import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
+import { NavError, symbolsFromIsin, priceHistory } from '../nav-fetch.js';
 
 const KINDS = ['BUY', 'SELL', 'DIVIDEND', 'FEE', 'SPLIT'];
 
@@ -398,6 +399,143 @@ const upsertPrice = (instrumentId, priceDate, price, source) => run(
   instrumentId, priceDate, price, source,
 );
 
+/**
+ * Un prezzo scaricato, che non tocca quello che c'e' gia': il prezzo scritto a
+ * mano vince sempre su quello preso da Internet.
+ *
+ * @returns {number} 1 se e' stato scritto, 0 se quel giorno c'era gia'
+ */
+export const insertDownloadedPrice = (instrumentId, priceDate, price) => run(
+  `INSERT INTO securities_prices (instrument_id, price_date, price, source)
+   VALUES (?, ?, ?, 'external') ON CONFLICT(instrument_id, price_date) DO NOTHING`,
+  instrumentId, priceDate, dec6(price),
+).changes;
+
+// ─── Una spesa vera che e' un acquisto ──────────────────────────────────────
+
+/**
+ * L'acquisto sull'estratto conto e' gia' un movimento: quando lo si registra
+ * anche qui, i soldi devono uscire una volta sola.
+ *
+ * Come per i versamenti nei piani, il punto di partenza e' la spesa importata:
+ * si marca, e diventa la faccia in uscita del trasferimento verso il dossier.
+ * Non conta piu' come spesa nei report — comprare titoli non e' spendere, e'
+ * spostare — ma resta con la sua data e il suo importo, perche' e' una riga
+ * vera dell'estratto.
+ */
+
+/** L'operazione gia' registrata su una spesa, o null se non ce n'e'. */
+export function tradeOfExpense(userId, expenseId) {
+  const row = one(
+    `SELECT id, instrument_id, quantity, price, fee, gross_amount, net_amount
+     FROM securities_transactions WHERE user_id = ? AND expense_id = ? AND kind = 'BUY' LIMIT 1`,
+    userId, expenseId,
+  );
+  return row ? {
+    id: row.id, instrument_id: row.instrument_id,
+    quantity: dec6(row.quantity), price: dec6(row.price), fee: dec2(row.fee),
+  } : null;
+}
+
+/** Gli strumenti su cui si puo' registrare un acquisto. */
+export const instrumentsForTrade = (userId) => all(
+  `${INSTRUMENT_SELECT} WHERE s.user_id = ? AND s.archived = 0 AND s.account_id IS NOT NULL
+   ORDER BY s.name ASC`, userId,
+).map(instrumentToPublic);
+
+/** Disfa l'acquisto senza portarsi via la spesa. Dentro una transazione. */
+function clearTradeRows(userId, expense) {
+  run("DELETE FROM securities_transactions WHERE user_id = ? AND expense_id = ? AND kind = 'BUY'",
+    userId, expense.id);
+  if (expense.transfer_id === null) return;
+  run('UPDATE expenses SET is_transfer = 0, transfer_id = NULL WHERE id = ? AND user_id = ?', expense.id, userId);
+  run('DELETE FROM transfers WHERE id = ? AND user_id = ?', expense.transfer_id, userId);
+}
+
+/**
+ * Marca una spesa come acquisto di uno strumento. Con `quantity` a zero la
+ * spesa torna una spesa normale.
+ *
+ * L'importo della spesa e' quello che il conto ha pagato davvero: le
+ * commissioni ci sono gia' dentro, quindi il controvalore dei titoli e'
+ * l'importo meno le commissioni, e il prezzo unitario viene da li'.
+ */
+export function setExpenseTrade(userId, expenseId, data) {
+  const expense = one(
+    `SELECT id, account_id, amount, expense_date, description, transfer_id
+     FROM expenses WHERE id = ? AND user_id = ? LIMIT 1`,
+    expenseId, userId,
+  );
+  if (!expense) throw HttpError.notFound('Spesa non trovata.');
+
+  const quantity = parseAmountLikePhp(data.quantity);
+  if (quantity <= 0) {
+    transaction(() => clearTradeRows(userId, expense));
+    return null;
+  }
+
+  const instrumentId = int(data.instrument_id);
+  const instrument = instrumentId > 0 ? findInstrument(instrumentId, userId) : null;
+  if (!instrument) throw HttpError.badRequest('Strumento non trovato.');
+  if (instrument.account_id === null) {
+    throw HttpError.badRequest(`Allo strumento «${instrument.name}» manca il conto dossier: assegnalo prima.`);
+  }
+  if (instrument.account_id === expense.account_id) {
+    throw HttpError.badRequest("Il conto della spesa e' lo stesso del dossier: non e' un acquisto.");
+  }
+  if (expense.account_id === null) {
+    throw HttpError.badRequest("Assegna un conto alla spesa prima di marcarla come acquisto.");
+  }
+
+  const total = roundLikePhp(Number(expense.amount), 2);
+  const fee = roundLikePhp(parseAmountLikePhp(data.fee), 2);
+  if (fee < 0) throw HttpError.badRequest('Commissione non valida.');
+  if (fee >= total) throw HttpError.badRequest('Le commissioni non possono valere quanto tutto il movimento.');
+
+  const gross = roundLikePhp(total - fee, 2);
+  const price = gross / quantity;
+  const date = expense.expense_date;
+
+  return transaction(() => {
+    clearTradeRows(userId, expense);
+
+    const sourceAccount = one('SELECT name FROM accounts WHERE id = ? AND user_id = ?', expense.account_id, userId);
+    const transfer = run(
+      `INSERT INTO transfers
+         (user_id, source_account_id, destination_account_id, amount, transfer_date, description, notes)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+      userId, expense.account_id, instrument.account_id, total.toFixed(2), date,
+      `Acquisto titoli — ${instrument.name}`.slice(0, 255),
+    );
+    const transferId = Number(transfer.lastInsertRowid);
+
+    run('UPDATE expenses SET is_transfer = 1, is_investment = 1, transfer_id = ? WHERE id = ? AND user_id = ?',
+      transferId, expense.id, userId);
+    run(
+      `INSERT INTO incomes
+         (user_id, account_id, source, description, amount, payment_method,
+          income_date, is_transfer, transfer_id)
+       VALUES (?, ?, 'Trasferimento', ?, ?, 'transfer', ?, 1, ?)`,
+      userId, instrument.account_id,
+      `Acquisto titoli da ${sourceAccount?.name ?? 'conto'} — ${instrument.name}`.slice(0, 255),
+      total.toFixed(2), date, transferId,
+    );
+
+    const r = run(
+      `INSERT INTO securities_transactions
+         (user_id, account_id, instrument_id, kind, trade_date, quantity, price, fee,
+          gross_amount, net_amount, tax_withheld, expense_id)
+       VALUES (?, ?, ?, 'BUY', ?, ?, ?, ?, ?, ?, '0.00', ?)`,
+      userId, instrument.account_id, instrument.id, date,
+      dec6(quantity), dec6(price), dec2(fee), dec2(gross), dec2(total), expense.id,
+    );
+
+    // Il prezzo pagato e' anche un prezzo di mercato di quel giorno.
+    upsertPrice(instrument.id, date, dec6(price), 'manual');
+    return Number(r.lastInsertRowid);
+  });
+}
+
 // ─── Endpoint ───────────────────────────────────────────────────────────────
 
 async function listInstruments(req, res) {
@@ -533,21 +671,29 @@ async function createTransaction(req, res) {
     let expenseId = null;
     let incomeId = null;
 
+    // Comprare e vendere titoli non e' spendere e incassare: e' spostare soldi
+    // fra il conto e il dossier. Marcati come i giroconti restano nel saldo del
+    // conto ma non nei report, altrimenti il mese di un acquisto da qualche
+    // migliaio di euro sembrerebbe un mese di spese folli. Il dividendo invece
+    // e' entrata vera, e la commissione e' costo vero: quelli contano.
+    const giro = row.kind === 'BUY' || row.kind === 'SELL' ? 1 : 0;
+
     if (row.kind === 'BUY' || row.kind === 'FEE') {
       const r = run(
         `INSERT INTO expenses
-           (user_id, category_id, account_id, amount, description, payment_method, expense_date, is_investment)
-         VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1)`,
-        userId, categoryId, row.account_id, dec2(row.net_amount), text, row.trade_date,
+           (user_id, category_id, account_id, amount, description, payment_method,
+            expense_date, is_investment, is_transfer)
+         VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1, ?)`,
+        userId, categoryId, row.account_id, dec2(row.net_amount), text, row.trade_date, giro,
       );
       expenseId = Number(r.lastInsertRowid);
     } else if (row.kind === 'SELL' || row.kind === 'DIVIDEND') {
       const r = run(
         `INSERT INTO incomes
-           (user_id, account_id, source, description, amount, payment_method, income_date)
-         VALUES (?, ?, ?, ?, ?, 'transfer', ?)`,
+           (user_id, account_id, source, description, amount, payment_method, income_date, is_transfer)
+         VALUES (?, ?, ?, ?, ?, 'transfer', ?, ?)`,
         userId, row.account_id, row.kind === 'DIVIDEND' ? 'Dividendo' : 'Vendita titolo',
-        text, dec2(row.net_amount), row.trade_date,
+        text, dec2(row.net_amount), row.trade_date, giro,
       );
       incomeId = Number(r.lastInsertRowid);
     }
@@ -583,6 +729,20 @@ async function deleteTransaction(req, res) {
   const id = int(body.id);
   const existing = id > 0 ? findTransaction(id, userId) : null;
   if (!existing) throw HttpError.notFound('Operazione non trovata.');
+
+  // Se l'operazione era stata marcata su un movimento vero dell'estratto, si
+  // disfa la marcatura e la spesa torna in elenco: cancellarla vorrebbe dire
+  // perdere una riga dell'estratto conto, che e' successa davvero.
+  if (existing.expense_id !== null) {
+    const expense = one(
+      'SELECT id, transfer_id FROM expenses WHERE id = ? AND user_id = ?', existing.expense_id, userId,
+    );
+    if (expense && expense.transfer_id !== null) {
+      transaction(() => clearTradeRows(userId, expense));
+      ok(res, { deleted: true, id, restored_expense_id: expense.id });
+      return;
+    }
+  }
 
   transaction(() => {
     // Via anche la scrittura contabile collegata, altrimenti resterebbe un
@@ -637,6 +797,114 @@ async function updatePrice(req, res) {
 
   upsertPrice(instrumentId, date, dec6(price), 'manual');
   ok(res, { updated: true, instrument_id: instrumentId, price_date: date });
+}
+
+/**
+ * Scarica i prezzi dello strumento e li salva.
+ *
+ * Stessa strada dei fondi dei piani: parte solo quando l'utente preme il
+ * bottone, e non tocca i prezzi gia' presenti — quello scritto a mano vince
+ * sempre su quello scaricato.
+ */
+async function fetchPrices(req, res) {
+  const body = await readBody(req);
+  assertCsrf(req, body);
+  const userId = currentUserId();
+
+  const instrumentId = int(body.instrument_id);
+  const instrument = instrumentId > 0 ? findInstrument(instrumentId, userId) : null;
+  if (!instrument) throw HttpError.notFound('Strumento non trovato.');
+  if (!instrument.ticker && !instrument.isin) {
+    throw HttpError.badRequest("Allo strumento manca sia l'ISIN sia il ticker: senza non c'e' niente da cercare.");
+  }
+
+  try {
+    const toTry = instrument.ticker
+      ? [instrument.ticker]
+      : (await symbolsFromIsin(instrument.isin, instrument.currency)).slice(0, 4);
+
+    // Da un mese prima della prima operazione: prima non servirebbe a niente.
+    const first = one(
+      'SELECT MIN(trade_date) AS d FROM securities_transactions WHERE user_id = ? AND instrument_id = ?',
+      userId, instrumentId,
+    )?.d ?? null;
+    const da = str(body.from) || (first
+      ? new Date(new Date(`${first}T00:00:00Z`).getTime() - 31 * 86400000).toISOString().slice(0, 10)
+      : null);
+
+    // La valuta sbagliata non e' un dettaglio: quei prezzi farebbero sembrare
+    // il titolo cresciuto o calato per il cambio.
+    let series = null;
+    let symbol = null;
+    const rejected = [];
+    for (const candidate of toTry) {
+      const s = await priceHistory(candidate, da);
+      if (s.currency && s.currency !== instrument.currency.toUpperCase()) {
+        rejected.push(`${candidate} (${s.currency})`);
+        continue;
+      }
+      series = s;
+      symbol = candidate;
+      break;
+    }
+    if (series === null) {
+      throw new NavError(
+        `Trovato solo ${rejected.join(', ')}, ma lo strumento e' in ${instrument.currency}. `
+        + "Scrivi a mano il ticker sulla scheda dello strumento: per l'Italia finisce in .MI "
+        + '(per esempio CSSPX.MI).',
+      );
+    }
+
+    if (symbol !== instrument.ticker) {
+      run('UPDATE securities_instruments SET ticker = ? WHERE id = ? AND user_id = ?', symbol, instrumentId, userId);
+    }
+
+    let saved = 0;
+    transaction(() => {
+      for (const p of series.points) saved += insertDownloadedPrice(instrumentId, p.nav_date, p.nav);
+    });
+
+    ok(res, {
+      symbol,
+      currency: series.currency,
+      downloaded: series.points.length,
+      saved,
+      from_date: series.points[0]?.nav_date ?? null,
+      to_date: series.points[series.points.length - 1]?.nav_date ?? null,
+    });
+  } catch (err) {
+    if (err instanceof NavError) throw HttpError.badRequest(err.message);
+    throw err;
+  }
+}
+
+async function getExpenseTrade(req, res) {
+  const { searchParams } = new URL(req.url, 'http://localhost');
+  const userId = currentUserId();
+
+  const expenseId = int(searchParams.get('expense_id'));
+  if (expenseId <= 0) throw HttpError.badRequest('ID spesa mancante.');
+
+  ok(res, {
+    instruments: instrumentsForTrade(userId).map((i) => ({
+      id: i.id, name: i.name, ticker: i.ticker, currency: i.currency,
+      account_id: i.account_id, account_name: i.account_name,
+    })),
+    trade: tradeOfExpense(userId, expenseId),
+  });
+}
+
+/** Marca (o smarca, con quantita' zero) una spesa come acquisto di titoli. */
+async function saveExpenseTrade(req, res) {
+  const body = await readBody(req);
+  assertCsrf(req, body);
+  const userId = currentUserId();
+
+  const expenseId = int(body.expense_id);
+  if (expenseId <= 0) throw HttpError.badRequest('ID spesa mancante.');
+
+  const id = setExpenseTrade(userId, expenseId, body);
+  ok(res, { expense_id: expenseId, transaction_id: id, trade: tradeOfExpense(userId, expenseId) });
 }
 
 async function deletePrice(req, res) {
@@ -714,6 +982,9 @@ export const securitiesRoutes = {
   'GET /securities/prices': listPrices,
   'POST /securities/prices/update': updatePrice,
   'POST /securities/prices/delete': deletePrice,
+  'POST /securities/prices/fetch': fetchPrices,
+  'GET /securities/expense-trade': getExpenseTrade,
+  'POST /securities/expense-trade': saveExpenseTrade,
   'GET /securities/asset-classes': listAssetClasses,
   'POST /securities/asset-classes/create': createAssetClass,
   'POST /securities/asset-classes/update': updateAssetClass,

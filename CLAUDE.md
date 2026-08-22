@@ -69,7 +69,8 @@ npm run dist       # crea l'installer in dist\
 | `server/contact-dedup.js` | Quali anagrafiche sono la stessa cosa scritta in due modi |
 | `server/pac-performance.js` | Andamento e rendimento di un piano di accumulo |
 | `server/pac-split.js` | Come una spesa sola si divide in quote fra piu' piani |
-| `server/nav-fetch.js` | Le quotazioni dei fondi prese da Internet |
+| `server/nav-fetch.js` | Le quotazioni di fondi e titoli prese da Internet |
+| `public/js/trade-mark.js` | La finestra che marca un'uscita come acquisto di titoli |
 | `public/js/` | Il frontend, un modulo per pagina |
 | `public/js/modal-guard.js` | Le finestre non si chiudono per sbaglio e non perdono quel che c'era scritto |
 | `public/vendor/` | Bootstrap, icone, font, grafici, editor. In locale |
@@ -190,8 +191,18 @@ stesso, ma chi legge deve saperlo.
 
 **Il saldo di un conto PAC non è quanto vale.** È la somma dei trasferimenti
 entrati, e da solo non sale mai. `accounts.withBalances` aggiunge
-`market_value`/`market_gain` per i conti che ospitano un piano — `null` per
-tutti gli altri, dove non significherebbero niente.
+`market_value`/`market_gain` per i conti che ospitano un piano **o un dossier
+titoli** (`investmentValues`, che somma i due) — `null` per tutti gli altri,
+dove non significherebbero niente.
+
+**Cambiare fondo a piano avviato rifà le quote.** Sbagliare fondo alla creazione
+e accorgersene dopo mesi capita; l'unica alternativa sarebbe cancellare il piano,
+e la `CASCADE` si porterebbe via tutti i versamenti. `routes/pac.js::
+recalculateUnits` riscrive NAV e quote di ogni versamento con il NAV che il
+fondo nuovo aveva quel giorno — le quote appartengono al fondo in cui i soldi
+sono finiti, quelle vecchie descriverebbero un altro prodotto. Passa di lì sia
+`change-fund` sia `updatePlan`, che il fondo lo cambiava già e lasciava le quote
+di prima.
 
 **I versamenti PAC non si generano da soli: si segnano sui movimenti.** I soldi
 escono dal conto una volta sola, e quella volta si vede sull'estratto conto:
@@ -213,6 +224,29 @@ su un versamento con `expense_id` disfa tutta la divisione invece di cancellare
 la riga da sola: sul conto PAC resterebbero soldi che nessun piano dichiara.
 `expense_id` (migration `0004`) è la differenza fra un versamento nato da un
 movimento vero e quelli che il piano si generava da solo.
+
+**Gli acquisti di titoli seguono la stessa strada.** L'«ACQUISTO TITOLI» è già
+una riga dell'estratto: registrarlo anche fra gli investimenti farebbe uscire i
+soldi due volte. Quindi si marca la spesa (`routes/securities.js::
+setExpenseTrade`, dal menu della riga in elenco spese), che diventa la faccia in
+uscita di un trasferimento verso il dossier e smette di contare come spesa —
+comprare titoli non è spendere, è spostare. Il prezzo per quota non si chiede:
+viene dall'importo del movimento meno le commissioni, diviso le quote, così è
+per forza coerente con quanto il conto ha pagato. Disfare (cestino
+sull'operazione) riporta la spesa in elenco invece di cancellarla:
+`clearTradeRows` distingue le due origini dal `transfer_id`, che ce l'ha solo
+l'operazione nata da un movimento vero.
+
+Anche le operazioni scritte a mano dalla scheda Investimenti seguono la regola:
+**BUY e SELL nascono `is_transfer = 1`**, DIVIDEND resta entrata e FEE resta
+spesa, perché quelli sono guadagno e costo veri.
+
+**Le quotazioni dei titoli si scaricano come i NAV dei fondi**
+(`securities/prices/fetch`, stesso `nav-fetch.js`): parte solo a bottone
+premuto, scarta i listini in valuta diversa, salva il ticker buono sullo
+strumento e **non sovrascrive** i prezzi già presenti — `insertDownloadedPrice`
+usa `source = 'external'`, che è una delle due parole ammesse dal `CHECK` sulla
+colonna (l'altra è `manual`, e quello scritto a mano vince sempre).
 
 **Gli importi sono float.** SQLite non ha un tipo decimale. Ogni aggregazione va
 arrotondata, e gli arrotondamenti passano da `roundLikePhp` in `amount.js`:

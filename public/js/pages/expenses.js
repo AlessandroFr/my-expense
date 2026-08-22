@@ -8,6 +8,7 @@ import { stagger, withViewTransition, animateEnter, flip } from '../transitions.
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 import { renderPager }       from '../pager.js';
 import { openPacSplit, wirePacSplitModal } from '../pac-split.js';
+import { openTradeMark, wireTradeModal } from '../trade-mark.js';
 import { fmtDate, fmtMoney, getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
@@ -268,6 +269,7 @@ function renderViewRow(e) {
                     <li><button type="button" class="dropdown-item" data-action="edit"><i class="bi bi-pencil me-2"></i>Modifica</button></li>
                     <li><button type="button" class="dropdown-item" data-action="attach"><i class="bi bi-paperclip me-2"></i>Allegati</button></li>
                     <li><button type="button" class="dropdown-item" data-action="pac"><i class="bi bi-piggy-bank me-2"></i>Versamento PAC…</button></li>
+                    <li><button type="button" class="dropdown-item" data-action="trade"><i class="bi bi-graph-up-arrow me-2"></i>Acquisto titoli…</button></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><button type="button" class="dropdown-item text-danger" data-action="delete"><i class="bi bi-trash me-2"></i>Elimina</button></li>
                 </ul>
@@ -761,6 +763,48 @@ async function openPacSplitForExpense(tr) {
     });
 }
 
+/**
+ * «Questa uscita e' in realta' un acquisto di titoli».
+ *
+ * Come il versamento nei piani: applicata, la spesa passa fra i trasferimenti
+ * e sparisce dall'elenco, quindi la riga si toglie a mano.
+ */
+async function openTradeForExpense(tr) {
+    const e = tr.dataset.expense ? JSON.parse(tr.dataset.expense) : {};
+    let d;
+    try {
+        const r = await apiGuard(api.get(`${BASE}/securities/expense-trade`, { expense_id: tr.dataset.id }));
+        d = r.data ?? {};
+    } catch (err) {
+        toast.error(err.message ?? 'Errore lettura titoli.');
+        return;
+    }
+    if (!(d.instruments ?? []).length) {
+        toast.warning('Non c\'e\' nessuno strumento con un conto dossier su cui registrare l\'acquisto.');
+        return;
+    }
+
+    openTradeMark({
+        amount: e.amount,
+        date: fmtDate(e.expense_date),
+        description: htmlToPlain(e.description ?? ''),
+        instruments: d.instruments,
+        trade: d.trade,
+        onApply: async (payload) => {
+            const params = new URLSearchParams({ ...payload, expense_id: tr.dataset.id, _csrf: getCsrfToken() });
+            await send(`${BASE}/securities/expense-trade`, params);
+            if (Number(String(payload.quantity).replace(',', '.')) > 0) {
+                removeDetailSibling(tr);
+                tr.remove();
+                updateTotalFromTable();
+                toast.success('Acquisto registrato.');
+            } else {
+                toast.success('La spesa non e\' piu\' un acquisto.');
+            }
+        },
+    });
+}
+
 function wireTableActions() {
     const tbody = document.getElementById('expenses-tbody');
     if (!tbody) return;
@@ -794,6 +838,11 @@ function wireTableActions() {
 
         if (action === 'pac') {
             await openPacSplitForExpense(tr);
+            return;
+        }
+
+        if (action === 'trade') {
+            await openTradeForExpense(tr);
             return;
         }
 
@@ -2025,6 +2074,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireCsvButtons();
     wireBankImport();
     wirePacSplitModal();
+    wireTradeModal();
     wireOcr();
     loadTags();
     loadSavedFilters();

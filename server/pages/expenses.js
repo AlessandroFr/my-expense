@@ -492,6 +492,53 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
     </div>
 </div>
 
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="trade-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-graph-up-arrow me-1"></i>Acquisto di titoli</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Scegli il titolo e quante quote hai comprato. Il prezzo lo calcola da s&eacute;,
+                    dividendo l'importo del movimento per le quote. Comprare titoli non &egrave;
+                    spendere: il movimento non conta pi&ugrave; come spesa, ma resta con il suo importo.
+                </p>
+                <div class="mb-2">
+                    <strong id="trade-amount">&mdash;</strong>
+                    <span class="text-muted">del <span id="trade-date">&mdash;</span></span>
+                </div>
+                <div class="small text-muted mb-3" id="trade-desc"></div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Titolo</label>
+                    <select class="form-select" id="trade-instrument"></select>
+                </div>
+                <div class="row g-2">
+                    <div class="col-7">
+                        <label class="form-label small mb-1">Quote comprate</label>
+                        <input type="text" class="form-control" id="trade-quantity" inputmode="decimal" placeholder="5">
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label small mb-1">Commissioni</label>
+                        <input type="text" class="form-control" id="trade-fee" inputmode="decimal" placeholder="0,00">
+                    </div>
+                </div>
+                <div id="trade-price" class="mt-2 small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto text-danger" id="trade-clear">
+                    <i class="bi bi-x-lg me-1"></i>Non &egrave; un acquisto
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="trade-apply">
+                    <i class="bi bi-check-lg me-1"></i>Applica
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: edit spesa -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="expense-edit-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
