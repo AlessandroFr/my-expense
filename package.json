@@ -59,7 +59,8 @@
     "publish": {
       "provider": "github",
       "owner": "AlessandroFr",
-      "repo": "my-expense"
+      "repo": "my-expense",
+      "releaseType": "release"
     },
     "npmRebuild": false
   },
