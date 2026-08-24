@@ -14,14 +14,15 @@ const BASE = document.body.dataset.baseUrl ?? '';
 
 const REQUIRED_PHRASE = 'ELIMINA TUTTO';
 
-const btnBackup   = document.getElementById('btn-download-backup');
+const formBackup  = document.getElementById('form-backup');
 const backupHint  = document.getElementById('backup-status');
 const phraseInput = document.getElementById('reset-phrase');
 const pwdInput    = document.getElementById('reset-password');
 const btnReset    = document.getElementById('btn-reset');
 const scopeRadios = document.querySelectorAll('input[name="reset-scope"]');
+const resetHint   = document.getElementById('reset-backup-status');
 
-// Flag in-memory: true solo se l'utente ha cliccato "Scarica backup" in questa
+// Flag in-memory: true solo se l'utente ha chiesto il backup in questa
 // sessione di pagina. Si perde al reload — by design (vogliamo che riscarichi).
 let backupClicked = false;
 
@@ -37,14 +38,18 @@ function refreshButtonState() {
     btnReset.disabled = !(backupClicked && phraseOk && pwdOk && scopeOk);
 }
 
-btnBackup.addEventListener('click', () => {
-    // L'utente apre /backup/download in una nuova tab (download server-side).
-    // Non possiamo verificare l'effettivo completamento del download, ma il
-    // click qui significa che il file è stato richiesto: lo accettiamo come
-    // conferma intenzionale.
+// Il backup è un submit normale: il file lo manda il server e lo scarica il
+// browser. Niente blob da costruire, e la password non finisce in un indirizzo.
+formBackup.addEventListener('submit', () => {
     backupClicked = true;
-    backupHint.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Backup richiesto — controlla la tab nuova.';
+    backupHint.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Scaricato.';
+    resetHint.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Backup richiesto.';
     refreshButtonState();
+});
+
+document.getElementById('btn-vai-backup').addEventListener('click', () => {
+    document.getElementById('tab-backup-tab').click();
+    document.getElementById('backup-password').focus();
 });
 
 phraseInput.addEventListener('input', refreshButtonState);
@@ -152,3 +157,67 @@ btnRestore.addEventListener('click', async () => {
         refreshRestoreState();
     }
 });
+
+// ─── Sicurezza ───────────────────────────────────────────────────────────────
+// Cambio password e chiave di recupero. Il vault sta sul disco, non nel
+// database: queste due cose non passano dal reset e non stanno nel backup.
+
+const formCambio = document.getElementById('form-cambio-password');
+
+formCambio.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nuova = document.getElementById('pw-nuova').value;
+    if (nuova !== document.getElementById('pw-nuova2').value) {
+        toast.error('Le due password nuove non sono uguali.');
+        return;
+    }
+
+    const btn = formCambio.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+        await send(`${BASE}/sicurezza/password`, {
+            vecchia: document.getElementById('pw-vecchia').value,
+            nuova,
+        });
+        formCambio.reset();
+        toast.success('Password cambiata. La chiave di recupero è ancora quella di prima.');
+    } catch (err) {
+        toast.error(err.message ?? 'Non è stato possibile cambiare la password.');
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+document.getElementById('btn-rigenera-chiave').addEventListener('click', async (e) => {
+    const ok = await confirmDialog(
+        'La chiave di recupero che hai adesso smetterà di funzionare subito. '
+        + 'Quella nuova va riscritta al posto della vecchia. Procedere?',
+        { title: 'Nuova chiave di recupero', confirmText: 'Sì, generala' }
+    );
+    if (!ok) return;
+
+    e.currentTarget.disabled = true;
+    try {
+        const r = await send(`${BASE}/sicurezza/chiave-recupero`, {});
+        document.getElementById('chiave-nuova').textContent = r.data.chiaveRecupero;
+        document.getElementById('chiave-nuova-riquadro').classList.remove('d-none');
+    } catch (err) {
+        toast.error(err.message ?? 'Non è stato possibile generare la chiave.');
+        e.currentTarget.disabled = false;
+    }
+});
+
+// Chi è entrato con la chiave di recupero arriva qui con ?nuova-password=1: la
+// password vecchia non ce l'ha — è il motivo per cui ha usato la chiave — e
+// chiedergliela sarebbe un vicolo cieco.
+if (new URLSearchParams(location.search).has('nuova-password')) {
+    document.getElementById('tab-sicurezza-tab').click();
+    const vecchia = document.getElementById('pw-vecchia');
+    vecchia.closest('.mb-3').hidden = true;
+    vecchia.required = false;
+    vecchia.value = '';
+    formCambio.insertAdjacentHTML('afterbegin',
+        '<div class="alert alert-info">Sei entrato con la chiave di recupero. '
+        + 'Scegli una password nuova: da adesso userai quella.</div>');
+    document.getElementById('pw-nuova').focus();
+}

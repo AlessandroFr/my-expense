@@ -175,7 +175,6 @@ ${o.head ?? ''}</head>
                             <button type="button" class="mx-theme-btn" data-theme-mode="auto" title="Auto" aria-label="Tema automatico"><i class="bi bi-circle-half"></i></button>
                         </div>
                     </li>
-                    <li><a class="dropdown-item" href="/backup/download"><i class="bi bi-cloud-download me-2"></i>Backup ZIP</a></li>
                     <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2"></i>Impostazioni</a></li>
                     <li><a class="dropdown-item" href="/wiki"><i class="bi bi-question-circle me-2"></i>Guida</a></li>
                     <li><hr class="dropdown-divider"></li>

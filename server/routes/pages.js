@@ -8,6 +8,7 @@ import { all, one, currentUserId } from '../db.js';
 import { HttpError, int, str } from '../http.js';
 import { page } from '../view.js';
 import { GENERIC_COLUMNS } from '../bank-profiles.js';
+import { copiaInChiaro } from '../lock.js';
 import { listForUser as profiliBanca } from './bank-profiles.js';
 
 import * as accountsPage from '../pages/accounts.js';
@@ -198,6 +199,8 @@ export const pageRoutes = {
     thisYear: new Date().getFullYear(),
   })),
 
-  'GET /settings': pageHandler('Impostazioni', settingsPage),
+  'GET /settings': pageHandler('Impostazioni', settingsPage, () => ({
+    copiaInChiaro: copiaInChiaro(),
+  })),
   'GET /wiki': pageHandler('Guida', wikiPage),
 };
