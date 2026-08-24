@@ -69,7 +69,7 @@ const BUILTIN = [
     // Mediolanum esporta lo stesso tracciato di Sella: «Operazione» e' la data
     // contabile, non il tipo di movimento. Sui nomi lunghi ('data contabile' e
     // compagnia) non riconosceva niente e il file finiva letto dal profilo
-    // Sella. Verificato sull'estratto 01/2026-07/2026 del conto MROSSI.
+    // Sella. Verificato su estratti veri, 01/2026-07/2026.
     key: 'mediolanum', name: 'Banca Mediolanum', delimiter: ';', date_order: 'dmy', amount_mode: 'in_out',
     verified: true,
     columns: {
