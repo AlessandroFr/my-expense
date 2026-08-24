@@ -23,11 +23,21 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
   },
 
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Il database dei test nasce chiuso, come quello vero: `sblocca.setup.js` lo
+  // apre una volta sola e tutto il resto viene dopo.
+  projects: [
+    { name: 'sblocco', testMatch: /sblocca\.setup\.js/ },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['sblocco'],
+      testIgnore: /sblocca\.setup\.js/,
+    },
+  ],
 
   webServer: {
     command: 'node e2e/server.js',
-    url: 'http://127.0.0.1:4599/dashboard',
+    url: 'http://127.0.0.1:4599/sblocca',
     // Sempre un server nuovo: il seme del database sta nel suo avvio.
     reuseExistingServer: false,
     timeout: 30_000,

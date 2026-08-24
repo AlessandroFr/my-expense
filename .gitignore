@@ -4,6 +4,10 @@
 # Configurazione locale
 /config/config.json
 
+# Le chiavi che aprono il database. Contengono solo roba cifrata, ma sono le
+# chiavi di casa di chi usa l'app: in git non ci vanno mai.
+/config/vault.json
+
 # Log
 /logs/*
 !/logs/.gitkeep

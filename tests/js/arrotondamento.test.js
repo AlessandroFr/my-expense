@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { roundLikePhp } from '../../server/amount.js';
+import { parseAmountItaliano, parseAmountLikePhp, roundLikePhp } from '../../server/amount.js';
 
 test('i valori esattamente a meta\' salgono, come in PHP', () => {
   // Math.round(263.585 * 100) / 100 darebbe 263.58, perche' 263.585 * 100 in
@@ -40,4 +40,38 @@ test('un valore non numerico vale zero, non NaN', () => {
 test('gli interi restano interi', () => {
   assert.equal(roundLikePhp(100, 2), 100);
   assert.equal(roundLikePhp(0, 2), 0);
+});
+
+// ── parseAmountItaliano ─────────────────────────────────────────────────────
+// Il fratello nuovo di parseAmountLikePhp, per i campi dove non c'e' niente di
+// vecchio da rispettare: il primo e' il saldo iniziale nella procedura di
+// benvenuto. Una persona che comincia scrive il saldo come lo legge in banca,
+// e "1.234,50" deve fare milleduecentotrentaquattro e cinquanta.
+
+test('legge il formato italiano completo, migliaia comprese', () => {
+  assert.equal(parseAmountItaliano('1.234,50'), 1234.5);
+  assert.equal(parseAmountItaliano('12.345.678,90'), 12345678.9);
+  assert.equal(parseAmountItaliano('1.234'), 1234, 'senza decimali sono migliaia');
+});
+
+test('e\' la differenza con quella vecchia, che quel numero lo sbagliava', () => {
+  assert.equal(parseAmountLikePhp('1.234,50'), 1.234);
+  assert.notEqual(parseAmountItaliano('1.234,50'), parseAmountLikePhp('1.234,50'));
+});
+
+test('legge anche il formato inglese, senza doverlo sapere prima', () => {
+  assert.equal(parseAmountItaliano('1,234.50'), 1234.5);
+  assert.equal(parseAmountItaliano('1234.50'), 1234.5);
+  assert.equal(parseAmountItaliano('1234,50'), 1234.5);
+});
+
+test('gli spazi, l\'euro e il vuoto non disturbano', () => {
+  assert.equal(parseAmountItaliano(' 2 500,00 € '), 2500);
+  assert.equal(parseAmountItaliano(''), 0);
+  assert.equal(parseAmountItaliano(null), 0);
+  assert.equal(parseAmountItaliano('non un numero'), 0);
+});
+
+test('i negativi restano negativi', () => {
+  assert.equal(parseAmountItaliano('-1.234,50'), -1234.5);
 });

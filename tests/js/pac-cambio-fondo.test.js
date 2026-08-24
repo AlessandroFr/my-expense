@@ -14,10 +14,13 @@ import { join } from 'node:path';
 process.env.MY_EXPENSE_DATA_DIR = mkdtempSync(join(tmpdir(), 'my-expense-test-'));
 
 const { migrate } = await import('../../database/migrate.js');
-const { databasePath, ensureUser, all, one, run } = await import('../../server/db.js');
+const { apri, db, ensureUser, all, one, run } = await import('../../server/db.js');
 const { pacRoutes } = await import('../../server/routes/pac.js');
 
-migrate(databasePath());
+// Senza chiave: il database di un test e' usa e getta, cifrarlo costerebbe
+// solo il tempo di scrypt e non proteggerebbe niente.
+apri();
+migrate(db());
 const userId = ensureUser();
 
 function chiama(route, body) {

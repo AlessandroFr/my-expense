@@ -16,6 +16,33 @@ export function parseAmountLikePhp(value) {
 }
 
 /**
+ * Un importo scritto all'italiana, **con** il separatore delle migliaia:
+ * "1.234,56" fa 1234,56 e non 1,234.
+ *
+ * Sta accanto a `parseAmountLikePhp` invece di sostituirla perche' sono due
+ * cose diverse: quella riproduce come sono stati letti i dati che ci sono gia'
+ * e non va toccata, questa serve ai campi nuovi, dove non c'e' niente di
+ * vecchio da rispettare e leggere 1.234,50 come «uno e ventitre» sarebbe solo
+ * un errore. Il primo campo cosi' e' il saldo iniziale nella procedura di
+ * benvenuto: una persona che comincia scrive il saldo come lo legge in banca.
+ */
+export function parseAmountItaliano(value) {
+  const grezzo = String(value ?? '').trim().replace(/[\s €]/g, '');
+  if (!grezzo) return 0;
+
+  // L'ultimo separatore e' quello dei decimali; gli altri sono migliaia. Vale
+  // sia per "1.234,56" sia per "1,234.56", senza dover indovinare la lingua.
+  const ultimoSep = Math.max(grezzo.lastIndexOf(','), grezzo.lastIndexOf('.'));
+  const decimali = ultimoSep >= 0 && grezzo.length - ultimoSep - 1 <= 2
+    ? grezzo.slice(ultimoSep + 1)
+    : '';
+  const intera = (decimali ? grezzo.slice(0, ultimoSep) : grezzo).replace(/[.,]/g, '');
+
+  const n = Number.parseFloat(`${intera}${decimali ? `.${decimali}` : ''}`);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
  * Arrotonda come round() di PHP.
  *
  * Math.round(x * 100) / 100 non basta: 263.585 * 100 in virgola mobile fa

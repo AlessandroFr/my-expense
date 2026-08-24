@@ -10,10 +10,16 @@
 //
 // La chiama `server.js`, che prima ha cancellato la cartella e messo
 // MY_EXPENSE_DATA_DIR: qui si trova gia' tutto al suo posto.
+/** La password del database dei test. Non protegge niente: e' usa e getta. */
+export const PASSWORD_TEST = 'prova-prova-1234';
+
 export async function seed() {
-  const { migrate } = await import('../database/migrate.js');
-  const { databasePath, ensureUser, run, one } = await import('../server/db.js');
-  migrate(databasePath());
+  // Le prove passano dal cancello vero: si crea un vault con la password nota
+  // a `sblocca.spec.js`, cosi' l'app dei test si apre esattamente come quella
+  // installata invece di avere una porta di servizio che nessuno collauda.
+  const lock = await import('../server/lock.js');
+  const { ensureUser, run, one } = await import('../server/db.js');
+  lock.proteggiNuovo(PASSWORD_TEST);
   const userId = ensureUser();
 
   const account = (name, type, opening = '0.00') => {
@@ -54,4 +60,9 @@ export async function seed() {
      VALUES (?, 1, ?, '500.00', 'ADDEBITO PAC AGOSTO', 'transfer', '2026-08-05')`,
     userId, conto,
   );
+
+  // Si richiude: le prove devono passare dalla schermata di sblocco come chi
+  // usa l'app davvero. Ad aprirlo e' `sblocca.setup.js`, da cui tutte le altre
+  // spec dipendono.
+  lock.blocca();
 }

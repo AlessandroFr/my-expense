@@ -21,11 +21,13 @@ import { reconciliationRoutes } from './reconciliations.js';
 import { recurringRoutes } from './recurring.js';
 import { reportRoutes } from './reports.js';
 import { securitiesRoutes } from './securities.js';
+import { sicurezzaRoutes } from './sicurezza.js';
 import { tagRoutes } from './tags.js';
 import { transferBackfillRoutes } from './transfers-backfill.js';
 import { transferRoutes } from './transfers.js';
 
 export const routes = new Map(Object.entries({
+  ...sicurezzaRoutes,
   ...pageRoutes,
   ...manutenzioneRoutes,
   ...categoryRoutes,

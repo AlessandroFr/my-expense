@@ -4,27 +4,47 @@
  * Serve le pagine, gli endpoint JSON e i file statici. Ascolta solo su
  * 127.0.0.1: l'app è per chi sta davanti al computer, non per la rete.
  *
- * Non c'è login: è un'applicazione per una persona sola sulla sua macchina, e
- * chi ha accesso al computer ha già accesso al file del database. Resta invece
- * il token CSRF, che serve a impedire a una pagina qualunque aperta nel browser
- * di chiamare 127.0.0.1 a nostra insaputa.
+ * Il database è cifrato e si apre con una password: finché non è stata data,
+ * il server sta in piedi ma sa servire solo la schermata di sblocco (o quella
+ * di benvenuto, al primo avvio). Il cancello è qui sotto, in un punto solo:
+ * una route dimenticata non deve poter scavalcare la password.
+ *
+ * Resta il token CSRF, che è un'altra cosa e serve anche a chi è già dentro:
+ * impedisce a una pagina qualunque aperta nel browser di chiamare 127.0.0.1 a
+ * nostra insaputa.
  */
 
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-import { assertLocalOrigin, fail, HttpError, parseCookies } from './http.js';
+import { assertLocalOrigin, fail, HttpError, parseCookies, sendJson } from './http.js';
 import { routes } from './routes/index.js';
 import { serveStatic } from './static.js';
-import { databasePath, ensureUser } from './db.js';
-import { migrate } from '../database/migrate.js';
+import { stato } from './lock.js';
 
 /**
  * Token CSRF del processo. Vale finché l'app resta aperta: non c'è una sessione
  * da cui derivarlo, e per il doppio invio (cookie + header) questo basta.
  */
 const csrfToken = randomBytes(32).toString('hex');
+
+/** Le uniche strade percorribili a database chiuso. */
+const APERTE = new Set([
+  '/sblocca', '/benvenuto',
+  '/sicurezza/sblocca', '/sicurezza/proteggi', '/sicurezza/completa',
+]);
+
+/** Dove mandare chi bussa nello stato in cui siamo. */
+function dirottamento(pathname) {
+  const dove = stato();
+  if (dove === 'aperto') {
+    // Sbloccati, quelle due pagine non hanno piu' niente da dire.
+    return ['/sblocca', '/benvenuto'].includes(pathname) ? '/dashboard' : null;
+  }
+  if (APERTE.has(pathname)) return null;
+  return dove === 'chiuso' ? '/sblocca' : '/benvenuto';
+}
 
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url ?? '/', 'http://localhost');
@@ -37,6 +57,22 @@ const server = createServer(async (req, res) => {
   }
 
   if (serveStatic(req, res, pathname)) return;
+
+  const verso = dirottamento(pathname);
+  if (verso) {
+    // Una pagina si rimanda; una chiamata del frontend riceve un codice che
+    // dice «sei fuori»: 423 Locked, che componentBase.js mostra com'e'.
+    if (req.headers.accept?.includes('text/html')) {
+      res.writeHead(302, { Location: verso });
+      res.end();
+    } else {
+      sendJson(res, {
+        ok: false,
+        error: { code: 'locked', message: 'Il database e\' chiuso: serve la password.', redirect: verso },
+      }, 423);
+    }
+    return;
+  }
 
   const handler = routes.get(`${req.method} ${pathname}`);
   if (!handler) {
@@ -64,7 +100,11 @@ const server = createServer(async (req, res) => {
 });
 
 /**
- * Prepara il database e mette il server in ascolto.
+ * Mette il server in ascolto.
+ *
+ * Il database **non** si apre qui: e' cifrato, e la chiave arriva dalla
+ * password che l'utente scrive nella schermata di sblocco, che e' servita da
+ * questo stesso server. Quindi prima si ascolta, poi si apre.
  *
  * La porta 0 significa «scegline una libera tu»: e' quello che usa Electron,
  * e toglie di mezzo sia i conflitti sia la ricerca di una porta libera.
@@ -73,9 +113,6 @@ const server = createServer(async (req, res) => {
  * @returns {Promise<{port: number, url: string, close: () => void}>}
  */
 export function start(requestedPort = 0) {
-  migrate(databasePath());
-  ensureUser();
-
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(requestedPort, '127.0.0.1', () => {

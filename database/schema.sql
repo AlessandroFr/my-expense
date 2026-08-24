@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `last_login_at`          TEXT,
     `reset_token_hash`       TEXT COLLATE NOCASE,
     `reset_token_expires_at` TEXT,
+    `base_currency`          TEXT COLLATE NOCASE NOT NULL DEFAULT 'EUR',
     CONSTRAINT `uq_users_username` UNIQUE (`username`)
 );
 
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS `accounts` (
     `color`                  TEXT COLLATE NOCASE NOT NULL DEFAULT '#6c757d',
     `icon`                   TEXT COLLATE NOCASE,
     `opening_balance`        NUMERIC NOT NULL DEFAULT 0.00,
+    `currency`               TEXT COLLATE NOCASE NOT NULL DEFAULT 'EUR',
     `iban`                   TEXT COLLATE NOCASE,
     `bic`                    TEXT COLLATE NOCASE,
     `bank_name`              TEXT COLLATE NOCASE,
@@ -188,6 +190,7 @@ CREATE TABLE IF NOT EXISTS `recurring_expenses` (
     `contact_id`             INTEGER,
     `account_id`             INTEGER,
     `amount`                 NUMERIC NOT NULL,
+    `amount_base`            NUMERIC,
     `description`            TEXT COLLATE NOCASE,
     `payment_method`         TEXT COLLATE NOCASE NOT NULL DEFAULT 'card' CHECK (`payment_method` IN ('cash', 'card', 'transfer', 'other')),
     `frequency`              TEXT COLLATE NOCASE NOT NULL DEFAULT 'monthly' CHECK (`frequency` IN ('weekly', 'monthly', 'yearly')),
@@ -273,6 +276,8 @@ CREATE TABLE IF NOT EXISTS `transfers` (
     `source_account_id`      INTEGER NOT NULL,
     `destination_account_id` INTEGER NOT NULL,
     `amount`                 NUMERIC NOT NULL,
+    `amount_base`            NUMERIC,
+    `destination_amount`     NUMERIC,
     `transfer_date`          TEXT NOT NULL,
     `description`            TEXT COLLATE NOCASE,
     `notes`                  TEXT COLLATE NOCASE,
@@ -315,6 +320,8 @@ CREATE TABLE IF NOT EXISTS `expenses` (
     `description`            TEXT COLLATE NOCASE,
     `shared_with`            TEXT COLLATE NOCASE,
     `share_amount`           NUMERIC,
+    `amount_base`            NUMERIC,
+    `share_amount_base`      NUMERIC,
     `payment_method`         TEXT COLLATE NOCASE NOT NULL DEFAULT 'card' CHECK (`payment_method` IN ('cash', 'card', 'transfer', 'other')),
     `expense_date`           TEXT NOT NULL,
     `value_date`             TEXT,
@@ -355,6 +362,7 @@ CREATE TABLE IF NOT EXISTS `incomes` (
     `source`                 TEXT COLLATE NOCASE NOT NULL,
     `description`            TEXT COLLATE NOCASE,
     `amount`                 NUMERIC NOT NULL,
+    `amount_base`            NUMERIC,
     `payment_method`         TEXT COLLATE NOCASE NOT NULL DEFAULT 'transfer' CHECK (`payment_method` IN ('cash', 'card', 'transfer', 'other')),
     `income_date`            TEXT NOT NULL,
     `value_date`             TEXT,
@@ -579,4 +587,27 @@ CREATE TRIGGER IF NOT EXISTS `tr_securities_transactions_updated_at`
 AFTER UPDATE ON `securities_transactions` FOR EACH ROW
 BEGIN
     UPDATE `securities_transactions` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
+END;
+
+-- I cambi sono **sempre contro EUR**, che fa da perno: e' come li pubblica ogni
+-- fonte, e le altre coppie si ricavano per triangolazione. `rate` = quante
+-- unita' di `quote` per 1 EUR.
+CREATE TABLE IF NOT EXISTS `exchange_rates` (
+    `id`                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    `user_id`                INTEGER NOT NULL,
+    `quote`                  TEXT COLLATE NOCASE NOT NULL,
+    `rate_date`              TEXT NOT NULL,
+    `rate`                   NUMERIC NOT NULL,
+    `source`                 TEXT COLLATE NOCASE NOT NULL DEFAULT 'manual' CHECK (`source` IN ('manual', 'external')),
+    `created_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `uq_rates_user_quote_date` UNIQUE (`user_id`, `quote`, `rate_date`),
+    CONSTRAINT `fk_rates_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS `ix_rates_user_quote_date` ON `exchange_rates` (`user_id`, `quote`, `rate_date`);
+
+CREATE TRIGGER IF NOT EXISTS `tr_exchange_rates_updated_at`
+AFTER UPDATE ON `exchange_rates` FOR EACH ROW
+BEGIN
+    UPDATE `exchange_rates` SET `updated_at` = CURRENT_TIMESTAMP WHERE `rowid` = NEW.`rowid`;
 END;

@@ -202,6 +202,56 @@ ${o.scripts ?? ''}</body>
 `;
 }
 
+/**
+ * Il layout senza niente intorno: niente menu, niente avatar, niente scorciatoie.
+ *
+ * Lo usano lo sblocco e il benvenuto, che girano a database chiuso. Non e' una
+ * questione di stile: a quel punto non c'e' un utente di cui mostrare il nome e
+ * non c'e' una sola pagina raggiungibile, quindi un menu sarebbe solo un elenco
+ * di porte chiuse.
+ */
+export function pageNuda(o) {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${esc(`${o.title ?? ''} - ${NOME_APP}`)}</title>
+    <link rel="stylesheet" href="/vendor/fonts.css">
+    <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="${asset('css/pastel.css')}">
+    <script>
+        (function() {
+            try {
+                var m = localStorage.getItem('mx-theme') || 'auto';
+                var r = (m === 'auto')
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : (m === 'dark' ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-bs-theme', r);
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body data-base-url="" class="mx-schermata-chiusa">
+<main class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="text-center mb-4">
+                <i class="bi bi-wallet2 fs-1 text-primary"></i>
+                <h1 class="h3 mt-2 mb-0">${esc(NOME_APP)}</h1>
+                <p class="text-body-secondary small mb-0">Versione ${esc(VERSION)}</p>
+            </div>
+${o.content}
+        </div>
+    </div>
+</main>
+<script src="/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+${o.scripts ?? ''}</body>
+</html>
+`;
+}
+
 /** Ripete un frammento per ogni elemento, senza separatori. */
 export const each = (items, fn) => (items ?? []).map(fn).join('');
 

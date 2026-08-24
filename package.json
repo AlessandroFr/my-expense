@@ -56,5 +56,8 @@
       "shortcutName": "My Expense",
       "deleteAppDataOnUninstall": false
     }
+  },
+  "dependencies": {
+    "better-sqlite3-multiple-ciphers": "^13.0.3"
   }
 }
