@@ -46,7 +46,7 @@ export const render = ({ username }) => `
 
 <div class="mx-hero mb-4">
     <div class="mx-hero-label">Bilancio netto · <span data-period-label>…</span></div>
-    <div id="kpi-net" class="mx-hero-value">€ —</div>
+    <div id="kpi-net" class="mx-hero-value">—</div>
     <span class="mx-hero-pill"><i class="bi bi-graph-up-arrow"></i> Entrate meno spese</span>
 </div>
 
@@ -69,13 +69,13 @@ export const render = ({ username }) => `
     <div class="col-md-4"><div class="mx-stat-card spese h-100">
         <div class="mx-stat-icon">💸</div>
         <div class="mx-stat-l">Spese</div>
-        <div id="kpi-current" class="mx-stat-v">€ —</div>
+        <div id="kpi-current" class="mx-stat-v">—</div>
         <div class="mx-stat-d" id="kpi-current-month" data-period-label>&nbsp;</div>
     </div></div>
     <div class="col-md-4"><div class="mx-stat-card entrate h-100">
         <div class="mx-stat-icon">💵</div>
         <div class="mx-stat-l">Entrate</div>
-        <div id="kpi-income" class="mx-stat-v">€ —</div>
+        <div id="kpi-income" class="mx-stat-v">—</div>
         <div class="mx-stat-d" data-period-label>&nbsp;</div>
     </div></div>
     <div class="col-md-4"><div class="mx-stat-card lilac h-100">

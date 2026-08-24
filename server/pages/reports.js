@@ -18,19 +18,19 @@ export const render = ({ thisYear }) => {
 <div class="row g-3 mb-4">
     <div class="col-md-3"><div class="card shadow-sm h-100 border-start border-danger border-4"><div class="card-body">
         <div class="text-muted small text-uppercase">Spese totali</div>
-        <div id="r-total-exp" class="h3 fw-semibold text-danger mt-1">EUR -</div>
+        <div id="r-total-exp" class="h3 fw-semibold text-danger mt-1">—</div>
     </div></div></div>
     <div class="col-md-3"><div class="card shadow-sm h-100 border-start border-success border-4"><div class="card-body">
         <div class="text-muted small text-uppercase">Entrate totali</div>
-        <div id="r-total-inc" class="h3 fw-semibold text-success mt-1">EUR -</div>
+        <div id="r-total-inc" class="h3 fw-semibold text-success mt-1">—</div>
     </div></div></div>
     <div class="col-md-3"><div class="card shadow-sm h-100 border-start border-primary border-4"><div class="card-body">
         <div class="text-muted small text-uppercase">Bilancio anno</div>
-        <div id="r-net" class="h3 fw-semibold mt-1">EUR -</div>
+        <div id="r-net" class="h3 fw-semibold mt-1">—</div>
     </div></div></div>
     <div class="col-md-3"><div class="card shadow-sm h-100"><div class="card-body">
         <div class="text-muted small text-uppercase">Media mensile spese</div>
-        <div id="r-avg" class="h3 fw-semibold mt-1">EUR -</div>
+        <div id="r-avg" class="h3 fw-semibold mt-1">—</div>
         <div class="small text-muted" id="r-extremes"></div>
     </div></div></div>
 </div>

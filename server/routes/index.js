@@ -8,6 +8,7 @@ import { backupRoutes } from './backup.js';
 import { bankImportRoutes } from './bank-import.js';
 import { bankProfileRoutes } from './bank-profiles.js';
 import { budgetRoutes } from './budgets.js';
+import { cambiRoutes } from './cambi.js';
 import { categoryRoutes } from './categories.js';
 import { contactRoutes } from './contacts.js';
 import { csvRoutes } from './csv.js';
@@ -34,6 +35,7 @@ export const routes = new Map(Object.entries({
   ...tagRoutes,
   ...filterRoutes,
   ...budgetRoutes,
+  ...cambiRoutes,
   ...accountRoutes,
   ...expenseRoutes,
   ...incomeRoutes,

@@ -35,7 +35,7 @@ export const render = ({ csrfToken, accounts }) => {
                 </select>
             </div>
             <div class="col-7">
-                <label class="form-label small mb-1">Importo (EUR)</label>
+                <label class="form-label small mb-1">Importo</label>
                 <input type="text" name="amount" class="form-control" inputmode="decimal" required placeholder="500,00">
             </div>
             <div class="col-5">
@@ -110,7 +110,7 @@ export const render = ({ csrfToken, accounts }) => {
                             </select>
                         </div>
                         <div class="col-7">
-                            <label class="form-label small mb-1">Importo (EUR)</label>
+                            <label class="form-label small mb-1">Importo</label>
                             <input type="text" name="amount" class="form-control" inputmode="decimal" required>
                         </div>
                         <div class="col-5">

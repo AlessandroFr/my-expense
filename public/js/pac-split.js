@@ -7,12 +7,9 @@
 // si raccolgono le quote, si passano a chi ha chiamato.
 
 import { escapeAttr, escapeHtml } from './componentBase.js';
+import { fmtMoney } from './format.js';
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
 
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const el = (id) => document.getElementById(id);
 

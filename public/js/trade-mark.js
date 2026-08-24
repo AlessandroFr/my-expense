@@ -6,11 +6,8 @@
 // si passa a chi ha chiamato. Cosi' la stessa finestra puo' servire l'elenco
 // spese e, un domani, l'anteprima dell'import.
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
 
-const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
+import { fmtMoney } from './format.js';
 const num = (v) => Number(String(v ?? '').replace(',', '.')) || 0;
 const el = (id) => document.getElementById(id);
 

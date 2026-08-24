@@ -5,13 +5,40 @@
 // avesse un'opzione diversa perche' lo stesso importo comparisse in due modi.
 // Le date restano in gg/mm/aaaa, che e' come si leggono qui.
 
-const moneyFmt = new Intl.NumberFormat('it-IT', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
-});
 const dateFmt = new Intl.DateTimeFormat('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-/** Un importo con il simbolo dell'euro. Quel che non e' un numero vale zero. */
-export const fmtMoney = (n) => moneyFmt.format(Number(n) || 0);
+/**
+ * La valuta principale, quella in cui si leggono i totali generali. La mette il
+ * server nel body di ogni pagina: qui non si sa niente del database.
+ */
+export const valutaPrincipale = () => document.body.dataset.baseCurrency || 'EUR';
+
+// Costruire un Intl.NumberFormat non e' gratis, e queste funzioni girano una
+// volta per riga di tabella: uno per valuta, tenuto da parte.
+const formattatori = new Map();
+const formattatore = (currency) => {
+    const codice = String(currency || valutaPrincipale()).toUpperCase();
+    if (!formattatori.has(codice)) {
+        let fmt;
+        try {
+            fmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: codice, minimumFractionDigits: 2 });
+        } catch {
+            // Una sigla che Intl non conosce non deve far sparire l'importo:
+            // si mostra il numero con la sigla accanto.
+            fmt = {
+                format: (n) => `${n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${codice}`,
+            };
+        }
+        formattatori.set(codice, fmt);
+    }
+    return formattatori.get(codice);
+};
+
+/**
+ * Un importo nella sua valuta. Senza valuta vale quella principale.
+ * Quel che non e' un numero vale zero.
+ */
+export const fmtMoney = (n, currency) => formattatore(currency).format(Number(n) || 0);
 
 /** Un numero con al massimo `dec` decimali (le quote di un fondo ne vogliono sei). */
 export const fmtNum = (n, dec = 4) => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: dec });

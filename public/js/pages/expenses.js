@@ -9,7 +9,7 @@ import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimis
 import { renderPager }       from '../pager.js';
 import { openPacSplit, wirePacSplitModal } from '../pac-split.js';
 import { openTradeMark, wireTradeModal } from '../trade-mark.js';
-import { fmtDate, fmtMoney, getCsrfToken } from '../format.js';
+import { fmtDate, fmtMoney, getCsrfToken, valutaPrincipale } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -122,9 +122,19 @@ function rowDataFromExpense(e) {
     };
 }
 
+/**
+ * Il controvalore, mostrato solo quando dice qualcosa in piu': una spesa in
+ * franchi vale anche tanti euro, e nei totali entra con quelli.
+ */
+function controvalore(e) {
+    if (!e.amount_base || !e.account_currency) return '';
+    if (e.account_currency === valutaPrincipale()) return '';
+    return `<div class="small text-muted fw-normal">${escHtml(fmtMoney(e.amount_base))}</div>`;
+}
+
 function shareBadge(e) {
     if (!e.shared_with && !e.share_amount) return '';
-    const yours = e.share_amount ? fmtMoney(e.share_amount) : '';
+    const yours = e.share_amount ? fmtMoney(e.share_amount, e.account_currency) : '';
     const tip   = e.shared_with ? `Diviso con: ${e.shared_with}` : 'Spesa condivisa';
     return `<span class="badge bg-info-subtle text-info-emphasis ms-1" title="${escapeAttr(tip)}">
         <i class="bi bi-people me-1"></i>${yours || 'split'}</span>`;
@@ -259,7 +269,7 @@ function renderViewRow(e) {
         <td class="mx-cell-truncate">${descCell}</td>
         <td class="text-center">${tagBadge}</td>
         <td class="text-center"><i class="bi ${paymentIcon(e.payment_method)}" title="${escapeAttr(payLabel)}"></i></td>
-        <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount))}${shareBadge(e)}${installmentBadge(e)}</td>
+        <td class="text-end fw-semibold text-nowrap">${escHtml(fmtMoney(e.amount, e.account_currency))}${controvalore(e)}${shareBadge(e)}${installmentBadge(e)}</td>
         <td class="text-end mx-row-actions">
             <div class="dropdown">
                 <button type="button" class="btn btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Azioni">
@@ -301,8 +311,8 @@ function renderDetailRow(e) {
     `;
 
     if (e.share_amount || e.shared_with) {
-        const yours = e.share_amount ? fmtMoney(e.share_amount) : '';
-        const total = fmtMoney(e.amount);
+        const yours = e.share_amount ? fmtMoney(e.share_amount, e.account_currency) : '';
+        const total = fmtMoney(e.amount, e.account_currency);
         const shared = e.shared_with ? ` · con ${escHtml(e.shared_with)}` : '';
         parts += `<dt>Quota</dt><dd>${yours ? `${yours} di ${total}` : total}${shared}</dd>`;
     }
@@ -409,7 +419,9 @@ function updateTotalFromTable(serverTotal = null) {
     let pageTotal = 0;
     rows.forEach(r => {
         const e = JSON.parse(r.dataset.expense || '{}');
-        pageTotal += Number(e.amount) || 0;
+        // Il controvalore, non l'importo: sommare franchi ed euro darebbe un
+        // numero che non significa niente.
+        pageTotal += Number(e.amount_base ?? e.amount) || 0;
     });
     document.getElementById('expenses-total').textContent = fmtMoney(pageTotal);
     const cnt = serverTotal != null ? serverTotal : rows.length;

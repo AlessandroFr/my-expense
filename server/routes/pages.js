@@ -9,11 +9,13 @@ import { HttpError, int, str } from '../http.js';
 import { page } from '../view.js';
 import { GENERIC_COLUMNS } from '../bank-profiles.js';
 import { copiaInChiaro } from '../lock.js';
+import { PERNO, valutaPrincipale } from '../fx.js';
 import { listForUser as profiliBanca } from './bank-profiles.js';
 
 import * as accountsPage from '../pages/accounts.js';
 import * as bankProfilesPage from '../pages/bank-profiles.js';
 import * as budgetsPage from '../pages/budgets.js';
+import * as cambiPage from '../pages/cambi.js';
 import * as categoriesPage from '../pages/categories.js';
 import * as categoriesEditPage from '../pages/categories-edit.js';
 import * as contactsPage from '../pages/contacts.js';
@@ -44,7 +46,7 @@ const categoriesForUser = (userId) => all(
 );
 
 const activeAccounts = (userId) => all(
-  `SELECT id, name, type, color, icon, opening_balance, iban, bic, bank_name,
+  `SELECT id, name, type, color, icon, opening_balance, currency, iban, bic, bank_name,
           account_holder, account_number, notes, archived, is_default_cash,
           sort_order, created_at, updated_at
    FROM accounts WHERE user_id = ? AND archived = 0 ORDER BY sort_order ASC, name ASC`, userId,
@@ -84,8 +86,11 @@ const pageHandler = (title, pageModule, dati = () => ({})) => async (req, res) =
   const { pathname } = new URL(req.url, 'http://localhost');
   const csrfToken = req.csrfToken;
 
-  const content = pageModule.render({ csrfToken, ...dati(userId, req) });
-  sendHtml(res, page({ title, path: pathname, username: username(), csrfToken, content }), csrfToken);
+  const baseCurrency = valutaPrincipale(userId);
+  const content = pageModule.render({ csrfToken, baseCurrency, ...dati(userId, req) });
+  sendHtml(res, page({
+    title, path: pathname, username: username(), baseCurrency, csrfToken, content,
+  }), csrfToken);
 };
 
 const dashboard = pageHandler('Dashboard', dashboardPage, () => ({ username: username() }));
@@ -197,6 +202,11 @@ export const pageRoutes = {
 
   'GET /reports': pageHandler('Report annuale', reportsPage, () => ({
     thisYear: new Date().getFullYear(),
+  })),
+
+  'GET /cambi': pageHandler('Cambi', cambiPage, (userId) => ({
+    perno: PERNO,
+    today: today(),
   })),
 
   'GET /settings': pageHandler('Impostazioni', settingsPage, () => ({

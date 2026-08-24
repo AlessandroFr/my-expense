@@ -35,7 +35,7 @@ export const render = ({ csrfToken, contacts, today }) => `
                 <select name="category_id" class="form-select"></select>
             </div>
             <div class="col-6">
-                <label class="form-label small mb-1">Importo (EUR)</label>
+                <label class="form-label small mb-1">Importo</label>
                 <input type="text" name="amount" class="form-control" inputmode="decimal" required>
             </div>
             <div class="col-6">

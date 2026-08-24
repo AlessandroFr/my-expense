@@ -13,6 +13,7 @@ const PAGES = [
   ['/expenses', '#expenses-tbody tr'],
   ['/incomes', 'table'],
   ['/accounts', '.card'],
+  ['/cambi', '.alert, .card'],
   ['/categories', '.card'],
   ['/budgets', '#budget-list'],
   ['/recurring', 'table'],

@@ -17,12 +17,13 @@ const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 
 const SELECT_COLUMNS = `
   e.id, e.user_id, e.category_id, e.contact_id, e.account_id, e.amount, e.description,
-  e.shared_with, e.share_amount,
+  e.shared_with, e.share_amount, e.amount_base, e.share_amount_base,
   e.payment_method, e.expense_date, e.value_date, e.import_hash,
   e.parent_expense_id, e.installment_seq, e.installment_total,
   e.created_at, e.updated_at,
   c.name AS category_name, c.color AS category_color, c.icon AS category_icon,
   a.name AS account_name,  a.color AS account_color,  a.icon AS account_icon,
+  a.currency AS account_currency,
   co.name AS contact_name, co.color AS contact_color, co.type AS contact_type`;
 
 const JOINS = `
@@ -43,6 +44,13 @@ function toPublic(row, tags = []) {
     description: row.description ?? null,
     shared_with: row.shared_with ?? null,
     share_amount: row.share_amount === null || row.share_amount === undefined ? null : money(row.share_amount),
+    // `amount` e' nella valuta del conto; `amount_base` il suo controvalore
+    // nella valuta principale, congelato alla data della spesa. Vuoto quando
+    // sono la stessa cosa — cioe' quasi sempre.
+    amount_base: row.amount_base === null || row.amount_base === undefined ? null : money(row.amount_base),
+    share_amount_base: row.share_amount_base === null || row.share_amount_base === undefined
+      ? null : money(row.share_amount_base),
+    account_currency: row.account_currency ?? null,
     payment_method: row.payment_method,
     expense_date: row.expense_date,
     value_date: row.value_date ?? null,

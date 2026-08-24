@@ -7,7 +7,7 @@ import { apiSend, confirmDialog } from '../componentBase.js';
 import { toast }     from '../toast.js';
 import { optimisticDelete } from '../optimistic.js';
 import { renderPager } from '../pager.js';
-import { getCsrfToken } from '../format.js';
+import { fmtMoney, getCsrfToken } from '../format.js';
 
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
@@ -41,9 +41,7 @@ function escHtml(s) {
     d.textContent = s ?? '';
     return d.innerHTML;
 }
-function fmtAmount(v) {
-    return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(v) || 0);
-}
+const fmtAmount = (v) => fmtMoney(v);
 function debounce(fn, ms) {
     let t = null;
     return (...args) => {

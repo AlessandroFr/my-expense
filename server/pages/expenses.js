@@ -7,7 +7,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
     </div>
     <div class="col-md-6 text-md-end">
         <span class="text-muted small">Totale filtrato: </span>
-        <span id="expenses-total" class="fw-semibold fs-5">EUR 0,00</span>
+        <span id="expenses-total" class="fw-semibold fs-5">—</span>
         <span class="text-muted small ms-2" id="expenses-count">(0 voci)</span>
     </div>
 </div>
@@ -188,7 +188,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                         <input type="date" name="expense_date" class="form-control" required value="${esc(today)}">
                     </div>
                     <div class="col-6">
-                        <label class="form-label small">Importo €</label>
+                        <label class="form-label small">Importo</label>
                         <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required placeholder="0,00">
                     </div>
                     <div class="col-12">
@@ -233,7 +233,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                         <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
                     </div>
                     <div class="col-5">
-                        <label class="form-label small">Tua quota €</label>
+                        <label class="form-label small">Tua quota</label>
                         <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
                     </div>
                     <div class="col-12">
@@ -314,11 +314,11 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                             `)}                        </select>
                     </div>
                     <div class="col-6">
-                        <label class="form-label small">Min €</label>
+                        <label class="form-label small">Min</label>
                         <input type="number" step="0.01" min="0" name="amount_min" class="form-control form-control-sm">
                     </div>
                     <div class="col-6">
-                        <label class="form-label small">Max €</label>
+                        <label class="form-label small">Max</label>
                         <input type="number" step="0.01" min="0" name="amount_max" class="form-control form-control-sm">
                     </div>
                     <div class="col-12">
@@ -556,7 +556,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                             <input type="date" name="expense_date" class="form-control" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small">Importo €</label>
+                            <label class="form-label small">Importo</label>
                             <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
                         </div>
                         <div class="col-md-4">
@@ -592,7 +592,7 @@ export const render = ({ csrfToken, categories, accounts, bankProfiles, contacts
                             <input type="text" name="shared_with" class="form-control" maxlength="255" placeholder="Marco, Luca">
                         </div>
                         <div class="col-md-5">
-                            <label class="form-label small">Tua quota €</label>
+                            <label class="form-label small">Tua quota</label>
                             <input type="number" step="0.01" min="0.01" name="share_amount" class="form-control" placeholder="0,00">
                         </div>
                     </div>

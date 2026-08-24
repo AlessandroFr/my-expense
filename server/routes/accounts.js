@@ -11,7 +11,7 @@ import { holdingsForUser } from './securities.js';
 const TYPES = ['checking', 'card', 'cash', 'savings', 'investment', 'deposit', 'pac', 'other'];
 const DETAIL_FIELDS = ['iban', 'bic', 'bank_name', 'account_holder', 'account_number', 'notes'];
 
-const LIST_COLUMNS = `id, name, type, color, icon, opening_balance,
+const LIST_COLUMNS = `id, name, type, color, icon, opening_balance, currency,
                       iban, bic, bank_name, account_holder, account_number, notes,
                       archived, is_default_cash, bank_profile_id, sort_order, created_at, updated_at`;
 
@@ -23,7 +23,7 @@ export const allForUser = (userId, includeArchived = false) => all(
 );
 
 const findForUser = (id, userId) => one(
-  `SELECT id, user_id, name, type, color, icon, opening_balance,
+  `SELECT id, user_id, name, type, color, icon, opening_balance, currency,
           iban, bic, bank_name, account_holder, account_number, notes,
           archived, is_default_cash, bank_profile_id, sort_order
    FROM accounts WHERE id = ? AND user_id = ? LIMIT 1`,
@@ -163,11 +163,20 @@ function validate(data) {
     throw HttpError.badRequest('Profilo banca non trovato.');
   }
 
+  // La valuta del conto: da qui in poi ogni movimento su questo conto e' in
+  // questa valuta, e il suo controvalore viene ricalcolato se la si cambia
+  // (trigger `tr_accounts_valuta_cambiata`).
+  const currency = str(data.currency).toUpperCase() || 'EUR';
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw HttpError.badRequest('La valuta e\' una sigla di tre lettere, per esempio EUR.');
+  }
+
   return {
     name,
     type,
     color,
     icon,
+    currency,
     opening_balance: value.toFixed(2),
     sort_order: int(data.sort_order, 0),
     is_default_cash: isDefaultCash,
@@ -237,11 +246,11 @@ async function create(req, res) {
     try {
       const result = run(
         `INSERT INTO accounts
-           (user_id, name, type, color, icon, opening_balance, sort_order,
+           (user_id, name, type, color, icon, opening_balance, currency, sort_order,
             iban, bic, bank_name, account_holder, account_number, notes, is_default_cash,
             bank_profile_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        userId, row.name, row.type, row.color, row.icon, row.opening_balance, row.sort_order,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        userId, row.name, row.type, row.color, row.icon, row.opening_balance, row.currency, row.sort_order,
         details.iban, details.bic, details.bank_name,
         details.account_holder, details.account_number, details.notes,
         row.is_default_cash ? 1 : 0, row.bank_profile_id,
@@ -273,11 +282,11 @@ async function update(req, res) {
     try {
       run(
         `UPDATE accounts
-         SET name = ?, type = ?, color = ?, icon = ?, opening_balance = ?, sort_order = ?,
+         SET name = ?, type = ?, color = ?, icon = ?, opening_balance = ?, currency = ?, sort_order = ?,
              archived = ?, iban = ?, bic = ?, bank_name = ?, account_holder = ?,
              account_number = ?, notes = ?, is_default_cash = ?, bank_profile_id = ?
          WHERE id = ? AND user_id = ?`,
-        row.name, row.type, row.color, row.icon, row.opening_balance, row.sort_order,
+        row.name, row.type, row.color, row.icon, row.opening_balance, row.currency, row.sort_order,
         archived ? 1 : 0, details.iban, details.bic, details.bank_name,
         details.account_holder, details.account_number, details.notes,
         row.is_default_cash ? 1 : 0, row.bank_profile_id, id, userId,

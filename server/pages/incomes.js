@@ -33,7 +33,7 @@ export const render = ({ csrfToken, accounts, contacts, today }) => `
                         <input type="date" name="income_date" class="form-control" value="${esc(today)}" required>
                     </div>
                     <div class="col-6">
-                        <label class="form-label small mb-1">Importo (EUR)</label>
+                        <label class="form-label small mb-1">Importo</label>
                         <input type="text" name="amount" class="form-control" inputmode="decimal" required>
                     </div>
                     <div class="col-12">
@@ -138,7 +138,7 @@ export const render = ({ csrfToken, accounts, contacts, today }) => `
             <tfoot>
                 <tr class="table-light">
                     <th colspan="5" class="text-end">Totale visibile</th>
-                    <th class="text-end" id="income-total">EUR -</th>
+                    <th class="text-end" id="income-total">—</th>
                     <th></th>
                 </tr>
             </tfoot>
@@ -165,7 +165,7 @@ export const render = ({ csrfToken, accounts, contacts, today }) => `
                             <input type="date" name="income_date" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small">Importo (EUR)</label>
+                            <label class="form-label small">Importo</label>
                             <input type="text" name="amount" class="form-control" inputmode="decimal" required>
                         </div>
                         <div class="col-md-6">

@@ -9,6 +9,9 @@ import { stagger, withViewTransition, animateEnter, flip } from '../transitions.
 import { optimisticCreate, optimisticDelete, optimisticUpdate } from '../optimistic.js';
 import { fmtMoney } from '../format.js';
 
+/** La valuta del conto di cui si sta guardando la riconciliazione. */
+const valutaRiconciliazione = () => reconcileCurrentAccount?.currency;
+
 const api  = FetchRequest.getInstance();
 const send = apiSend(api);
 const BASE = document.body.dataset.baseUrl ?? '';
@@ -51,8 +54,8 @@ function renderCard(a) {
         const cls = g > 0 ? 'text-success' : (g < 0 ? 'text-danger' : 'text-muted');
         marketRow = `<div class="mt-2 pt-2 border-top">
             <div class="small text-muted">Valore delle quote</div>
-            <div class="h5 mb-0">${fmtMoney(a.market_value)}
-                <span class="small ${cls}">${g > 0 ? '+' : ''}${fmtMoney(g)}</span>
+            <div class="h5 mb-0">${fmtMoney(a.market_value, a.currency)}
+                <span class="small ${cls}">${g > 0 ? '+' : ''}${fmtMoney(g, a.currency)}</span>
             </div>
         </div>`;
     }
@@ -66,11 +69,11 @@ function renderCard(a) {
                     <strong class="flex-grow-1">${escapeHtml(a.name)}${archivedBadge}</strong>
                 </div>
                 <div class="text-muted small">${TYPE_LABELS[a.type] ?? escapeHtml(a.type)}</div>
-                <div class="display-6 fw-semibold mt-2 ${balCls}">${fmtMoney(a.balance)}</div>
+                <div class="display-6 fw-semibold mt-2 ${balCls}">${fmtMoney(a.balance, a.currency)}</div>
                 <div class="small text-muted mt-1">
-                    Iniziale ${fmtMoney(a.opening_balance)} ·
-                    Entrate ${fmtMoney(a.incomes_total)} ·
-                    Spese ${fmtMoney(a.expenses_total)}
+                    Iniziale ${fmtMoney(a.opening_balance, a.currency)} ·
+                    Entrate ${fmtMoney(a.incomes_total, a.currency)} ·
+                    Spese ${fmtMoney(a.expenses_total, a.currency)}
                 </div>
                 ${bankRow}
                 ${marketRow}
@@ -162,6 +165,7 @@ function openEditModal(a) {
     editForm.elements['color'].value           = a.color ?? '#0d6efd';
     editForm.elements['icon'].value            = a.icon ?? '';
     editForm.elements['opening_balance'].value = a.opening_balance ?? '0';
+    editForm.elements['currency'].value = a.currency ?? 'EUR';
     editForm.elements['sort_order'].value      = a.sort_order ?? 0;
     editForm.elements['archived'].value        = Number(a.archived) === 1 ? '1' : '0';
     if (editForm.elements['is_default_cash']) {
@@ -211,7 +215,7 @@ list.addEventListener('click', async (ev) => {
         try {
             await send(`${BASE}/accounts/update`, {
                 id, name: a.name, type: a.type, color: a.color, icon: a.icon ?? '',
-                opening_balance: a.opening_balance, sort_order: a.sort_order,
+                opening_balance: a.opening_balance, currency: a.currency, sort_order: a.sort_order,
                 archived: Number(a.archived) === 1 ? 0 : 1,
                 is_default_cash: Number(a.is_default_cash) === 1 ? 1 : 0,
                 // Anche i campi che non c'entrano con l'archiviazione: questa
@@ -306,11 +310,11 @@ function updateReconcilePreview() {
     } else if (diff > 0) {
         reconcilePreview.className = 'alert alert-success small mb-0 py-2';
         reconcilePreview.innerHTML = `<i class="bi bi-arrow-up-circle me-1"></i>`
-            + `Differenza: <strong>+${fmtMoney(diff)}</strong> → verrà creata un'<strong>entrata di rettifica</strong>.`;
+            + `Differenza: <strong>+${fmtMoney(diff, reconcileCurrentAccount?.currency)}</strong> → verrà creata un'<strong>entrata di rettifica</strong>.`;
     } else {
         reconcilePreview.className = 'alert alert-warning small mb-0 py-2';
         reconcilePreview.innerHTML = `<i class="bi bi-arrow-down-circle me-1"></i>`
-            + `Differenza: <strong>${fmtMoney(diff)}</strong> → verrà creata una <strong>spesa di rettifica</strong>.`;
+            + `Differenza: <strong>${fmtMoney(diff, reconcileCurrentAccount?.currency)}</strong> → verrà creata una <strong>spesa di rettifica</strong>.`;
     }
 }
 
@@ -318,7 +322,7 @@ function openReconcileModal(a) {
     if (!reconcileModal || !reconcileForm) return;
     reconcileCurrentAccount = a;
     reconcileNameEl.textContent = a.name ? `· ${a.name}` : '';
-    reconcileCalcEl.value = fmtMoney(a.balance);
+    reconcileCalcEl.value = fmtMoney(a.balance, a.currency);
     reconcileForm.elements['account_id'].value = a.id;
     reconcileForm.elements['declared_balance'].value = '';
     reconcileForm.elements['reconciled_at'].value = todayIso();
@@ -394,9 +398,9 @@ function renderHistoryRow(r) {
     return `
         <tr>
             <td>${formatDateIt(r.reconciled_at)}${noteLine}</td>
-            <td class="text-end">${fmtMoney(r.declared_balance)}</td>
-            <td class="text-end">${fmtMoney(r.calculated_balance)}</td>
-            <td class="text-end ${diffCls}"><strong>${diffSign}${fmtMoney(diff)}</strong></td>
+            <td class="text-end">${fmtMoney(r.declared_balance, valutaRiconciliazione())}</td>
+            <td class="text-end">${fmtMoney(r.calculated_balance, valutaRiconciliazione())}</td>
+            <td class="text-end ${diffCls}"><strong>${diffSign}${fmtMoney(diff, valutaRiconciliazione())}</strong></td>
             <td>${badge}</td>
             <td class="text-end">
                 <button type="button" class="btn btn-sm btn-outline-danger"
@@ -427,13 +431,13 @@ if (reconcileForm) {
         try {
             const r = await send(`${BASE}/accounts/reconcile`, Object.fromEntries(fd.entries()));
             const newBal = Number(r.data?.new_balance);
-            toast.success(`Conto riconciliato (saldo allineato a ${fmtMoney(newBal)}).`);
+            toast.success(`Conto riconciliato (saldo allineato a ${fmtMoney(newBal, reconcileCurrentAccount?.currency)}).`);
             const accountId = Number(reconcileForm.elements['account_id'].value);
             await loadList();
             const fresh = cache.find(x => Number(x.id) === accountId);
             if (fresh) {
                 reconcileCurrentAccount = fresh;
-                reconcileCalcEl.value = fmtMoney(fresh.balance);
+                reconcileCalcEl.value = fmtMoney(fresh.balance, fresh.currency);
             }
             reconcileForm.elements['declared_balance'].value = '';
             updateReconcilePreview();

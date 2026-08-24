@@ -7,7 +7,7 @@ import { asset, csrfField, each, esc } from '../view.js';
 const profileOptions = (profiles) => `<option value="">Riconoscimento automatico</option>${
   each(profiles, (p) => `<option value="${p.id}">${esc(p.name)}</option>`)}`;
 
-export const render = ({ csrfToken, bankProfiles = [] }) => `
+export const render = ({ csrfToken, bankProfiles = [], baseCurrency = 'EUR' }) => `
 <div class="row mb-3">
     <div class="col-12">
         <h1 class="h3 mb-0"><i class="bi bi-bank me-2"></i>Conti</h1>
@@ -38,9 +38,15 @@ export const render = ({ csrfToken, bankProfiles = [] }) => `
                     <option value="other">Altro</option>
                 </select>
             </div>
-            <div class="col-12">
-                <label class="form-label small mb-1">Saldo iniziale (EUR)</label>
+            <div class="col-8">
+                <label class="form-label small mb-1">Saldo iniziale</label>
                 <input type="text" name="opening_balance" class="form-control" inputmode="decimal" value="0">
+            </div>
+            <div class="col-4">
+                <label class="form-label small mb-1">Valuta</label>
+                <input type="text" name="currency" class="form-control text-uppercase" maxlength="3"
+                       value="${esc(baseCurrency)}" required>
+                <div class="form-text">I totali generali la convertono in ${esc(baseCurrency)}.</div>
             </div>
             <div class="col-12" data-cash-only style="display:none">
                 <div class="form-check">
@@ -149,6 +155,11 @@ export const render = ({ csrfToken, bankProfiles = [] }) => `
                         <label class="form-label small mb-1">Saldo iniziale</label>
                         <input type="text" name="opening_balance" class="form-control" inputmode="decimal">
                     </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Valuta</label>
+                        <input type="text" name="currency" class="form-control text-uppercase" maxlength="3" required>
+                        <div class="form-text">Cambiarla rifa' i controvalori.</div>
+                    </div>
                     <div class="col-md-1">
                         <label class="form-label small mb-1">Col.</label>
                         <input type="color" name="color" class="form-control form-control-color">
@@ -230,7 +241,7 @@ export const render = ({ csrfToken, bankProfiles = [] }) => `
                     <input type="text" id="reconcile-calculated" class="form-control" readonly>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small mb-1">Saldo reale dichiarato (EUR)</label>
+                    <label class="form-label small mb-1">Saldo reale dichiarato</label>
                     <input type="text" name="declared_balance" class="form-control"
                            inputmode="decimal" required placeholder="Es: 1234,56">
                 </div>
