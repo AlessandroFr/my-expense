@@ -1,6 +1,6 @@
 {
   "name": "my-expense",
-  "version": "1.8.1",
+  "version": "2.0.0",
   "private": true,
   "productName": "My Expense",
   "type": "module",
@@ -55,9 +55,16 @@
       "createStartMenuShortcut": true,
       "shortcutName": "My Expense",
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "AlessandroFr",
+      "repo": "my-expense"
+    },
+    "npmRebuild": false
   },
   "dependencies": {
-    "better-sqlite3-multiple-ciphers": "^13.0.3"
+    "better-sqlite3-multiple-ciphers": "^13.0.3",
+    "electron-updater": "^6.8.9"
   }
 }

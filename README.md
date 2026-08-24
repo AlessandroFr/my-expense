@@ -1,16 +1,31 @@
 # My Expense
 
 Tracker di spese personali. Gira sul tuo computer, i dati restano sul tuo
-computer: un solo file di database, niente account, niente nuvola.
+computer: un solo file di database cifrato, niente account, niente nuvola.
 
 ## Installare
 
-Apri `MyExpense-Setup-1.0.0.exe` e segui l'installazione. Poi doppio click
-sull'icona, sul desktop o nel menu avvio.
+Scarica l'ultimo `MyExpense-Setup-*.exe` dalla
+[pagina delle versioni](https://github.com/AlessandroFr/my-expense/releases) e
+aprilo. Windows dirà che non si fida — il programma non è firmato: clicca
+«Ulteriori informazioni» e poi «Esegui comunque».
+
+Le istruzioni per esteso, scritte per chi di computer non se ne intende, sono in
+[INSTALLAZIONE.md](INSTALLAZIONE.md).
 
 Non serve nient'altro: né PHP, né Node, né XAMPP. È tutto dentro il pacchetto,
-e funziona anche senza connessione a Internet. L'unica cosa che la richiede è
-la lettura automatica dell'importo dalla foto di uno scontrino.
+e funziona anche senza connessione a Internet. Le uniche due cose che la
+richiedono sono la lettura dell'importo dalla foto di uno scontrino e lo scarico
+dei cambi e delle quotazioni.
+
+## La password
+
+Al primo avvio l'app chiede di crearne una, e con quella il database viene
+conservato **cifrato**: chi copia il file dei tuoi conti non ci legge niente.
+
+Ti mostra anche una **chiave di recupero** di ventiquattro caratteri, una volta
+sola: va scritta su un foglio e messa insieme ai documenti. Senza password e
+senza chiave di recupero i dati non si aprono più — non c'è nessun altro modo.
 
 ## Dove finiscono i dati
 
@@ -20,8 +35,8 @@ e non spariscono se disinstalli.
 
 Per copiartelo via: chiudi l'app e copia la cartella `data` dove preferisci.
 
-Dall'app puoi anche scaricare un archivio ZIP che contiene i dati **e** gli
-allegati: icona con la nuvola, in alto a destra.
+Dall'app puoi anche scaricare un backup che contiene i dati **e** gli allegati:
+Impostazioni → Backup. Esce cifrato con la tua password.
 
 ## Cosa sa fare
 
@@ -31,6 +46,8 @@ allegati: icona con la nuvola, in alto a destra.
 - Budget mensili per categoria, con avviso quando ti avvicini al tetto
 - Spese ricorrenti, generate da sole
 - Più conti, con saldo aggiornato e riconciliazione
+- Più valute: una per conto, con i totali generali convertiti in quella
+  principale al cambio del giorno di ogni movimento
 - Trasferimenti tra conti
 - Rubrica di fornitori e clienti
 - Investimenti e piani di accumulo
@@ -52,3 +69,7 @@ npm run dist    # crea l'installer in dist\
 
 Con `npm run app` e `npm start` i dati stanno nella cartella del progetto,
 non in `%APPDATA%`, così le prove non toccano i dati veri.
+
+Per pubblicare una versione: alza `version` in `package.json`, poi
+`npm run dist -- --publish always` con un `GH_TOKEN` nell'ambiente. Da lì l'app
+se ne accorge da sola al primo avvio successivo, la scarica e si aggiorna.

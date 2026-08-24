@@ -16,6 +16,20 @@ const SECTIONS = [
     "group": "Inizia"
   },
   {
+    "id": "password",
+    "icon": "bi-shield-lock",
+    "title": "Password e chiave di recupero",
+    "app": "/settings",
+    "group": "Inizia"
+  },
+  {
+    "id": "valute",
+    "icon": "bi-currency-exchange",
+    "title": "Più valute",
+    "app": "/cambi",
+    "group": "Inizia"
+  },
+  {
     "id": "dashboard",
     "icon": "bi-speedometer2",
     "title": "Dashboard",
@@ -418,13 +432,47 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── PRIMI PASSI ─ -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(section('primi-passi'))}    <p class="wiki-section-lead">Non c'&egrave; nessuna registrazione e nessuna password: l'app &egrave; tua e gira sul tuo computer. Si apre e si comincia.</p>
+    ${heading(section('primi-passi'))}    <p class="wiki-section-lead">Al primo avvio l'app ti guida: scegli una password, metti al sicuro la chiave di recupero, dici come ti chiami e crei il primo conto. Dopo, si comincia.</p>
     <ol>
-        <li><strong>Crea almeno un conto.</strong> Vai in <a href="#conti">Conti multipli</a> e aggiungi il tuo conto principale (corrente, contanti, carta&hellip;). Ogni movimento sta su un conto.</li>
-        <li><strong>Sistema le categorie.</strong> Ne trovi gi&agrave; un po'; nomi, colori e icone si cambiano in <a href="#categorie">Categorie</a>.</li>
-        <li><strong>Comincia a registrare.</strong> Da <a href="#spese">Spese</a> per la prima a mano, oppure carica il file della banca da <a href="#import-bancario">Import estratto conto</a> e in un colpo ci sono tutti.</li>
+        <li><strong>La password.</strong> Apre l'app, e con quella i tuoi dati vengono conservati cifrati: senza, il file dei tuoi conti non si legge nemmeno copiandolo altrove. Una frase intera &egrave; meglio di una parola corta e complicata.</li>
+        <li><strong>La chiave di recupero.</strong> L'app te la mostra <strong>una volta sola</strong>. Scrivila su un foglio e mettila insieme ai documenti, non nello stesso computer: se dimentichi la password &egrave; l'unico modo per riaprire i tuoi dati. Vedi <a href="#password">Password e chiave di recupero</a>.</li>
+        <li><strong>Il primo conto.</strong> &Egrave; dove stanno i soldi: il conto in banca, il portafoglio, una carta. Gli altri li aggiungi quando vuoi da <a href="#conti">Conti multipli</a>, e ognuno pu&ograve; avere la sua <a href="#valute">valuta</a>.</li>
+        <li><strong>Comincia a registrare.</strong> Da <a href="#spese">Spese</a> per la prima a mano, oppure carica il file della banca da <a href="#import-bancario">Import estratto conto</a> e in un colpo ci sono tutti. Le categorie di partenza ci sono gi&agrave;: nomi, colori e icone si cambiano in <a href="#categorie">Categorie</a>.</li>
     </ol>
     <div class="wiki-tip"><i class="bi bi-shield-check"></i><div>Per ricominciare da zero c'&egrave; il <a href="#reset-db">Reset database</a>. Prima, per&ograve;, scarica un <a href="#backup-restore">backup</a>.</div></div>
+</section>
+
+<!-- ──────────────────────────────────────────────────────────── PASSWORD ──── -->
+<section class="wiki-section" data-wiki-section>
+    ${heading(section('password'))}    <p class="wiki-section-lead">I tuoi dati sono conservati <strong>cifrati</strong>: il file dei conti, senza la password, non si legge nemmeno copiandolo su un altro computer.</p>
+
+    <p><strong>La password</strong> si scrive a ogni avvio dell'app. Si cambia da Impostazioni &rarr; Sicurezza, e serve quella vecchia per farlo.</p>
+
+    <p><strong>La chiave di recupero</strong> sono ventiquattro lettere e numeri, mostrati una volta sola quando crei la password. Aprono i tuoi dati esattamente come la password, e continuano a funzionare anche dopo che l'hai cambiata. Puoi scriverla con o senza trattini, in maiuscolo o in minuscolo.</p>
+
+    <div class="wiki-tip"><i class="bi bi-exclamation-triangle"></i><div>Senza password e senza chiave di recupero <strong>i tuoi dati non si aprono pi&ugrave;</strong>. Non &egrave; una formalit&agrave;: non esiste nessun altro modo, e non c'&egrave; nessuno a cui chiederla. Tienila su carta, insieme ai documenti.</div></div>
+
+    <p>Se temi che qualcun altro l'abbia vista, da Impostazioni &rarr; Sicurezza puoi generarne una nuova: quella di prima smette di funzionare all'istante.</p>
+
+    <p>Anche <a href="#backup-restore">il backup</a> esce cifrato, con la password che hai <em>nel momento in cui lo scarichi</em>. Se un giorno la cambi, i backup fatti prima continueranno a volere quella vecchia.</p>
+</section>
+
+<!-- ──────────────────────────────────────────────────────────── VALUTE ────── -->
+<section class="wiki-section" data-wiki-section>
+    ${heading(section('valute'))}    <p class="wiki-section-lead">Ogni conto ha la <strong>sua</strong> valuta. I totali generali li leggi in una sola, quella che hai scelto come principale.</p>
+
+    <p>Un conto in franchi produce spese in franchi, e il suo saldo resta in franchi: cos&igrave; lo puoi confrontare con l'estratto della banca. Quando invece guardi un totale che mette insieme pi&ugrave; conti &mdash; la dashboard, i report, i budget &mdash; ogni movimento viene convertito nella valuta principale.</p>
+
+    <p><strong>La conversione usa il cambio del giorno del movimento</strong>, non quello di oggi. Una spesa del 2025 vale quello che valeva allora, e il report del 2025 non cambia perch&eacute; nel frattempo il cambio si &egrave; mosso.</p>
+
+    <p>I cambi si trovano in <strong>Pianifica &rarr; Cambi</strong>:</p>
+    <ul>
+        <li><strong>Scarica</strong> li prende da Internet, dal giorno del tuo movimento pi&ugrave; vecchio a oggi. Parte solo quando lo chiedi tu.</li>
+        <li><strong>Scrivi un cambio</strong> serve quando conosci quello vero, per esempio quello che ti ha applicato la banca. Un cambio scritto a mano vince sempre su quello scaricato.</li>
+        <li><strong>La valuta principale</strong> si cambia da l&igrave;. Cambiarla rif&agrave; il conto a tutti i movimenti.</li>
+    </ul>
+
+    <div class="wiki-tip"><i class="bi bi-info-circle"></i><div>Se hai tutti i conti in una valuta sola, la pagina Cambi te lo dice e non c'&egrave; niente da impostare. Se invece qualche movimento resta senza cambio, la pagina lo segnala: finch&eacute; manca, nei totali quel movimento conta per il numero della sua valuta, che non &egrave; convertito.</div></div>
 </section>
 
 <!-- ──────────────────────────────────────────────────────────── DASHBOARD ─── -->
@@ -748,18 +796,15 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
 <!-- ──────────────────────────────────────────────────────────── BACKUP ────── -->
 <section class="wiki-section" data-wiki-section>
-    ${heading(section('backup-restore'))}    <p class="wiki-section-lead">Scarica un <strong>backup ZIP completo</strong> dei tuoi dati con un click. Contiene un dump SQL di tutte le tabelle (filtrate sul tuo utente) + la cartella degli allegati.</p>
-    <ul>
-        <li>Bottone <i class="bi bi-cloud-download"></i> <strong>Backup ZIP</strong> nel menu utente, oppure URL diretto <code>/backup/download</code>.</li>
-        <li>Il file scaricato contiene:
-            <ul>
-                <li><code>dump.sql</code> con gli INSERT dei tuoi dati (si rilegge con <code>sqlite3</code>).</li>
-                <li><code>uploads/{user_id}/</code> con tutti gli allegati delle spese.</li>
-            </ul>
-        </li>
-        <li><strong>Restore</strong>: la pagina <code>/settings</code> ha la tab "Ripristina backup". Carica il file e digita la frase di conferma.</li>
-    </ul>
-    <div class="wiki-tip"><i class="bi bi-shield-check"></i><div>Per buona pratica, scarica un backup <strong>prima</strong> di qualsiasi operazione potenzialmente distruttiva (reset DB, restore, import massivo).</div></div>
+    ${heading(section('backup-restore'))}    <p class="wiki-section-lead">Una copia completa dei tuoi dati: tutti i movimenti e tutti gli allegati, in un file solo.</p>
+    <p><strong>Per farlo:</strong> Impostazioni &rarr; Backup. Scrivi la password e premi Scarica. Metti il file su una chiavetta o su un disco esterno &mdash; un backup che sta solo sul computer di cui &egrave; la copia non serve a niente.</p>
+
+    <p>Il file esce <strong>cifrato</strong> (estensione <code>.mxb</code>) con la password che hai in quel momento: un backup leggibile accanto a un database cifrato sarebbe solo il posto pi&ugrave; comodo da cui leggere i tuoi conti.</p>
+
+    <p><strong>Per ripristinarlo:</strong> Impostazioni &rarr; Ripristina backup. Carica il file, digita la frase di conferma e scrivi <em>la password che avevi quando quel backup &egrave; stato fatto</em>, che non &egrave; per forza quella di adesso. Vanno bene anche i vecchi backup <code>.zip</code> e <code>.sql</code> delle versioni precedenti.</p>
+
+    <div class="wiki-warn"><i class="bi bi-exclamation-triangle"></i><div>Il ripristino <strong>sovrascrive</strong>: i dati che hai adesso vengono cancellati e sostituiti da quelli del backup. Non &egrave; una fusione.</div></div>
+    <div class="wiki-tip"><i class="bi bi-shield-check"></i><div>Scarica un backup <strong>prima</strong> di qualsiasi operazione che cancella (reset del database, ripristino, import grosso).</div></div>
 </section>
 
 <!-- ──────────────────────────────────────────────────────────── RESET DB ──── -->
@@ -773,7 +818,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
     </ul>
     <p><strong>Per procedere devi:</strong></p>
     <ol>
-        <li>Scaricare un <a href="#backup-restore">backup ZIP</a> (il bottone resta disabilitato finché non lo fai).</li>
+        <li>Scaricare un <a href="#backup-restore">backup</a> (il bottone resta disabilitato finch&eacute; non lo fai).</li>
         <li>Digitare la frase letterale <code>ELIMINA TUTTO</code> in maiuscolo.</li>
         <li>Reinserire la tua password.</li>
     </ol>

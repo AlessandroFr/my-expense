@@ -13,7 +13,6 @@
 import { app, BrowserWindow, Menu, dialog, shell } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkForUpdates } from './update.js';
 
 /**
  * Dove tenere i dati.
@@ -157,7 +156,14 @@ async function startApplication() {
 
   // Dopo la finestra, non prima: un aggiornamento che non arriva non deve
   // ritardare l'avvio, e se qualcosa va storto l'app e' gia' utilizzabile.
-  checkForUpdates(app, dialog, note)
+  //
+  // Importato **qui dentro** e non in cima: gli import in cima vengono risolti
+  // prima che questo file cominci a essere eseguito, quindi una libreria che
+  // non si carica farebbe morire l'applicazione prima ancora che `note()`
+  // possa scriverlo — cioe' senza finestra, senza errore e senza una riga di
+  // log. E' esattamente quello che e' successo con electron-updater.
+  import('./update.js')
+    .then(({ checkForUpdates }) => checkForUpdates(app, dialog, note))
     .catch((err) => note(`aggiornamenti: ${err?.stack ?? err}`));
 }
 

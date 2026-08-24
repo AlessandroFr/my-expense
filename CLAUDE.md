@@ -4,24 +4,40 @@ Guida per Claude Code (claude.ai/code) su questo repository.
 
 ## Cos'è
 
-`my-expense` è un tracker di spese personali per **una persona sola**, che gira
-in locale sulla sua macchina. Non c'è login: chi ha accesso al computer ha già
-accesso al file dei dati.
+`my-expense` è un tracker di spese personali che gira in locale sulla macchina
+di chi lo usa. Ogni installazione è di una persona sola — c'è una riga sola in
+`users` — ma l'app **si distribuisce**: Alessandro la dà anche ad amici, e da lì
+vengono la password all'avvio, la procedura di benvenuto e gli aggiornamenti
+dalle Release.
+
+**Il database è cifrato** e si apre con una password (`server/vault.js`,
+`server/lock.js`). Non c'è più il «chi ha acceso il computer ha già i dati»: chi
+copia il file non ci legge niente.
 
 Copre: spese ed entrate (con filtri, tag, allegati, quote condivise,
 rateizzazione), budget mensili per categoria, spese ricorrenti, multi-conto con
 saldi e riconciliazioni, trasferimenti fra conti, anagrafiche fornitori/clienti,
 investimenti (strumenti, operazioni, posizioni) e piani di accumulo, report
-annuali, import da CSV e da estratto conto bancario (un profilo per banca), backup ZIP,
-lettura degli scontrini nel browser.
+annuali, import da CSV e da estratto conto bancario (un profilo per banca),
+backup cifrato, lettura degli scontrini nel browser, e più valute — una per
+conto, con i totali in quella principale.
 
 ## Stack
 
-**Node 24 e nient'altro.** Nessuna dipendenza a runtime: il database è
-`node:sqlite`, il server `node:http`, i test `node:test`. Anche le cose che di
-solito richiedono un pacchetto sono scritte qui perché servivano solo in
-piccola parte: il lettore di form multipart, lo scrittore/lettore ZIP, il
-riconoscimento del tipo di un file caricato.
+**Node 24 e due dipendenze.** Il server è `node:http`, i test `node:test`, e le
+cose che di solito richiedono un pacchetto sono scritte qui perché servivano
+solo in piccola parte: il lettore di form multipart, lo scrittore/lettore ZIP,
+il riconoscimento del tipo di un file caricato.
+
+Le due che ci sono hanno un motivo che non si aggira scrivendo codice:
+
+- **`better-sqlite3-multiple-ciphers`** al posto di `node:sqlite`, perché la
+  libreria standard non cifra e non cifrerà. L'API è la stessa
+  (`prepare().all/get/run`, `exec`, `close`), e **non c'è niente da
+  ricompilare**: è un modulo N-API, un binario per piattaforma che vale sia per
+  Node sia per Electron.
+- **`electron-updater`**, perché su un computer che non è questo l'aggiornamento
+  deve arrivare da qualche parte.
 
 Il frontend è invariato dai tempi di PHP: pagine HTML rese dal server e
 migliorate da un modulo ES per pagina in `public/js/pages/`. Nessun bundler.
@@ -32,9 +48,10 @@ copiano da `node_modules` (le versioni sono fissate nelle devDependencies) e
 sono in git, così il repo appena clonato funziona.
 
 Si distribuisce come **applicazione installabile**: `electron-builder` produce un
-installer per Windows, e dentro c'è un solo runtime. Electron 43 porta con sé
-Node 24, quindi `node:sqlite` arriva dalla libreria standard e **non c'è nessun
-modulo nativo da ricompilare**.
+installer per Windows, e dentro c'è un solo runtime. Non è firmato — un
+certificato costa qualche centinaio di euro l'anno e questi sono amici — quindi
+al primo avvio Windows mostra SmartScreen: `INSTALLAZIONE.md` spiega i due clic
+che servono a passare oltre.
 
 PHP non c'è più. La migrazione è raccontata in
 `C:\Users\perso\.claude\plans\prendi-in-mano-my-expense-noble-prism.md`.
@@ -54,10 +71,13 @@ npm run dist       # crea l'installer in dist\
 | Path | Ruolo |
 |------|------|
 | `electron/main.js` | Il processo principale: dati, server, finestra |
-| `electron/update.js` | L'aggiornamento: cerca un installer piu' recente e lo esegue |
+| `electron/update.js` | L'aggiornamento, dalle Release del repo |
 | `server/index.js` | Il server: file statici, pagine, endpoint; esporta `start()` |
 | `server/paths.js` | Dove stanno database, allegati e configurazione |
 | `server/db.js` | Accesso al database e id dell'utente |
+| `server/vault.js` | Le chiavi che aprono il database, e la cifratura dei backup |
+| `server/lock.js` | Il lucchetto: in che stato siamo e chi ha la chiave |
+| `server/fx.js` | I cambi e il controvalore di un movimento |
 | `server/view.js` | Layout e helper di rendering (`esc`, `asset`, `each`) |
 | `server/pages/` | Una funzione per pagina, restituisce HTML |
 | `server/routes/` | Un file per dominio; `routes/index.js` è il registro |
@@ -110,15 +130,17 @@ vecchio installer non succedeva mai. Su database vuoto si crea da `schema.sql` e
 le migration presenti si segnano come applicate senza eseguirle; su database
 esistente si applicano solo quelle non registrate, una transazione ciascuna.
 
-**L'app si aggiorna da una cartella, non da un server.** All'avvio
-`electron/update.js` guarda in `C:\dev\my-expense\dist` (o in
-`MY_EXPENSE_UPDATE_DIR`) se c'e' un `MyExpense-Setup-<versione>.exe` piu' recente
-di quello in esecuzione; se c'e', lo propone e lo lancia con `/S`. Quindi
-pubblicare una modifica e' `npm run dist`, e basta — ma **la versione in
-package.json va alzata prima**, altrimenti l'installer nuovo si chiama come il
-vecchio e l'app non ha modo di accorgersene. Da sorgente il controllo non parte
-(`app.isPackaged`). Il giorno in cui l'app dovesse girare su un altro computer
-questo non basta piu': li' serve electron-updater con le Release del repo.
+**L'app si aggiorna dalle Release del repo**, con `electron-updater`. Il repo è
+pubblico apposta: scaricare da uno privato vorrebbe dire mettere un token dentro
+il pacchetto, cioè regalarlo a chiunque installi l'app. Pubblicare una versione
+è alzare `version` in `package.json` e `npm run dist -- --publish always` con
+`GH_TOKEN` nell'ambiente. Da sorgente il controllo non parte
+(`app.isPackaged`).
+
+Lo scarico **non** è automatico (`autoDownload = false`): su una connessione a
+consumo un centinaio di megabyte presi di nascosto sono un dispetto. E
+`quitAndInstall(true, true)` — la seconda è quella che conta, senza l'app si
+chiude e non torna.
 
 **Due cose chiedono la rete, e nessuna delle due parte da sola.** La lettura
 degli scontrini (`ocr.js` carica Tesseract.js da un CDN quando serve: portarlo
@@ -248,6 +270,30 @@ strumento e **non sovrascrive** i prezzi già presenti — `insertDownloadedPric
 usa `source = 'external'`, che è una delle due parole ammesse dal `CHECK` sulla
 colonna (l'altra è `manual`, e quello scritto a mano vince sempre).
 
+**La valuta di un movimento è quella del suo conto**, e il suo controvalore
+nella valuta principale (`amount_base`) è **congelato alla data del movimento**:
+un report del 2025 non deve cambiare perché oggi il cambio si è mosso. Le somme
+restano somme di una colonna sola — `SUM(COALESCE(amount_base, amount))`, cioè
+`fx.inBase()` — invece di una JOIN sui cambi in ogni query. I saldi dei conti
+**non** si convertono: restano nella valuta del conto, o non si potrebbero
+confrontare con l'estratto della banca.
+
+**Chi riempie `amount_base` non è nessuna delle route che scrivono un
+movimento.** Il lavoro è diviso in due: i trigger di `0006` dicono *quando* un
+controvalore è scaduto (importo, conto, data, valuta del conto, valuta
+principale) mettendolo a NULL; `fx.allinea()` dice *quanto* vale, e parte da un
+punto solo — `server/index.js`, dopo ogni scrittura andata a buon fine. Così una
+route scritta il mese prossimo non ha niente da ricordarsi, e su
+un'installazione tutta nella valuta principale sono quattro SELECT su indice che
+non trovano niente. Scrivere la conversione anche in SQL sarebbero due regole
+del denaro da tenere d'accordo per sempre.
+
+**I cambi sono sempre contro EUR**, che fa da perno: è come li pubblica ogni
+fonte, e le altre coppie si ricavano per triangolazione. Il cambio di un
+movimento è quello del suo giorno o dell'ultimo noto prima. Un movimento senza
+cambio resta scoperto e conta per l'importo grezzo: sbagliato ma visibile, e
+`fx.senzaControvalore()` lo va a cercare per dirlo.
+
 **Gli importi sono float.** SQLite non ha un tipo decimale. Ogni aggregazione va
 arrotondata, e gli arrotondamenti passano da `roundLikePhp` in `amount.js`:
 `Math.round(x * 100) / 100` sbaglia sui valori esattamente a metà, perché
@@ -258,6 +304,11 @@ precisione esatta la strada è memorizzare i centesimi come `INTEGER`.
 il separatore delle migliaia. Era il comportamento di prima ed è rimasto per non
 cambiare in silenzio il significato dei dati già inseriti. Cambiarlo è una
 decisione, non una correzione.
+
+Accanto c'è **`parseAmountItaliano`**, che le migliaia le gestisce, e serve ai
+campi **nuovi**, dove non c'è niente di vecchio da rispettare: il saldo iniziale
+nella procedura di benvenuto e i cambi. Lì leggere 1.234,50 come «uno e
+ventitré» sarebbe solo un errore.
 
 **L'estratto conto si legge per nome di colonna, non per posizione.** Un
 profilo (`bank_profiles`) dice come si chiamano le colonne di quella banca; il
@@ -282,10 +333,29 @@ questo il conto porta `bank_profile_id`, e quando c'è l'import usa quello senza
 tirare a indovinare (`routes/bank-import.js`). Senza profilo assegnato si torna
 al riconoscimento automatico.
 
-**Il CSRF resta anche senza login.** Non serve a sapere chi sei: impedisce a una
-pagina qualunque aperta nel browser di chiamare `127.0.0.1` a tua insaputa. Il
-token vive quanto il processo, viaggia come cookie leggibile e torna come header
-(`FetchRequest.js`), e il server controlla che coincidano.
+**Il CSRF è un'altra cosa dalla password**, e serve anche a chi è già dentro:
+impedisce a una pagina qualunque aperta nel browser di chiamare `127.0.0.1` a
+tua insaputa. Il token vive quanto il processo, viaggia come cookie leggibile e
+torna come header (`FetchRequest.js`), e il server controlla che coincidano.
+
+**Il cancello sta in un punto solo**, in `server/index.js` prima di
+`routes.get()`. Finché la password non è arrivata l'unica cosa che risponde è lo
+sblocco (o il benvenuto): una pagina viene rimandata lì, una chiamata del
+frontend riceve `423`. Aggiungere una route non la rende raggiungibile — per
+quello c'è la lista `APERTE`, che è corta apposta.
+
+**La chiave del database sta in memoria e lì soltanto**, per il tempo in cui
+l'app resta aperta. Non deriva dalla password: è incartata due volte, con la
+password e con la chiave di recupero (`vault.js`). Così cambiare password non
+ricifra il database — a metà strada sarebbe illeggibile — e chi la dimentica non
+resta chiuso fuori per sempre.
+
+**Il primo avvio su un database in chiaro lo cifra**, e l'ordine non è
+negoziabile: copia di sicurezza, `journal_mode = DELETE` (SQLite si rifiuta di
+cifrare un database aperto in WAL, e il WAL resterebbe leggibile), `rekey`,
+riapertura, verifica, **poi** il vault. Scriverlo prima vorrebbe dire, dopo un
+errore a metà, dire all'avvio successivo di aprire con una chiave un database
+che quella chiave non ha.
 
 **Il frontend legge chiavi precise dall'envelope JSON.** `showBudgetWarning()` in
 `public/js/pages/expenses.js` usa `exceeded` e `near_limit`: se un endpoint
