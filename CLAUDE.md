@@ -53,8 +53,8 @@ certificato costa qualche centinaio di euro l'anno e questi sono amici — quind
 al primo avvio Windows mostra SmartScreen: `INSTALLAZIONE.md` spiega i due clic
 che servono a passare oltre.
 
-PHP non c'è più. La migrazione è raccontata in
-`C:\Users\perso\.claude\plans\prendi-in-mano-my-expense-noble-prism.md`.
+PHP non c'è più: la migrazione da XAMPP + Apache + MySQL a Electron + SQLite
+è stata fatta in sette fasi, e ne resta traccia nella storia dei commit.
 
 ## Comandi
 
