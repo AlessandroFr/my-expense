@@ -4,6 +4,7 @@ import { all, one, run, currentUserId } from '../db.js';
 import { assertCsrf, HttpError, int, ok, readBody, str } from '../http.js';
 import { parseAmountLikePhp, roundLikePhp } from '../amount.js';
 import { listForUser as listCategories } from './categories.js';
+import { inBase } from '../fx.js';
 
 const isYearMonth = (ym) => /^\d{4}-(0[1-9]|1[0-2])$/.test(ym);
 
@@ -51,7 +52,7 @@ export function progressForMonth(userId, ym) {
   return all(
     `SELECT b.id, b.category_id, b.year_month, b.amount,
             c.name, c.color, c.icon,
-            COALESCE(SUM(e.amount), 0) AS spent
+            COALESCE(SUM(${inBase("e")}), 0) AS spent
      FROM budgets b
      INNER JOIN categories c ON c.id = b.category_id AND c.user_id = b.user_id
      LEFT JOIN expenses e
@@ -73,7 +74,7 @@ export function checkForCategory(userId, categoryId, ym) {
   const row = one(
     `SELECT b.id, b.category_id, b.year_month, b.amount,
             c.name, c.color, c.icon,
-            COALESCE(SUM(e.amount), 0) AS spent
+            COALESCE(SUM(${inBase("e")}), 0) AS spent
      FROM budgets b
      INNER JOIN categories c ON c.id = b.category_id AND c.user_id = b.user_id
      LEFT JOIN expenses e

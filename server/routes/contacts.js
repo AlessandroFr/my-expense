@@ -9,6 +9,7 @@ import { HttpError, assertCsrf, int, isValidDate, ok, readBody, str } from '../h
 import { roundLikePhp } from '../amount.js';
 import { duplicateGroups } from '../contact-dedup.js';
 import { looksLikeBankJargon } from '../bank-statement.js';
+import { inBase } from '../fx.js';
 
 const TYPES = ['supplier', 'customer', 'both'];
 
@@ -154,7 +155,7 @@ function usageCount(id, userId) {
 
 function balanceSummary(userId, from, to, type) {
   const perContatto = (table, dateCol) => new Map(all(
-    `SELECT contact_id, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
+    `SELECT contact_id, COALESCE(SUM(${inBase()}), 0) AS total, COUNT(*) AS cnt
      FROM ${table}
      WHERE user_id = ? AND contact_id IS NOT NULL AND ${dateCol} BETWEEN ? AND ?
      GROUP BY contact_id`,
@@ -204,7 +205,7 @@ const breakdownByCategory = (userId, contactId, from, to) => all(
           COALESCE(c.name, '(senza categoria)') AS category_name,
           COALESCE(c.color, '#6c757d') AS category_color,
           COALESCE(c.icon, 'tag') AS category_icon,
-          COALESCE(SUM(e.amount), 0) AS total,
+          COALESCE(SUM(${inBase("e")}), 0) AS total,
           COUNT(*) AS cnt
    FROM expenses e
    LEFT JOIN categories c ON c.id = e.category_id

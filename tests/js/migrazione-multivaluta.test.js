@@ -20,12 +20,19 @@ process.env.MY_EXPENSE_DATA_DIR = mkdtempSync(join(tmpdir(), 'my-expense-mv-'));
 const { migrate } = await import('../../database/migrate.js');
 const { apri, db, one, run } = await import('../../server/db.js');
 
-const MIGRATION = '0005-multivaluta.sql';
+const MIGRATIONS = ['0005-multivaluta.sql', '0006-controvalore-scaduto.sql'];
 
 apri();
 migrate(db());
 
 // ── Indietro nel tempo: com'era prima della migration ───────────────────────
+// I trigger di 0006 parlano di colonne che qui stiamo per togliere: vanno via
+// prima loro, o SQLite si rifiuta di lasciar cadere la colonna.
+for (const t of [
+  'tr_expenses_base_scaduto', 'tr_incomes_base_scaduto', 'tr_transfers_base_scaduto',
+  'tr_recurring_base_scaduto', 'tr_accounts_valuta_cambiata', 'tr_users_valuta_principale_cambiata',
+]) db().exec(`DROP TRIGGER IF EXISTS \`${t}\``);
+
 for (const [tabella, colonna] of [
   ['users', 'base_currency'], ['accounts', 'currency'],
   ['expenses', 'amount_base'], ['expenses', 'share_amount_base'],
@@ -36,7 +43,7 @@ for (const [tabella, colonna] of [
   db().exec(`ALTER TABLE \`${tabella}\` DROP COLUMN \`${colonna}\``);
 }
 db().exec('DROP TABLE `exchange_rates`');
-run('DELETE FROM schema_migrations WHERE name = ?', MIGRATION);
+for (const m of MIGRATIONS) run('DELETE FROM schema_migrations WHERE name = ?', m);
 
 // ── I dati che quella versione aveva ────────────────────────────────────────
 run("INSERT INTO users (username, password_hash) VALUES ('io', '')");
@@ -60,7 +67,7 @@ run(`INSERT INTO recurring_expenses (user_id, account_id, amount, description, p
 const applicate = migrate(db());
 
 test('la migration gira, e gira una volta sola', () => {
-  assert.deepEqual(applicate, [MIGRATION]);
+  assert.deepEqual(applicate, MIGRATIONS);
   assert.deepEqual(migrate(db()), [], 'rieseguirla non deve fare niente');
 });
 

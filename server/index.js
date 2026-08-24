@@ -21,7 +21,9 @@ import { pathToFileURL } from 'node:url';
 import { assertLocalOrigin, fail, HttpError, parseCookies, sendJson } from './http.js';
 import { routes } from './routes/index.js';
 import { serveStatic } from './static.js';
-import { stato } from './lock.js';
+import { sbloccato, stato } from './lock.js';
+import { one } from './db.js';
+import { allinea } from './fx.js';
 
 /**
  * Token CSRF del processo. Vale finché l'app resta aperta: non c'è una sessione
@@ -93,11 +95,39 @@ const server = createServer(async (req, res) => {
 
   try {
     await handler(req, res);
+    allineaDopoScrittura(req);
   } catch (err) {
     if (!(err instanceof HttpError)) console.error(`[${req.method} ${pathname}]`, err);
     if (!res.headersSent) fail(res, err);
   }
 });
+
+/**
+ * Dopo ogni scrittura, i controvalori in valuta si rimettono in pari.
+ *
+ * Sta qui e non nelle trenta route che scrivono un movimento perche' li' si
+ * dimenticherebbe: la prossima route non ancora scritta passa comunque da
+ * questa riga. E costa niente — su un'installazione tutta nella valuta
+ * principale sono quattro SELECT su indice che non trovano niente.
+ *
+ * Non deve mai far fallire una richiesta gia' andata a buon fine: la risposta
+ * e' partita, e un errore qui riguarda i cambi, non quello che l'utente ha
+ * appena salvato.
+ */
+function allineaDopoScrittura(req) {
+  if (req.method === 'GET' || req.method === 'HEAD') return;
+  if (!sbloccato()) return;
+  try {
+    // `currentUserId()` **no**: crea l'utente se non c'e', e qui puo' non
+    // esserci ancora — fra la password e la fine della procedura di benvenuto
+    // il database e' aperto ma vuoto. Creandolo qui, quella procedura si
+    // troverebbe gia' finita e non chiederebbe piu' nome e valuta.
+    const utente = one('SELECT id FROM users ORDER BY id LIMIT 1');
+    if (utente) allinea(utente.id);
+  } catch (err) {
+    console.error('[controvalori]', err);
+  }
+}
 
 /**
  * Mette il server in ascolto.

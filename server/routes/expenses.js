@@ -8,6 +8,7 @@ import { HttpError, assertCsrf, int, isValidDate, nullableInt, ok, readBody, str
 import { money, parseAmountLikePhp } from '../amount.js';
 import { checkForCategory } from './budgets.js';
 import { findOrCreate as findOrCreateContact } from './contacts.js';
+import { inBase } from '../fx.js';
 
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 
@@ -123,7 +124,7 @@ function installmentGroupSummary(userId, ids) {
             (SELECT COUNT(*) FROM expenses x
               WHERE x.user_id = e.user_id
                 AND COALESCE(x.parent_expense_id, x.id) = COALESCE(e.parent_expense_id, e.id)) AS group_count,
-            (SELECT ROUND(SUM(x.amount), 2) FROM expenses x
+            (SELECT ROUND(SUM(${inBase("x")}), 2) FROM expenses x
               WHERE x.user_id = e.user_id
                 AND COALESCE(x.parent_expense_id, x.id) = COALESCE(e.parent_expense_id, e.id)) AS group_total
      FROM expenses e

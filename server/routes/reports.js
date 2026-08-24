@@ -10,11 +10,12 @@ import { roundLikePhp, roundLikePhp as round2 } from '../amount.js';
 import { progressForMonth } from './budgets.js';
 import { holdingsForUser, holdingsByAssetClass } from './securities.js';
 import { generatePending } from './recurring.js';
+import { inBase } from '../fx.js';
 
 
 /** Somma dei movimenti in un intervallo, trasferimenti esclusi. */
 const totalForRange = (table, dateCol, userId, from, to) => Number(one(
-  `SELECT COALESCE(SUM(amount), 0) AS t FROM ${table}
+  `SELECT COALESCE(SUM(${inBase()}), 0) AS t FROM ${table}
    WHERE user_id = ? AND ${dateCol} >= ? AND ${dateCol} <= ? AND is_transfer = 0`,
   userId, from, to,
 ).t);
@@ -26,7 +27,7 @@ const totalsByMonth = (table, dateCol, userId, monthsBack) => {
   const from = inizioMese.toISOString().slice(0, 10);
 
   return all(
-    `SELECT strftime('%Y-%m', ${dateCol}) AS month, ROUND(SUM(amount), 2) AS total
+    `SELECT strftime('%Y-%m', ${dateCol}) AS month, ROUND(SUM(${inBase()}), 2) AS total
      FROM ${table} WHERE user_id = ? AND ${dateCol} >= ? AND is_transfer = 0
      GROUP BY month ORDER BY month ASC`,
     userId, from,
@@ -152,7 +153,7 @@ async function dashboardData(req, res) {
 
   const byCategory = all(
     `SELECT e.category_id, COALESCE(c.name, 'Senza categoria') AS name,
-            COALESCE(c.color, '#6c757d') AS color, c.icon AS icon, SUM(e.amount) AS total
+            COALESCE(c.color, '#6c757d') AS color, c.icon AS icon, SUM(${inBase("e")}) AS total
      FROM expenses e LEFT JOIN categories c ON c.id = e.category_id
      WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date <= ? AND e.is_transfer = 0
      GROUP BY e.category_id, c.name, c.color, c.icon
@@ -295,7 +296,7 @@ async function reportYear(req, res) {
   }));
 
   const perMese = (table, dateCol) => all(
-    `SELECT CAST(strftime('%m', ${dateCol}) AS INTEGER) AS m, SUM(amount) AS total
+    `SELECT CAST(strftime('%m', ${dateCol}) AS INTEGER) AS m, SUM(${inBase()}) AS total
      FROM ${table} WHERE user_id = ? AND ${dateCol} >= ? AND ${dateCol} < ? AND is_transfer = 0
      GROUP BY m`,
     userId, start, end,
@@ -313,7 +314,7 @@ async function reportYear(req, res) {
 
   const byCategory = all(
     `SELECT COALESCE(c.name, 'Senza categoria') AS name, COALESCE(c.color, '#6c757d') AS color,
-            c.id AS category_id, SUM(e.amount) AS total
+            c.id AS category_id, SUM(${inBase("e")}) AS total
      FROM expenses e LEFT JOIN categories c ON c.id = e.category_id
      WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date < ? AND e.is_transfer = 0
      GROUP BY c.id, c.name, c.color ORDER BY total DESC`,
@@ -354,13 +355,13 @@ async function reportYear(req, res) {
     const months = Array(12).fill(0);
     const rows = tc.category_id !== null
       ? all(
-        `SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(amount) AS total
+        `SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(${inBase()}) AS total
          FROM expenses WHERE user_id = ? AND category_id = ?
            AND expense_date >= ? AND expense_date < ? AND is_transfer = 0 GROUP BY m`,
         userId, tc.category_id, start, end,
       )
       : all(
-        `SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(amount) AS total
+        `SELECT CAST(strftime('%m', expense_date) AS INTEGER) AS m, SUM(${inBase()}) AS total
          FROM expenses WHERE user_id = ? AND category_id IS NULL
            AND expense_date >= ? AND expense_date < ? AND is_transfer = 0 GROUP BY m`,
         userId, start, end,
